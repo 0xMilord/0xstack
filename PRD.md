@@ -46,6 +46,7 @@ The product is not “a repo template”. It’s a **factory**:
 - As a developer, I can accept payments via **Dodo Payments** (checkout + customer portal + webhooks) and keep billing state in sync with my DB.
 - As a developer, I can store and serve user-generated files via **Google Cloud Storage** using signed URLs, without proxying large uploads through my server.
 - As a developer, I can enable **Email (Resend)** and get production-grade auth emails (verify-email + reset-password) with real templates and dark-friendly styling.
+- As a developer, I can enable a **PWA module** (manifest + service worker + offline + push foundations) so the app is installable and resilient with enterprise-grade caching and notification infrastructure.
 
 ## Product scope
 
@@ -67,6 +68,7 @@ Creates a new project folder (or initializes current folder) with:
 - Billing: Dodo Payments wiring (API routes + webhook receiver + DB tables)
 - Storage: Google Cloud Storage wiring (signed upload/download URLs + bucket layout + permissions)
 - Email: Resend wiring (provider + templates + Better Auth hooks for verification + reset password)
+- PWA: manifest + service worker + offline page + push notification foundations (config-gated)
 - Docs: `README.md` files in each `lib/*` subsystem folder (see Docs requirements)
 
 #### Progressive activation model (must-have)

@@ -17,6 +17,7 @@ export type ModuleContext = {
     billing: false | "dodo";
     storage: false | "gcs";
     email: false | "resend";
+    pwa: boolean;
     observability: { sentry: boolean; otel: boolean };
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
   };

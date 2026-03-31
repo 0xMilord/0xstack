@@ -502,6 +502,9 @@ export async function runBaseline(input: BaselineInput) {
         if (cfg.modules.email === "resend") {
           deps.push("resend", "@react-email/components", "@react-email/render");
         }
+        if (cfg.modules.pwa) {
+          deps.push("web-push", "idb");
+        }
 
         const cmd = pmCmd(input.packageManager);
         const install = async (pkgs: string[], dev: boolean) => {
@@ -633,6 +636,7 @@ export async function runBaseline(input: BaselineInput) {
             billing: cfg.modules.billing,
             storage: cfg.modules.storage,
             email: cfg.modules.email,
+            pwa: !!cfg.modules.pwa,
             observability: cfg.modules.observability,
             jobs: cfg.modules.jobs,
           },

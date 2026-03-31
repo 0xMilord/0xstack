@@ -10,6 +10,7 @@ import { webhookLedgerModule } from "./webhook-ledger";
 import { uiFoundationModule } from "./ui-foundation.module";
 import { coreDbStateModule } from "./core-db-state.module";
 import { emailResendModule } from "./email-resend.module";
+import { pwaModule } from "./pwa.module";
 
 export function getModules(): Module[] {
   return [
@@ -24,6 +25,7 @@ export function getModules(): Module[] {
     billingDodoModule,
     storageGcsModule,
     emailResendModule,
+    pwaModule,
   ];
 }
 
