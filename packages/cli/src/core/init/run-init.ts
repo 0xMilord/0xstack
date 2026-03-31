@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import ora from "ora";
-import { REQUIRED_GLOBALS_CSS } from "./globals-css";
+import { getGlobalsCss, type GlobalsTheme } from "./globals-css";
 import { execCmd } from "../exec";
 import { logger } from "../logger";
 import { runPipeline } from "../pipeline";
@@ -13,6 +13,7 @@ export type InitInput = {
   dir: string;
   name: string;
   packageManager: PackageManager;
+  theme?: GlobalsTheme;
   features?: {
     seo: boolean;
     blogMdx: boolean;
@@ -162,8 +163,8 @@ export async function runInit(input: InitInput) {
 `
         );
 
-        // Enforce globals.css baseline
-        await writeFileEnsured(path.join(projectRoot, "app", "globals.css"), REQUIRED_GLOBALS_CSS);
+        // Enforce globals.css baseline (theme selectable)
+        await writeFileEnsured(path.join(projectRoot, "app", "globals.css"), getGlobalsCss(input.theme ?? "default"));
 
         // pnpm safety: allow required build scripts (esbuild) for common tooling.
         if (input.packageManager === "pnpm") {

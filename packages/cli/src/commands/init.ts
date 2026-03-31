@@ -23,6 +23,7 @@ export function registerInitCommand(cli: CAC) {
           dir: answers.dir,
           name: answers.name,
           packageManager: answers.packageManager,
+          theme: answers.theme,
           features: answers.modules,
         });
         return;

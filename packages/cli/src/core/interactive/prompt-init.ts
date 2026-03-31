@@ -6,6 +6,7 @@ export type InitAnswers = {
   dir: string;
   name: string;
   packageManager: "pnpm" | "npm";
+  theme: "default" | "corporate-blue" | "amber" | "grass";
   modules: {
     seo: boolean;
     blogMdx: boolean;
@@ -60,6 +61,18 @@ export async function promptInitDefaults(cwd: string): Promise<InitAnswers> {
         initial: 0,
       },
       {
+        type: "select",
+        name: "theme",
+        message: "Theme (globals.css tokens)",
+        choices: [
+          { title: "Default (0xstack)", value: "default" },
+          { title: "Corporate Blue", value: "corporate-blue" },
+          { title: "Amber", value: "amber" },
+          { title: "Grass", value: "grass" },
+        ],
+        initial: 0,
+      },
+      {
         type: "multiselect",
         name: "modulesOn",
         message: "Enable modules (core auth + orgs are always on)",
@@ -96,6 +109,10 @@ export async function promptInitDefaults(cwd: string): Promise<InitAnswers> {
     dir,
     name: String(response.name).trim(),
     packageManager: response.packageManager === "npm" ? "npm" : "pnpm",
+    theme:
+      response.theme === "corporate-blue" || response.theme === "amber" || response.theme === "grass"
+        ? response.theme
+        : "default",
     modules: {
       seo: enabled.has("seo"),
       blogMdx: enabled.has("blogMdx"),
