@@ -5,7 +5,7 @@ import { promptInitDefaults } from "../core/interactive/prompt-init";
 
 export function registerInitCommand(cli: CAC) {
   cli
-    .command("init", "Initialize a new 0xmilord app")
+    .command("init", "Initialize a new 0xstack app")
     .option("--dir <dir>", "Target directory (default: current)")
     .option("--name <name>", "Project name (default: folder name)")
     .option("--pm <pm>", "Package manager: pnpm|npm (default: pnpm)")

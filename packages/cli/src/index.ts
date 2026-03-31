@@ -9,7 +9,7 @@ import { registerDocsSyncCommand } from "./commands/docs-sync";
 import { registerGenerateCommand } from "./commands/generate";
 import { registerAddCommand } from "./commands/add";
 
-const cli = cac("0xmilord");
+const cli = cac("0xstack");
 
 cli.help();
 cli.version("0.0.0");

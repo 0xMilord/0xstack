@@ -87,7 +87,7 @@ export async function guardApiRequest(req: Request, limit: RateLimit = DEFAULT_L
       redis,
       limiter: Ratelimit.slidingWindow(limit.max, \`\${Math.max(1, Math.round(limit.windowMs / 1000))} s\`),
       analytics: true,
-      prefix: "0xmilord:rl",
+      prefix: "0xstack:rl",
     });
     const id = keyFromRequest(req);
     const res = await ratelimit.limit(id);

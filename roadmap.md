@@ -1,6 +1,6 @@
-# Roadmap — 0xmilord Starter System (7-day build)
+# Roadmap — 0xstack Starter System (7-day build)
 
-Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: CLI that can `init` and `baseline` a Next.js (App Router) + Supabase Postgres + Drizzle app, enforce the architecture, and progressively activate modules (auth/orgs required; blog/seo/billing/storage gated).
+Build window: **7 days**. Goal: ship a **working v1** of the 0xstack factory: CLI that can `init` and `baseline` a Next.js (App Router) + Supabase Postgres + Drizzle app, enforce the architecture, and progressively activate modules (auth/orgs required; blog/seo/billing/storage gated).
 
 ---
 
@@ -21,7 +21,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
 ## Dependency map (build order backbone)
 
 1. **CLI foundation** (command runner, logging, error handling) → needed by every command.
-2. **Config system** (`0xmilord.config.ts`, `defineConfig`, Zod validation, defaults) → needed for activation gating, baseline, doctor, sync.
+2. **Config system** (`0xstack.config.ts`, `defineConfig`, Zod validation, defaults) → needed for activation gating, baseline, doctor, sync.
 3. **Deterministic pipeline engine** (`runPipeline(step[])`) → required for `init`, `baseline`, `doctor`, `sync`.
 4. **Template scaffolding + AST transforms** → required for safe reruns / idempotent merges.
 5. **Init minimal app** (Next.js + shadcn + env + db wiring + auth handler + UI foundation + orgs core) → required before baseline modules can be activated.
@@ -33,7 +33,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
 
 ## Definition of Done (v1 ship gate)
 
-- **CLI**: `npx 0xmilord init|baseline|generate|doctor|sync|docs sync` all run deterministically (no accidental prompts unless explicitly required).
+- **CLI**: `npx 0xstack init|baseline|generate|doctor|sync|docs sync` all run deterministically (no accidental prompts unless explicitly required).
 - **Progressive activation**:
   - Disabled modules **do not** ship route handlers.
   - Disabled modules avoid heavy top-level imports where practical.
@@ -57,7 +57,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
   - CLI project structure (commands/core/wrappers/generators/utils) per PRD.
   - **Command framework** (cac/commander), structured logger, error formatting.
   - **Config system**
-    - `0xmilord.config.ts` scaffold
+    - `0xstack.config.ts` scaffold
     - `defineConfig()` + Zod schema + defaults
     - profiles: `milord`, `minimal`
     - module flags: auth (fixed), orgs, blogMdx, seo, billing(dodo/false), storage(gcs/false), observability, jobs
@@ -66,16 +66,16 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
     - step result model (ok/skip/fail + metadata)
 
 - **Acceptance checks**
-  - `0xmilord config validate` (or `doctor` in config-only mode) detects invalid config and prints fixes.
+  - `0xstack config validate` (or `doctor` in config-only mode) detects invalid config and prints fixes.
   - Pipeline logs show step boundaries and underlying commands when wrappers are used.
-  - Wrapper namespace stubs exist for all baseline wrapped CLIs: `0xmilord shadcn ...`, `0xmilord auth ...`, `0xmilord drizzle ...` (even if only passthrough on Day 1).
+  - Wrapper namespace stubs exist for all baseline wrapped CLIs: `0xstack shadcn ...`, `0xstack auth ...`, `0xstack drizzle ...` (even if only passthrough on Day 1).
 
 ---
 
 ### Day 2 — `init` minimal (core app skeleton, no optional surfaces activated)
 
 - **Deliverables**
-  - `npx 0xmilord init` generates a runnable Next.js App Router repo (TS).
+  - `npx 0xstack init` generates a runnable Next.js App Router repo (TS).
   - **Flat layout** created (`app/`, `lib/`, `drizzle/`, `content/`, etc.) with no route groups.
   - **shadcn** installed + base components included; theme provider + theme toggle.
   - **Global CSS**: `app/globals.css` uses the PRD’s required baseline tokens verbatim (plus any required shadcn layers).
@@ -109,9 +109,9 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
   - **Core orgs domain** skeleton (minimum):
     - repo/loader/rules/actions + initial UI stubs under `app/app/orgs/*`
   - CLI wrappers added (passthrough + auditable):
-    - `0xmilord shadcn ...` (shadcn)
-    - `0xmilord auth ...` (Better Auth CLI)
-    - `0xmilord drizzle ...` (drizzle-kit)
+    - `0xstack shadcn ...` (shadcn)
+    - `0xstack auth ...` (Better Auth CLI)
+    - `0xstack drizzle ...` (drizzle-kit)
 
 - **Acceptance checks**
   - All `userId` columns referencing Better Auth are text/varchar.
@@ -127,7 +127,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
     - route-level gating: module-disabled ⇒ route handlers absent/not emitted
     - import-level gating: dynamic import heavy SDKs when module enabled
     - factory getters: `getBillingService()`, `getStorageService()`, `getSeoConfig()`
-  - `npx 0xmilord baseline`
+  - `npx 0xstack baseline`
     - installs deps (capability-aware)
     - installs files for enabled modules
     - activates enabled modules’ routes/surfaces
@@ -189,19 +189,19 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
 ### Day 7 — Generators + Doctor + Sync + Docs + polish (ship hardening)
 
 - **Deliverables**
-  - `npx 0xmilord generate <domain>`
+  - `npx 0xstack generate <domain>`
     - schema additions + migration stub
     - repo/loader/rules/actions
     - query keys + mutation keys + TanStack hooks
     - optional external API route generation
     - UI stubs + route placeholders (explicit routes, no groups)
     - minimal tests per domain (repo/rules/actions) per PRD (warn-only acceptable if time tight, but stubs must exist)
-  - `npx 0xmilord doctor`
+  - `npx 0xstack doctor`
     - env var checks per enabled modules
     - boundary violations (restricted imports)
     - migration state checks
     - checks for security/SEO/billing/storage surfaces when enabled
-  - `npx 0xmilord sync` + `docs sync`
+  - `npx 0xstack sync` + `docs sync`
     - marker-based regeneration for:
       - root docs sections (PRD inventory, ERD, Architecture inventory)
       - per `lib/*` README.md files
@@ -209,9 +209,9 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xmilord factory: C
   - CLI UX polish
     - spinners, clear remediation, idempotent reruns
   - **Optional-but-recommended (PRD)**: stub the namespaces (no “engine”) so teams can extend after v1:
-    - `npx 0xmilord git ...` (shells out)
-    - `npx 0xmilord release` (changesets-based in monorepo setups)
-  - **Stretch (PRD)**: `npx 0xmilord upgrade` codemods hook point (may ship as a no-op placeholder in v1).
+    - `npx 0xstack git ...` (shells out)
+    - `npx 0xstack release` (changesets-based in monorepo setups)
+  - **Stretch (PRD)**: `npx 0xstack upgrade` codemods hook point (may ship as a no-op placeholder in v1).
 
 - **Acceptance checks**
   - Running `init` then `baseline` then `doctor` succeeds for both `minimal` and `milord` profiles (or produces actionable guidance for missing env).

@@ -1,5 +1,5 @@
 {
-  "name": "0xmilord",
+  "name": "0xstack",
   "private": true,
   "packageManager": "pnpm@10.12.2",
   "workspaces": [

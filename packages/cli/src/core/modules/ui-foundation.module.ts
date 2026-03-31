@@ -6,14 +6,14 @@ import type { Module } from "./types";
 async function patchRootLayout(projectRoot: string) {
   const layoutPath = path.join(projectRoot, "app", "layout.tsx");
   let src = await fs.readFile(layoutPath, "utf8");
-  if (src.includes("0xMILORD:UI-FOUNDATION")) return;
+  if (src.includes("0xstack:UI-FOUNDATION")) return;
 
   // Ensure Providers wrapper and header/footer render.
   // This is a best-effort patch designed for create-next-app templates.
   src = src.replace(
     /<body([^>]*)>\s*\{children\}\s*<\/body>/m,
     `<body$1>
-        {/* 0xMILORD:UI-FOUNDATION */}
+        {/* 0xstack:UI-FOUNDATION */}
         <Providers>
           <SiteHeader />
           <div className="flex-1">{children}</div>
@@ -51,7 +51,7 @@ export function SiteHeader() {
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="font-semibold">
-          {process.env.NEXT_PUBLIC_APP_NAME ?? "0xmilord"}
+          {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
           <Button asChild variant="ghost" size="sm">
@@ -88,7 +88,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-        <p>© {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME ?? "0xmilord"}. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}. All rights reserved.</p>
         <div className="flex items-center gap-4">
           <Link className="hover:underline" href="/terms">Terms</Link>
           <Link className="hover:underline" href="/privacy">Privacy</Link>

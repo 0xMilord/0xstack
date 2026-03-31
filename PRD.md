@@ -1,7 +1,7 @@
-# PRD — 0xmilord Starter System (CLI + Modules + Generators)
+# PRD — 0xstack Starter System (CLI + Modules + Generators)
 
 ## Summary
-0xmilord is an **opinionated starter system** that generates and maintains a consistent production-ready architecture for Next.js apps built on **Supabase Postgres + Drizzle ORM**, using a **tiered architecture**:
+0xstack is an **opinionated starter system** that generates and maintains a consistent production-ready architecture for Next.js apps built on **Supabase Postgres + Drizzle ORM**, using a **tiered architecture**:
 
 - **DB** (Supabase Postgres)
 - **Drizzle schema + repos**
@@ -14,9 +14,9 @@
 
 The product is not “a repo template”. It’s a **factory**:
 
-- `npx 0xmilord init` scaffolds an app based on choices (auth, DB, API style, billing, etc.)
-- `npx 0xmilord generate <domain>` adds a new domain module end-to-end (schema → repo → service → api/actions → hooks → UI stubs)
-- `npx 0xmilord doctor` verifies conventions, env, and architecture constraints
+- `npx 0xstack init` scaffolds an app based on choices (auth, DB, API style, billing, etc.)
+- `npx 0xstack generate <domain>` adds a new domain module end-to-end (schema → repo → service → api/actions → hooks → UI stubs)
+- `npx 0xstack doctor` verifies conventions, env, and architecture constraints
 
 ## Goals / Non-goals
 
@@ -50,7 +50,7 @@ The product is not “a repo template”. It’s a **factory**:
 ## Product scope
 
 ### CLI commands (v1)
-#### `npx 0xmilord init`
+#### `npx 0xstack init`
 Creates a new project folder (or initializes current folder) with:
 - Next.js app router (TypeScript)
 - shadcn UI installed and preconfigured
@@ -70,13 +70,13 @@ Creates a new project folder (or initializes current folder) with:
 - Docs: `README.md` files in each `lib/*` subsystem folder (see Docs requirements)
 
 #### Progressive activation model (must-have)
-0xmilord must support **progressive activation** so projects don’t feel “executionally suicidal”.
+0xstack must support **progressive activation** so projects don’t feel “executionally suicidal”.
 
 Principle:
 - **Installed ≠ Activated**
 
 Rules:
-- `init` may install baseline capabilities, but **must keep modules dormant** unless enabled in `0xmilord.config.*`.
+- `init` may install baseline capabilities, but **must keep modules dormant** unless enabled in `0xstack.config.*`.
 - `baseline` (and profiles) are what flip modules “on”.
 - Runtime code must be **lazy + config-aware**:
   - Use factories like `getBillingService()`, `getStorageService()`, `getSeoConfig()` that:
@@ -101,15 +101,15 @@ Required command semantics:
 
 Profiles:
 - Support `--profile=<name>`:
-  - `npx 0xmilord baseline --profile=milord` (your “everything on” default)
-  - `npx 0xmilord baseline --profile=minimal` (auth+orgs only)
-  - Profiles are just config presets applied to `0xmilord.config.*`.
+  - `npx 0xstack baseline --profile=milord` (your “everything on” default)
+  - `npx 0xstack baseline --profile=minimal` (auth+orgs only)
+  - Profiles are just config presets applied to `0xstack.config.*`.
 
 #### CLI wrapping policy (must-have)
-0xmilord must **wrap and orchestrate upstream CLIs** required by the stack, instead of re-implementing their behavior.
+0xstack must **wrap and orchestrate upstream CLIs** required by the stack, instead of re-implementing their behavior.
 
 Goals:
-- Keep 0xmilord as the **orchestrator**: apply conventions, wire files, and run vendor CLIs in the right order.
+- Keep 0xstack as the **orchestrator**: apply conventions, wire files, and run vendor CLIs in the right order.
 - Preserve the ability to run vendor CLIs directly when needed.
 
 Required wrapped CLIs (baseline):
@@ -119,10 +119,10 @@ Required wrapped CLIs (baseline):
 
 Wrapper requirements:
 - **Passthrough**: provide a way to forward raw args to the underlying CLI, e.g.:
-  - `npx 0xmilord shadcn ...`
-  - `npx 0xmilord auth ...`
-  - `npx 0xmilord drizzle ...`
-- **Non-interactive by default**: wrappers should prefer deterministic flags. If upstream requires prompts, 0xmilord must either:
+  - `npx 0xstack shadcn ...`
+  - `npx 0xstack auth ...`
+  - `npx 0xstack drizzle ...`
+- **Non-interactive by default**: wrappers should prefer deterministic flags. If upstream requires prompts, 0xstack must either:
   - surface the prompt cleanly, or
   - provide equivalent flags/presets.
 - **Auditability**: each wrapper run should print:
@@ -132,7 +132,7 @@ Wrapper requirements:
 - **Idempotency**: rerunning wrappers should not duplicate config or corrupt files.
 
 #### CLI architecture (enterprise) (must-have)
-0xmilord is simultaneously:
+0xstack is simultaneously:
 - **Scaffolder**: `init`, `generate`
 - **Orchestrator**: wraps vendor CLIs
 - **Project operator**: docs, hygiene, git/release automation
@@ -187,7 +187,7 @@ Recommended tooling:
 - process runner: `execa`
 
 #### Operator commands (enterprise) (must-have)
-0xmilord must provide “operator” commands that keep projects consistent over time.
+0xstack must provide “operator” commands that keep projects consistent over time.
 
 #### Deterministic execution engine (must-have)
 All CLI commands that touch multiple systems (deps, schema, routes, docs, lint) must execute through a deterministic pipeline engine.
@@ -216,8 +216,8 @@ await runPipeline([
 ])
 ```
 
-##### `npx 0xmilord sync`
-Auto-heal the repo based on `0xmilord.config.*`:
+##### `npx 0xstack sync`
+Auto-heal the repo based on `0xstack.config.*`:
 - validate config + env schema
 - re-run schema/type generation steps that are safe to re-run
 - regenerate docs (`PRD.md`, `ERD.md`, `ARCHITECTURE.md`) in auto-generated sections
@@ -231,7 +231,7 @@ Reconciliation requirements (must-have):
   - unused modules (warn, and optionally offer removal)
 - `sync` must never silently delete code; it may generate a plan/diff and require a flag to apply destructive changes.
 
-##### `npx 0xmilord docs sync`
+##### `npx 0xstack docs sync`
 Regenerate documentation safely using markers:
 
 - Must use stable markers like:
@@ -242,10 +242,10 @@ Regenerate documentation safely using markers:
 #### Git automation namespace (optional but recommended)
 Provide a `git` command namespace that shells out to git (do not implement a “git engine”).
 
-##### `npx 0xmilord git init`
+##### `npx 0xstack git init`
 - initialize repo + add baseline `.gitignore`
 
-##### `npx 0xmilord git commit`
+##### `npx 0xstack git commit`
 - prompt-based commit message builder:
   - type: `feat`/`fix`/`chore`/`refactor`
   - scope: `orgs`/`billing`/`auth`/etc.
@@ -253,7 +253,7 @@ Provide a `git` command namespace that shells out to git (do not implement a “
 - output: a standardized message, optionally with emoji mapping (configurable)
 
 #### Release automation (optional)
-Provide `npx 0xmilord release` for versioning and tagging.
+Provide `npx 0xstack release` for versioning and tagging.
 
 Preferred:
 - `changesets` for monorepos
@@ -273,9 +273,9 @@ Recommended tooling:
 - `ts-morph` for TypeScript AST transforms
 
 #### Configuration & presets (enterprise) (must-have)
-0xmilord must support a repo-local configuration file to define what is **enforced** vs **customizable**.
+0xstack must support a repo-local configuration file to define what is **enforced** vs **customizable**.
 
-- **Config file**: `0xmilord.config.ts` (preferred) or `0xmilord.config.json`
+- **Config file**: `0xstack.config.ts` (preferred) or `0xstack.config.json`
 - **Purpose**: declare modules, domains, and conventions so `baseline`, `doctor`, and generators are deterministic.
 
 Minimum config schema:
@@ -298,7 +298,7 @@ Minimum config schema:
   - `idStrategy`: `"text"` (required for Better Auth compatibility)
 
 Doctor requirements:
-- `doctor` must read `0xmilord.config.*` and validate:
+- `doctor` must read `0xstack.config.*` and validate:
   - config schema
   - installed deps match enabled modules (see Baseline dependencies)
   - required files exist for enabled modules
@@ -340,7 +340,7 @@ Prompts (initial set):
 - Multi-tenancy: on/off (orgs)
 - UI: shadcn + theme (light/dark) on/off
 
-#### `npx 0xmilord generate <domain>`
+#### `npx 0xstack generate <domain>`
 Adds a domain module with consistent wiring.
 
 Inputs:
@@ -367,7 +367,7 @@ Outputs (typical):
 - UI stubs: list/detail/create components + route placeholders
 - Tests (optional in v1, required in v2)
 
-#### `npx 0xmilord add <module>`
+#### `npx 0xstack add <module>`
 Installs a feature module and wires config:
 - `billing-dodo`
 - `orgs` (multi-tenant baseline)
@@ -393,8 +393,8 @@ Rules:
 - `baseline` orchestrates `install → activate → validate → sync` through the pipeline engine.
 - `doctor` must call `validate()` logic (or equivalent checks) for enabled modules.
 
-#### `npx 0xmilord baseline`
-Installs the **full 0xmilord baseline** in one command (idempotent).
+#### `npx 0xstack baseline`
+Installs the **full 0xstack baseline** in one command (idempotent).
 
 This is the “stop rebuilding it every time” command. It must:
 - Add/ensure **all baseline folders/files**, including:
@@ -413,13 +413,13 @@ This is the “stop rebuilding it every time” command. It must:
 - Be safe to re-run: it should either merge cleanly or refuse with actionable guidance.
 
 Activation requirements:
-- `baseline` must respect `0xmilord.config.*` and only **activate** what is enabled.
+- `baseline` must respect `0xstack.config.*` and only **activate** what is enabled.
 - It may still **install** deps for disabled modules (if using an “everything installed” posture), but must:
   - keep code paths dormant
   - avoid routing surface area for disabled modules
   - avoid runtime imports for disabled modules where practical
 
-#### `npx 0xmilord doctor`
+#### `npx 0xstack doctor`
 Validates:
 - Env vars present and correct format
 - Drizzle migrations state
@@ -432,13 +432,13 @@ Validates:
   - observability hooks present (if enabled)
   - jobs endpoints present (if enabled)
 
-#### `npx 0xmilord upgrade` (stretch)
+#### `npx 0xstack upgrade` (stretch)
 Applies codemods for newer conventions.
 
 ## Architecture spec (what generated code must follow)
 
 ### Contracts and boundaries
-0xmilord standardizes **two highways**:
+0xstack standardizes **two highways**:
 
 - **Read highway (fast)**: `RSC Page → Loader → Repo → DB`
   - No services. No client hooks. No business logic.
@@ -706,7 +706,7 @@ Constraints:
   - API routes importing repos directly
 
 ### Security baseline (enterprise) (must-have)
-0xmilord must ship an opinionated security posture suitable for production.
+0xstack must ship an opinionated security posture suitable for production.
 
 #### Central security subsystem (must-have)
 Security logic must be centralized to avoid copy-paste drift.
@@ -754,7 +754,7 @@ Rules:
   - Next.js `next/image` and fonts
 - CSP should be:
   - strict by default (`default-src 'self'`)
-  - extensible via config (`0xmilord.config.ts`)
+  - extensible via config (`0xstack.config.ts`)
 - `doctor` must verify a CSP exists and is not trivially permissive (e.g. `*` everywhere).
 
 #### Webhook hardening (must-have)
@@ -792,7 +792,7 @@ External API routes under `app/api/v1/*` must follow consistent contracts.
 - `doctor` must verify API routes return the standardized envelope for non-2xx responses (best-effort static checks).
 
 ### Observability baseline (enterprise) (must-have)
-0xmilord must provide a consistent observability story.
+0xstack must provide a consistent observability story.
 
 #### Logging (must-have)
 - Provide a structured logger utility in `lib/utils/logger.ts` with:
@@ -966,7 +966,7 @@ Better Auth core schema requirements (must-have):
   - `session`
   - `account`
   - `verification`
-- 0xmilord must not “hand-roll” these tables. It must:
+- 0xstack must not “hand-roll” these tables. It must:
   - run the Better Auth CLI schema generator (`npx auth@latest generate`) and
   - integrate the generated Drizzle schema into the app’s Drizzle schema exports.
 - Compatibility requirement with “single schema file” convention:
@@ -995,7 +995,7 @@ Org naming requirement:
 - The domain is **org** everywhere (not workspace). Public routing uses `orgSlug` where appropriate.
 
 ### Docs requirements (must-have)
-- Every first-class `lib/*` subsystem folder must contain a `README.md` generated/maintained by 0xmilord.
+- Every first-class `lib/*` subsystem folder must contain a `README.md` generated/maintained by 0xstack.
 - Minimum `README.md` sections (per folder):
   - **Purpose** (what this subsystem owns)
   - **Allowed imports** (what it can/can’t import)
@@ -1022,14 +1022,14 @@ Required `README.md` locations (baseline):
 - `lib/stores/README.md`
 
 ### Project docs (must-have)
-0xmilord must generate and maintain the following files at repo root:
+0xstack must generate and maintain the following files at repo root:
 
 - `PRD.md`
 - `ERD.md`
 - `ARCHITECTURE.md`
 
 Rules:
-- Generated by `0xmilord baseline` and updated by domain/module installs.
+- Generated by `0xstack baseline` and updated by domain/module installs.
 - Must include a **current inventory** of installed domains/modules and their entry points (API routes, actions, loaders, repos).
 - Must preserve user edits by using merge-friendly stable sections/markers.
 
@@ -1059,7 +1059,7 @@ Requirements:
 - `ERD.md` is derived from:
   - Drizzle schema exports + relations (and/or migration snapshots)
 - module inventory is derived from:
-  - `0xmilord.config.*` + detected entry points
+  - `0xstack.config.*` + detected entry points
 - routes inventory is derived from:
   - `app/api/**` tree (and activated modules)
 - domains inventory is derived from:
@@ -1267,7 +1267,7 @@ For a new domain, generator must:
 - Idempotency: running the same generator twice should not corrupt code (either skip, merge safely, or fail with a clear message)
 
 ### Testability baseline (enterprise) (must-have)
-0xmilord must ship a testing story so the platform remains refactorable.
+0xstack must ship a testing story so the platform remains refactorable.
 
 Requirements:
 - Domain generator must create minimal tests per domain:
@@ -1296,7 +1296,7 @@ Requirements:
 - Testing (later): Vitest + Playwright (stretch)
 
 ## Baseline dependencies (must-have)
-0xmilord must install dependencies by **capability/module**, and `doctor` must verify that:
+0xstack must install dependencies by **capability/module**, and `doctor` must verify that:
 - enabled modules have their required packages installed
 - disabled modules do not leave unused heavy deps behind (warn-only)
 - imports match installed deps (best-effort static check)
@@ -1345,7 +1345,7 @@ Optional enhancements (toggle-able module flags; doctor warns if missing when en
 - If `app/blog/*` exists → `gray-matter` + `next-mdx-remote` + mdx plugins present.
 
 ## Project state model (platform core) (must-have)
-0xmilord must maintain an internal representation of “what this project is” so `doctor`, `sync`, and docs are consistent.
+0xstack must maintain an internal representation of “what this project is” so `doctor`, `sync`, and docs are consistent.
 
 Conceptual shape:
 
@@ -1367,7 +1367,7 @@ Requirements:
 
 ### Repo structure (mono or single)
 Preferred (monorepo):
-- `packages/cli` — `0xmilord` CLI
+- `packages/cli` — `0xstack` CLI
 - `packages/core` — interfaces/contracts + shared utilities
 - `packages/modules/*` — installable modules (billing/org/ai)
 - `examples/saas` — dogfood example output
@@ -1410,7 +1410,7 @@ Use a hybrid approach:
 ## Risks & mitigations
 - **Generators become brittle**: start with limited patterns; introduce structured edits (AST) for critical files.
 - **Too many options**: keep v1 prompts small; add `--preset` for common paths.
-- **Over-opinionation**: allow overrides via config file (`0xmilord.config.*`) and module selection.
+- **Over-opinionation**: allow overrides via config file (`0xstack.config.*`) and module selection.
 
 ## Open questions (to decide before v1)
 - API versioning default: `api/v1/*` or unversioned?

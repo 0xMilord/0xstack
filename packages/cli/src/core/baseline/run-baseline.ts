@@ -39,7 +39,7 @@ async function writeFileEnsured(p: string, content: string) {
 }
 
 async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
-  const p = path.join(projectRoot, "lib", "0xmilord", "config.ts");
+  const p = path.join(projectRoot, "lib", "0xstack", "config.ts");
   const src = await fs.readFile(p, "utf8").catch(() => "");
   if (!src) return;
 
@@ -454,7 +454,7 @@ export async function runBaseline(input: BaselineInput) {
       },
     },
     {
-      name: "upgrade config runtime schema (lib/0xmilord/config.ts)",
+      name: "upgrade config runtime schema (lib/0xstack/config.ts)",
       run: async () => {
         await ensureConfigRuntimeSchemaUpToDate(root);
         return { kind: "ok" };
@@ -465,7 +465,7 @@ export async function runBaseline(input: BaselineInput) {
       run: async () => {
         const cfg = applyProfile(await loadConfig(root), input.profile);
         await writeFileEnsured(
-          path.join(root, "lib", "0xmilord", "state.json"),
+          path.join(root, "lib", "0xstack", "state.json"),
           JSON.stringify({ appliedProfile: input.profile, modules: cfg.modules }, null, 2) + "\n"
         );
         return { kind: "ok", meta: { profile: input.profile } };
@@ -530,7 +530,7 @@ export async function runBaseline(input: BaselineInput) {
         // Break circular dependency: ensure lib/db/schema.ts doesn't export auth-schema before generation.
         const schemaPath = path.join(root, "lib", "db", "schema.ts");
         let schemaSrc = await fs.readFile(schemaPath, "utf8");
-        const marker = "// 0xMILORD:BETTER-AUTH-EXPORTS";
+        const marker = "// 0xstack:BETTER-AUTH-EXPORTS";
         if (schemaSrc.includes(marker)) {
           schemaSrc = schemaSrc.replace(new RegExp(`${marker}[\\s\\S]*?$`, "m"), "").trimEnd() + "\n";
           await fs.writeFile(schemaPath, schemaSrc, "utf8");

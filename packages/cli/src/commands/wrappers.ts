@@ -44,7 +44,7 @@ export function registerWrapperCommands(cli: CAC) {
   registerWrapper(cli, "auth");
   registerWrapper(cli, "drizzle");
 
-  // Convenience alias: `0xmilord drizzle ...` is already covered above.
+  // Convenience alias: `0xstack drizzle ...` is already covered above.
   // Keep commands flat and explicit (no nested subcommands needed).
   cli.command("wrap", "Show wrapper info").action(() => {
     const rel = path.relative(process.cwd(), process.cwd());

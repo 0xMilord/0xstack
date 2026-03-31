@@ -106,7 +106,7 @@ export async function writeDefaultConfig(
     observability: { sentry: boolean; otel: boolean };
   }
 ) {
-  const configPath = path.join(targetDir, "0xmilord.config.ts");
+  const configPath = path.join(targetDir, "0xstack.config.ts");
   try {
     await fs.access(configPath);
     return;
@@ -123,7 +123,7 @@ export async function writeDefaultConfig(
     blogMdx: modules?.blogMdx ?? false,
   };
 
-  const content = `import { defineConfig } from "./lib/0xmilord/config";
+  const content = `import { defineConfig } from "./lib/0xstack/config";
 
 export default defineConfig({
   app: { name: ${JSON.stringify(appName)}, baseUrl: "http://localhost:3000" },
@@ -145,8 +145,8 @@ export default defineConfig({
 }
 
 export async function loadConfig(projectRoot: string): Promise<MilordConfig> {
-  const configPathTs = path.join(projectRoot, "0xmilord.config.ts");
-  const configPathJs = path.join(projectRoot, "0xmilord.config.js");
+  const configPathTs = path.join(projectRoot, "0xstack.config.ts");
+  const configPathJs = path.join(projectRoot, "0xstack.config.js");
 
   let configPath: string | null = null;
   try {

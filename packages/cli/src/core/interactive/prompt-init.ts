@@ -23,7 +23,7 @@ export async function promptInitDefaults(cwd: string): Promise<InitAnswers> {
       {
         type: "select",
         name: "locationMode",
-        message: "Where should 0xmilord initialize the app?",
+        message: "Where should 0xstack initialize the app?",
         choices: [
           { title: "Create a new folder", value: "new-dir" },
           { title: "Use the current directory", value: "current-dir" },

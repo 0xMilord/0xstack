@@ -1,6 +1,6 @@
-# 0xmilord
+# 0xstack
 
-`0xmilord` is a starter-system CLI that generates and maintains **production-ready Next.js apps** with a strict, enterprise-friendly architecture.
+`0xstack` is a starter-system CLI that generates and maintains **production-ready Next.js apps** with a strict, enterprise-friendly architecture.
 
 ## What it generates
 - Next.js App Router (TypeScript) + Tailwind + shadcn/ui
@@ -20,29 +20,29 @@ node packages/cli/dist/index.js --help
 ## CLI (usage)
 ```bash
 # create a new app (interactive by default) - npm/npx first
-npx 0xmilord init
+npx 0xstack init
 
 # enforce baseline workflows in an existing app
-npx 0xmilord baseline --profile minimal
+npx 0xstack baseline --profile minimal
 
 # validate boundaries + env + required files
-npx 0xmilord doctor --profile minimal
+npx 0xstack doctor --profile minimal
 
 # keep docs/ inventories in sync
-npx 0xmilord docs-sync
+npx 0xstack docs-sync
 
 # generate a domain end-to-end
-npx 0xmilord generate materials --with-api
+npx 0xstack generate materials --with-api
 ```
 
 pnpm alternative:
 
 ```bash
-pnpm dlx 0xmilord init
-pnpm dlx 0xmilord baseline --profile minimal
-pnpm dlx 0xmilord doctor --profile minimal
-pnpm dlx 0xmilord docs-sync
-pnpm dlx 0xmilord generate materials --with-api
+pnpm dlx 0xstack init
+pnpm dlx 0xstack baseline --profile minimal
+pnpm dlx 0xstack doctor --profile minimal
+pnpm dlx 0xstack docs-sync
+pnpm dlx 0xstack generate materials --with-api
 ```
 
 ## Docs

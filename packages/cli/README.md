@@ -1,4 +1,4 @@
-# 0xmilord
+# 0xstack
 
 An opinionated starter-system CLI that generates **production-ready Next.js apps** with a strict architecture and enterprise-grade modules (config-gated).
 
@@ -6,43 +6,43 @@ An opinionated starter-system CLI that generates **production-ready Next.js apps
 
 ### Use without installing (recommended)
 ```bash
-npx 0xmilord init
+npx 0xstack init
 ```
 
 ### Install globally
 ```bash
-npm i -g 0xmilord
+npm i -g 0xstack
 # or
-pnpm add -g 0xmilord
+pnpm add -g 0xstack
 ```
 
 ## Quick start
 ```bash
-npx 0xmilord init
+npx 0xstack init
 cd my-app
-npx 0xmilord baseline --profile milord
-npx 0xmilord doctor --profile milord
+npx 0xstack baseline --profile milord
+npx 0xstack doctor --profile milord
 pnpm dev
 ```
 
 pnpm alternative:
 
 ```bash
-pnpm dlx 0xmilord init
+pnpm dlx 0xstack init
 cd my-app
-pnpm dlx 0xmilord baseline --profile milord
-pnpm dlx 0xmilord doctor --profile milord
+pnpm dlx 0xstack baseline --profile milord
+pnpm dlx 0xstack doctor --profile milord
 pnpm dev
 ```
 
 ## Commands
-- `0xmilord init`: scaffold a Next.js app (interactive)
-- `0xmilord baseline`: enforce baseline (deps, auth schema, migrations, module activation, docs)
-- `0xmilord doctor`: validate boundaries + env + required files
-- `0xmilord sync`: reconcile repo with `0xmilord.config.ts`
-- `0xmilord docs-sync`: regenerate docs using stable markers
-- `0xmilord generate <domain>`: generate a domain end-to-end (schema → repo → service → actions/loaders → UI)
-- `0xmilord add <module>`: enable a module in config and apply baseline
+- `0xstack init`: scaffold a Next.js app (interactive)
+- `0xstack baseline`: enforce baseline (deps, auth schema, migrations, module activation, docs)
+- `0xstack doctor`: validate boundaries + env + required files
+- `0xstack sync`: reconcile repo with `0xstack.config.ts`
+- `0xstack docs-sync`: regenerate docs using stable markers
+- `0xstack generate <domain>`: generate a domain end-to-end (schema → repo → service → actions/loaders → UI)
+- `0xstack add <module>`: enable a module in config and apply baseline
 
 ## Architecture (what gets generated)
 - **Flat structure**: routes in `app/`; everything else in `lib/` (no `src/`, no route groups)
@@ -56,7 +56,7 @@ pnpm dev
   - `app/api/v1/*`: external HTTP APIs (must call services, not repos)
 
 ## Modules (config-gated)
-Enabled via `0xmilord.config.ts` profiles/modules.
+Enabled via `0xstack.config.ts` profiles/modules.
 - **SEO**: `robots.ts`, `sitemap.ts`, OG/Twitter images, JSON-LD helpers
 - **Blog (MDX)**: content loader + routes + RSS
 - **Billing (Dodo)**: checkout/portal/webhook + reconciliation + idempotency ledger

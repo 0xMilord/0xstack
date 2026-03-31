@@ -207,7 +207,7 @@ import { sendResendEmail } from "@/lib/email/resend";
 import { VerifyEmailTemplate } from "@/lib/email/templates/verify-email";
 import { ResetPasswordTemplate } from "@/lib/email/templates/reset-password";
 import { env } from "@/lib/env/server";
-import { getMilordConfig } from "@/lib/0xmilord/config";
+import { getMilordConfig } from "@/lib/0xstack/config";
 
 function appName() {
   return getMilordConfig().app.name ?? "App";

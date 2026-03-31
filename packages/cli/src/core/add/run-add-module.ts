@@ -5,7 +5,7 @@ import { runBaseline } from "../baseline/run-baseline";
 export type AddInput = { projectRoot: string; moduleId: string };
 
 export async function runAddModule(input: AddInput) {
-  const cfgPath = path.join(input.projectRoot, "0xmilord.config.ts");
+  const cfgPath = path.join(input.projectRoot, "0xstack.config.ts");
   const src = await fs.readFile(cfgPath, "utf8");
 
   const enable = (inSrc: string, key: string, value: string) => {

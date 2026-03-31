@@ -22,7 +22,7 @@ export async function writeFileEnsured(p: string, content: string) {
 export async function backupAndRemove(projectRoot: string, relPath: string) {
   const abs = path.join(projectRoot, relPath);
   if (!(await exists(abs))) return;
-  const backupRoot = path.join(projectRoot, ".0xmilord", "disabled");
+  const backupRoot = path.join(projectRoot, ".0xstack", "disabled");
   const backupAbs = path.join(backupRoot, relPath);
   await ensureDir(path.dirname(backupAbs));
   await fs.copyFile(abs, backupAbs);

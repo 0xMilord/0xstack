@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const START = "// 0xMILORD:SCHEMA-AUTO-START";
-const END = "// 0xMILORD:SCHEMA-AUTO-END";
+const START = "// 0xstack:SCHEMA-AUTO-START";
+const END = "// 0xstack:SCHEMA-AUTO-END";
 
 export async function ensureSchemaMarkers(projectRoot: string) {
   const schemaPath = path.join(projectRoot, "lib", "db", "schema.ts");

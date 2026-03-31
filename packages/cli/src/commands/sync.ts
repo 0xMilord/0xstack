@@ -4,7 +4,7 @@ import { runSync } from "../core/sync/run-sync";
 
 export function registerSyncCommand(cli: CAC) {
   cli
-    .command("sync", "Reconcile repo with 0xmilord.config (non-destructive)")
+    .command("sync", "Reconcile repo with 0xstack.config (non-destructive)")
     .option("--dir <dir>", "Project directory (default: current)")
     .option("--profile <profile>", "Profile to apply (default: minimal)")
     .action(async (options) => {

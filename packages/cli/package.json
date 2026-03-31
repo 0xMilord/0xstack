@@ -1,10 +1,10 @@
 {
-  "name": "0xmilord",
+  "name": "0xstack",
   "version": "0.1.0",
   "private": false,
   "type": "module",
   "bin": {
-    "0xmilord": "dist/index.js"
+    "0xstack": "dist/index.js"
   },
   "files": [
     "dist"
