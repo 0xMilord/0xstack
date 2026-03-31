@@ -1,6 +1,7 @@
 import path from "node:path";
 import { ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
+import { ensureEnvSchemaModuleWiring } from "./env-edit";
 
 export const observabilityModule: Module = {
   id: "observability",
@@ -8,6 +9,21 @@ export const observabilityModule: Module = {
   activate: async (ctx) => {
     // Always create baseline logger; Sentry/OTEL wiring is config-gated later.
     await ensureDir(path.join(ctx.projectRoot, "lib", "utils"));
+
+    // Env schema for observability (composed into lib/env/schema.ts)
+    await ensureDir(path.join(ctx.projectRoot, "lib", "env"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "env", "observability.ts"),
+      `import { z } from "zod";
+\nexport const ObservabilityEnvSchema = z.object({
+  // Sentry
+  SENTRY_DSN: z.string().min(1).optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
+  SENTRY_PROFILES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
+});
+`
+    );
+    await ensureEnvSchemaModuleWiring(ctx.projectRoot);
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "utils", "logger.ts"),
       `/* eslint-disable no-console */
@@ -83,6 +99,25 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+async function sentryCapture(message: string, context: LogContext, error?: unknown) {
+  try {
+    if (process.env.OXSTACK_SENTRY_DISABLED === "1") return;
+    const dsn = process.env.SENTRY_DSN;
+    if (!dsn) return;
+    const Sentry = await import("@sentry/nextjs").catch(() => null);
+    if (!Sentry) return;
+    if (error instanceof Error) {
+      Sentry.captureException(error, { tags: { source: "logger" }, extra: { message, ...context } });
+    } else if (error != null) {
+      Sentry.captureMessage(message, { level: "error", extra: { ...context, error } });
+    } else {
+      Sentry.captureMessage(message, { level: "error", extra: { ...context } });
+    }
+  } catch {
+    // never let observability break runtime
+  }
+}
+
 export function log(level: Level, message: string, context: LogContext = {}, error?: unknown) {
   if (!shouldLog(level)) return;
   const ctx = redact(context);
@@ -95,6 +130,7 @@ export function log(level: Level, message: string, context: LogContext = {}, err
 
   if (isProd()) {
     console.log(JSON.stringify(payload));
+    if (level === "error") void sentryCapture(message, ctx, error);
     return;
   }
 
@@ -102,6 +138,7 @@ export function log(level: Level, message: string, context: LogContext = {}, err
   const c = color(level);
   const reset = "\\x1b[0m";
   console.log(\`\${c}\${prefix}\${reset} \${message}\`, Object.keys(payload).length ? payload : undefined);
+  if (level === "error") void sentryCapture(message, ctx, error);
 }
 
 export const logger = {
@@ -123,6 +160,42 @@ export const logger = {
 };
 `
     );
+
+    // Sentry SDK init files (only when enabled in config).
+    if (ctx.modules.observability?.sentry) {
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "sentry.client.config.ts"),
+        `import * as Sentry from "@sentry/nextjs";
+\nSentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+  profilesSampleRate: Number(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? 0),
+  enabled: process.env.NODE_ENV === "production",
+});
+`
+      );
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "sentry.server.config.ts"),
+        `import * as Sentry from "@sentry/nextjs";
+\nSentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+  profilesSampleRate: Number(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? 0),
+  enabled: process.env.NODE_ENV === "production",
+});
+`
+      );
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "sentry.edge.config.ts"),
+        `import * as Sentry from "@sentry/nextjs";
+\nSentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+  enabled: process.env.NODE_ENV === "production",
+});
+`
+      );
+    }
   },
   validate: async () => {},
   sync: async () => {},

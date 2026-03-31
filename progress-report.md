@@ -24,6 +24,227 @@ This list matches what the CLI currently registers/activates (as of this report)
 
 For “what’s actually generated”, see each module’s **Generated output (verify-app)** subsection below.
 
+## Per-module implementation checklists (audit-grade)
+
+Legend:
+- ✅ **Shipped** (exists + wired)
+- ⚠️ **Partial/basic** (exists but minimal / not cohesive / not org-scoped / not fully documented)
+- ❌ **Missing**
+
+These checklists are intentionally repetitive so gaps are obvious.
+
+### Checklist: Config + env validation (always-on)
+
+- **UI**: ✅ (implicit; surfaced via `/app/*` behavior + error messages)
+- **loaders**: ⚠️ (`lib/env/server.ts` loads; no “env status” loader)
+- **actions**: ❌ (no “validate env” server action)
+- **services**: ✅ (env loader + schema)
+- **repos**: N/A
+- **APIs**: ⚠️ (no dedicated `/api/v1/health` returning env/module status)
+- **cache tags**: N/A
+- **docs/runbook**: ⚠️ (needs a single definitive env runbook)
+
+### Checklist: UI Foundation (`ui-foundation`)
+
+- **UI**: ✅
+  - Header/footer present and header is auth-aware.
+  - Settings page upgraded from shell.
+- **loaders**: ⚠️ (relies on viewer loader; no general layout guard loader)
+- **actions**: ⚠️ (signout action exists; no “app shell guard” actions)
+- **services**: ✅ (via auth-core viewer/auth services)
+- **repos**: N/A
+- **APIs**: N/A
+- **cache tags**: ⚠️ (uses viewer tags indirectly; no explicit UI-level invalidation strategy docs)
+- **docs/runbook**: ⚠️ (needs “how app shell is guarded” and navigation conventions)
+
+### Checklist: Auth core (`auth-core`, Better Auth)
+
+- **UI**: ✅
+  - `/login`, `/get-started`, `/forgot-password`, `/reset-password`
+- **loaders**: ✅
+  - `lib/loaders/viewer.loader.ts` with caching
+- **actions**: ✅
+  - `lib/actions/auth.actions.ts` (signout + revalidation)
+- **services**: ✅
+  - `viewer.service.ts`, `auth.service.ts`
+  - profile ensure on first session read
+- **repos**: ✅
+  - `user-profiles.repo.ts` (+ Better Auth tables via generated schema)
+- **APIs**: ✅
+  - Better Auth callback route + `/api/v1/auth/viewer`, `/api/v1/auth/signout`
+- **cache tags**: ⚠️
+  - viewer is tagged; other auth-adjacent reads not standardized
+- **docs/runbook**: ⚠️
+  - missing “auth flows” runbook (verify/reset callbacks, troubleshooting)
+
+### Checklist: Orgs (`core-db-state` domain surface)
+
+- **UI**: ⚠️
+  - `/app/app/orgs` exists but minimal polish
+- **loaders**: ✅
+  - `orgs.loader.ts`
+- **actions**: ✅
+  - `orgs.actions.ts` exists (create/select)
+- **services**: ✅
+  - `orgs.service.ts`
+- **repos**: ✅
+  - `orgs.repo.ts`, `org-members.repo.ts`
+- **APIs**: ❌
+  - no stable `/api/v1/orgs/*` external surface yet (optional feature gap)
+- **cache tags**: ❌
+  - org list/active org not tag-revalidated in a standardized way
+- **docs/runbook**: ❌
+  - no “active org backbone” runbook; cookie + guard patterns not standardized
+
+### Checklist: DB baseline/state (`core-db-state`)
+
+- **UI**: ✅ (orgs page present; other tables are backend-only)
+- **loaders**: ⚠️ (orgs loader exists; assets/billing loaders missing)
+- **actions**: ⚠️ (org actions exist; other write actions missing)
+- **services**: ⚠️ (org/profile services exist; other domain services minimal)
+- **repos**: ✅ (core repos exist for orgs/assets/billing/api keys/webhook ledger)
+- **APIs**: N/A
+- **cache tags**: ⚠️ (viewer only is strong; other tags need coverage)
+- **docs/runbook**: ⚠️ (ERD exists; but “how to extend schema safely” needs runbook)
+
+### Checklist: Cache (`cache`)
+
+- **UI**: N/A
+- **loaders**: ⚠️ (viewer uses it; other loaders not standardized)
+- **actions**: ⚠️ (revalidate helpers exist; not consistently used across domains)
+- **services**: ✅ (`withServerCache` style helpers exist)
+- **repos**: N/A
+- **APIs**: N/A
+- **cache tags**: ⚠️ (tag registry exists but not applied broadly)
+- **docs/runbook**: ❌ (needs “how to choose tags/TTL” documentation)
+
+### Checklist: Observability (`observability`)
+
+- **UI**: ❌ (no UI for observability status)
+- **loaders**: N/A
+- **actions**: N/A
+- **services**: ✅ (structured logger)
+- **repos**: N/A
+- **APIs**: N/A
+- **cache tags**: N/A
+- **docs/runbook**: ⚠️ (logger exists; needs “logging conventions” doc)
+
+### Checklist: Sentry (part of `observability`)
+
+- **UI**: ❌
+- **loaders**: N/A
+- **actions**: N/A
+- **services**: ⚠️
+  - logger forwards `error` to Sentry via lazy import when `SENTRY_DSN` is set
+- **repos**: N/A
+- **APIs**: ⚠️
+  - init config files exist when enabled; does not yet wrap all route handlers consistently
+- **cache tags**: N/A
+- **docs/runbook**: ❌
+  - missing “how to set DSN, source maps, environments, release” runbook
+
+### Checklist: Security API (`security-api`)
+
+- **UI**: ❌
+- **loaders**: N/A
+- **actions**: ❌ (no server actions for API key management)
+- **services**: ✅ (`verifyApiKey`, guards)
+- **repos**: ✅ (`api-keys.repo.ts`)
+- **APIs**: ⚠️
+  - guard helpers exist; not all v1 routes guaranteed to use them
+- **cache tags**: N/A
+- **docs/runbook**: ❌
+  - missing API key issuance/rotation policy + rate limiting policy
+
+### Checklist: Webhook ledger (`webhook-ledger`)
+
+- **UI**: ❌
+- **loaders**: ❌
+- **actions**: ❌
+- **services**: ⚠️ (used by billing reconciliation; generic only)
+- **repos**: ✅ (`webhook-events.repo.ts`)
+- **APIs**: ⚠️ (providers can write into ledger; no admin/inspection API)
+- **cache tags**: N/A
+- **docs/runbook**: ❌
+  - missing “webhook idempotency + replay” runbook
+
+### Checklist: Jobs (`jobs`)
+
+- **UI**: ❌
+- **loaders**: ❌
+- **actions**: ❌
+- **services**: ⚠️ (placeholder reconcile endpoint)
+- **repos**: N/A
+- **APIs**: ⚠️ (`/api/v1/jobs/reconcile` exists, minimal secret-gate)
+- **cache tags**: N/A
+- **docs/runbook**: ❌ (needs real driver wiring docs: cron/inngest)
+
+### Checklist: SEO (`seo`)
+
+- **UI**: N/A
+- **loaders**: ⚠️ (sitemap reads blog posts; no generalized route registry)
+- **actions**: N/A
+- **services**: ✅ (JSON-LD helper)
+- **repos**: N/A
+- **APIs**: N/A
+- **cache tags**: ⚠️ (sitemap should be cached/tagged; currently implicit)
+- **docs/runbook**: ⚠️ (needs enterprise SEO checklist: canonical, OG per page/post)
+
+### Checklist: Blog (MDX) (`blogMdx`)
+
+- **UI**: ⚠️ (blog index + post page exist; minimal layout)
+- **loaders**: ⚠️ (`blog.loader.ts` exists; frontmatter validation is minimal)
+- **actions**: N/A
+- **services**: N/A
+- **repos**: N/A
+- **APIs**: ✅ (`/rss.xml`)
+- **cache tags**: ❌ (no content tags/revalidation story)
+- **docs/runbook**: ⚠️ (needs “content workflow”, drafts, publishing, SEO per post)
+
+### Checklist: Storage (GCS) (`storage-gcs`)
+
+- **UI**: ⚠️ (`/app/app/assets` list/open/delete; upload missing)
+- **loaders**: ❌ (no `assets.loader.ts` for RSC reads)
+- **actions**: ❌ (no server actions for asset mutations; API-only)
+- **services**: ✅ (`storage.service.ts`)
+- **repos**: ✅ (`assets.repo.ts`)
+- **APIs**: ✅ (sign-upload/read, list, delete)
+- **cache tags**: ❌ (assets list not tagged/revalidated)
+- **docs/runbook**: ❌ (missing GCS IAM/service-account/keyless auth guidance)
+
+### Checklist: Billing (Dodo) (`billing-dodo`)
+
+- **UI**: ⚠️ (`/pricing`, `/app/app/billing`, success/cancel exist; status UI missing)
+- **loaders**: ❌ (no `billing.loader.ts` / subscription read model loader)
+- **actions**: ❌ (no server actions for checkout/portal; UI links directly to API)
+- **services**: ⚠️ (`billing.service.ts` reconciles best-effort; needs org-scoped mapping)
+- **repos**: ✅ (`billing.repo.ts`, webhook ledger)
+- **APIs**: ✅ (checkout/portal/webhook)
+- **cache tags**: ❌ (billing status tagging + invalidation missing)
+- **docs/runbook**: ❌ (needs “plans, checkout metadata, webhook mapping, troubleshooting”)
+
+### Checklist: Email (Resend) (`email-resend`)
+
+- **UI**: N/A
+- **loaders**: N/A
+- **actions**: N/A
+- **services**: ✅ (`auth-emails.ts` wiring)
+- **repos**: N/A
+- **APIs**: N/A
+- **cache tags**: N/A
+- **docs/runbook**: ⚠️ (needs deliverability + domain setup + template preview workflow)
+
+### Checklist: PWA (`pwa`)
+
+- **UI**: ❌ (no settings UI to enable/disable push, test push, etc.)
+- **loaders**: ❌ (no loader for subscription state)
+- **actions**: ❌ (no server actions; API-only)
+- **services**: ✅ (`push-subscriptions.service.ts`)
+- **repos**: ✅ (`push-subscriptions.repo.ts`)
+- **APIs**: ✅ (subscribe/unsubscribe/send)
+- **cache tags**: ❌ (push subscription state not tagged)
+- **docs/runbook**: ⚠️ (needs “VAPID keys, SW lifecycle, update strategy”)
+
 ---
 
 ## CLI commands (product surface)
