@@ -1,0 +1,36 @@
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+*/packages/cli/node_modules/
+*/packages/cli/dist/
+# Builds
+dist/
+.tsup/
+.turbo/
+.next/
+out/
+coverage/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+*.swp
+

@@ -1,0 +1,54 @@
+import type { CAC } from "cac";
+import path from "node:path";
+import { execCmd } from "../core/exec";
+import { logger } from "../core/logger";
+import { detectPackageManager, pmDlx, pmExec } from "../core/pm";
+
+type WrapperId = "shadcn" | "auth" | "drizzle";
+
+function registerWrapper(cli: CAC, id: WrapperId) {
+  cli
+    .command(`${id} [...args]`, `Pass through to ${id} CLI`)
+    .action(async (args: string[] = []) => {
+      const cwd = process.cwd();
+      const pm = await detectPackageManager(cwd);
+
+      if (id === "shadcn") {
+        const { cmd, dlxArgs } = pmDlx(pm);
+        const fullArgs = [...dlxArgs, "shadcn@latest", ...args];
+        logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
+        await execCmd(cmd, fullArgs, { cwd });
+        return;
+      }
+
+      if (id === "auth") {
+        // Better Auth CLI. PRD expects `npx auth@latest generate` support.
+        const { cmd, dlxArgs } = pmDlx(pm);
+        const fullArgs = [...dlxArgs, "auth@latest", ...args];
+        logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
+        await execCmd(cmd, fullArgs, { cwd });
+        return;
+      }
+
+      // drizzle-kit should be installed in the target repo; use package-manager exec.
+      const { cmd, execArgs } = pmExec(pm);
+      const fullArgs = [...execArgs, "drizzle-kit", ...args];
+      logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
+      await execCmd(cmd, fullArgs, { cwd });
+    });
+}
+
+export function registerWrapperCommands(cli: CAC) {
+  // Namespaces required by PRD wrapper policy
+  registerWrapper(cli, "shadcn");
+  registerWrapper(cli, "auth");
+  registerWrapper(cli, "drizzle");
+
+  // Convenience alias: `0xmilord drizzle ...` is already covered above.
+  // Keep commands flat and explicit (no nested subcommands needed).
+  cli.command("wrap", "Show wrapper info").action(() => {
+    const rel = path.relative(process.cwd(), process.cwd());
+    logger.info(`Wrappers are executed in cwd: ${rel || "."}`);
+  });
+}
+
