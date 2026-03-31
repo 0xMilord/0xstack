@@ -1,6 +1,6 @@
 # 0xstack
 
-An opinionated starter-system CLI that generates **production-ready Next.js apps** with a strict architecture and enterprise-grade modules (config-gated).
+`0xstack` is a starter-system CLI that generates **production-ready Next.js apps** with a strict architecture and enterprise-grade modules (config-gated).
 
 ## Install / Run
 
@@ -68,7 +68,6 @@ Enabled via `0xstack.config.ts` profiles/modules.
 Generated apps validate env via Zod (`lib/env/*`). Start from `.env.example`.
 
 ## Release checklist (publisher)
-1. Replace `REPLACE_ME_*` fields in `packages/cli/package.json`.
-2. Ensure `dist/` is built (`pnpm -C packages/cli build`).
+1. Ensure `dist/` is built (`pnpm -C packages/cli build`).
 3. Publish (see README in repo root for commands).
 
