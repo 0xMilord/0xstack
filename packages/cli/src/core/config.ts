@@ -19,6 +19,7 @@ export const ConfigSchema = z.object({
       billing: z.union([z.literal(false), z.literal("dodo")]).default(false),
       storage: z.union([z.literal(false), z.literal("gcs")]).default(false),
       email: z.union([z.literal(false), z.literal("resend")]).default(false),
+      cache: z.boolean().default(true),
       pwa: z.boolean().default(false),
       seo: z.boolean().default(false),
       blogMdx: z.boolean().default(false),
@@ -41,6 +42,7 @@ export const ConfigSchema = z.object({
       billing: false,
       storage: false,
       email: false,
+      cache: true,
       pwa: false,
       seo: false,
       blogMdx: false,
@@ -64,6 +66,7 @@ export const ConfigSchema = z.object({
             billing: z.union([z.literal(false), z.literal("dodo")]).optional(),
             storage: z.union([z.literal(false), z.literal("gcs")]).optional(),
             email: z.union([z.literal(false), z.literal("resend")]).optional(),
+            cache: z.boolean().optional(),
             pwa: z.boolean().optional(),
             seo: z.boolean().optional(),
             blogMdx: z.boolean().optional(),
@@ -106,6 +109,7 @@ export async function writeDefaultConfig(
     storage: false | "gcs";
     email?: false | "resend";
     pwa?: boolean;
+    cache?: boolean;
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
     observability: { sentry: boolean; otel: boolean };
   }
@@ -123,6 +127,7 @@ export async function writeDefaultConfig(
     billing: modules?.billing ?? false,
     storage: modules?.storage ?? false,
     email: modules?.email ?? false,
+    cache: modules?.cache ?? true,
     pwa: modules?.pwa ?? false,
     seo: modules?.seo ?? false,
     blogMdx: modules?.blogMdx ?? false,
@@ -137,13 +142,15 @@ export default defineConfig({
     orgs: true,
     billing: ${JSON.stringify(initModules.billing)},
     storage: ${JSON.stringify(initModules.storage)},
+    email: ${JSON.stringify(initModules.email)},
+    cache: ${JSON.stringify(initModules.cache)},
     pwa: ${JSON.stringify(initModules.pwa)},
     seo: ${JSON.stringify(initModules.seo)},
     blogMdx: ${JSON.stringify(initModules.blogMdx)},
   },
   profiles: {
-    core: { modules: { orgs: true, billing: false, storage: false, email: false, pwa: false, seo: false, blogMdx: false } },
-    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", pwa: true, seo: true, blogMdx: true, jobs: { enabled: true, driver: "cron-only" } } },
+    core: { modules: { orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false } },
+    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", cache: true, pwa: true, seo: true, blogMdx: true, jobs: { enabled: true, driver: "cron-only" } } },
   },
 });
 `;

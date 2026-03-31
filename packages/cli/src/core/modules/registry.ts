@@ -11,10 +11,12 @@ import { uiFoundationModule } from "./ui-foundation.module";
 import { coreDbStateModule } from "./core-db-state.module";
 import { emailResendModule } from "./email-resend.module";
 import { pwaModule } from "./pwa.module";
+import { cacheModule } from "./cache.module";
 
 export function getModules(): Module[] {
   return [
     uiFoundationModule,
+    cacheModule,
     coreDbStateModule,
     securityApiModule,
     webhookLedgerModule,

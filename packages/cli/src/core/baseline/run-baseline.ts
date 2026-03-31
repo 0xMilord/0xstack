@@ -52,6 +52,22 @@ async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
     );
   }
 
+  // Ensure pwa exists in runtime schema
+  if (!next.includes("pwa: z.boolean()")) {
+    next = next.replace(
+      /email:\s*z\.union\(\[z\.literal\(false\),\s*z\.literal\("resend"\)\]\),\s*\n/m,
+      (m) => `${m}    pwa: z.boolean().optional(),\n`
+    );
+  }
+
+  // Ensure cache exists in runtime schema
+  if (!next.includes("cache: z.boolean()")) {
+    next = next.replace(
+      /email:\s*z\.union\(\[z\.literal\(false\),\s*z\.literal\("resend"\)\]\),\s*\n/m,
+      (m) => `${m}    cache: z.boolean().optional(),\n`
+    );
+  }
+
   // Ensure jobs/observability shapes exist (so config additions never get dropped)
   if (!next.includes("observability: z.object")) {
     next = next.replace(
@@ -59,6 +75,52 @@ async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
       (m) =>
         `${m}    observability: z.object({ sentry: z.boolean(), otel: z.boolean() }).optional(),\n    jobs: z.object({ enabled: z.boolean(), driver: z.enum(["inngest", "cron-only"]) }).optional(),\n`
     );
+  }
+
+  if (next !== src) await fs.writeFile(p, next, "utf8");
+}
+
+async function ensureConfigFileKeysUpToDate(projectRoot: string) {
+  const p = path.join(projectRoot, "0xstack.config.ts");
+  const src = await fs.readFile(p, "utf8").catch(() => "");
+  if (!src) return;
+
+  let next = src;
+
+  const modulesBlockMatch = next.match(/modules:\s*{\s*[\s\S]*?\n\s*},/m);
+  const modulesBlock = modulesBlockMatch?.[0] ?? "";
+
+  // Ensure modules.email exists (older apps may not have it).
+  if (modulesBlock && !/\bemail:\s*/m.test(modulesBlock)) {
+    if (/\bstorage:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bstorage:\s*[^\r\n]*,?\r?\n)/m, `$1    email: false,\n`);
+    } else if (/\bbilling:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bbilling:\s*[^\r\n]*,?\r?\n)/m, `$1    email: false,\n`);
+    } else if (/modules:\s*{\s*\r?\n/m.test(modulesBlock)) {
+      next = next.replace(/(modules:\s*{\s*\r?\n)/m, `$1    email: false,\n`);
+    }
+  }
+
+  // Ensure modules.pwa exists.
+  if (modulesBlock && !/\bpwa:\s*/m.test(modulesBlock)) {
+    if (/\bemail:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bemail:\s*[^\r\n]*,?\r?\n)/m, `$1    pwa: false,\n`);
+    } else if (/\bstorage:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bstorage:\s*[^\r\n]*,?\r?\n)/m, `$1    pwa: false,\n`);
+    } else if (/modules:\s*{\s*\r?\n/m.test(modulesBlock)) {
+      next = next.replace(/(modules:\s*{\s*\r?\n)/m, `$1    pwa: false,\n`);
+    }
+  }
+
+  // Ensure modules.cache exists.
+  if (modulesBlock && !/\bcache:\s*/m.test(modulesBlock)) {
+    if (/\bemail:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bemail:\s*[^\r\n]*,?\r?\n)/m, `$1    cache: true,\n`);
+    } else if (/\bstorage:\s*/m.test(modulesBlock)) {
+      next = next.replace(/(\bstorage:\s*[^\r\n]*,?\r?\n)/m, `$1    cache: true,\n`);
+    } else if (/modules:\s*{\s*\r?\n/m.test(modulesBlock)) {
+      next = next.replace(/(modules:\s*{\s*\r?\n)/m, `$1    cache: true,\n`);
+    }
   }
 
   if (next !== src) await fs.writeFile(p, next, "utf8");
@@ -450,6 +512,7 @@ export async function runBaseline(input: BaselineInput) {
       name: "ensure config exists",
       run: async () => {
         await writeDefaultConfig(root, path.basename(root));
+        await ensureConfigFileKeysUpToDate(root);
         return { kind: "ok" };
       },
     },
@@ -501,6 +564,9 @@ export async function runBaseline(input: BaselineInput) {
         }
         if (cfg.modules.email === "resend") {
           deps.push("resend", "@react-email/components", "@react-email/render");
+        }
+        if (cfg.modules.cache) {
+          deps.push("lru-cache");
         }
         if (cfg.modules.pwa) {
           deps.push("web-push", "idb");

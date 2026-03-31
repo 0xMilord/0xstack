@@ -101,6 +101,23 @@ export async function ensureAssetsTable(projectRoot: string) {
   );
 }
 
+export async function ensurePushTables(projectRoot: string) {
+  await upsertDomainTable(
+    projectRoot,
+    "pushSubscriptions",
+    `export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniq: uniqueIndex("push_subscriptions_user_endpoint").on(t.userId, t.endpoint),
+}));`
+  );
+}
+
 export async function ensureBillingTables(projectRoot: string) {
   await upsertDomainTable(
     projectRoot,

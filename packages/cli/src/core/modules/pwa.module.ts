@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { backupAndRemove, ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
 import { ensureEnvSchemaModuleWiring } from "./env-edit";
+import { ensurePushTables } from "../generate/schema-edit";
 
 async function patchRootLayoutForPwa(projectRoot: string) {
   const layoutPath = path.join(projectRoot, "app", "layout.tsx");
@@ -30,7 +31,7 @@ async function patchRootLayoutForPwa(projectRoot: string) {
 }
 
 export const pwaModule: Module = {
-  id: "orgs",
+  id: "pwa",
   install: async () => {},
   activate: async (ctx) => {
     if (!ctx.modules.pwa) {
@@ -49,10 +50,14 @@ export const pwaModule: Module = {
 
     await ensureDir(path.join(ctx.projectRoot, "public"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "pwa"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "repos"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "services"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "env"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "subscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "send"));
+
+    await ensurePushTables(ctx.projectRoot);
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "env", "pwa.ts"),
@@ -279,15 +284,123 @@ export function configureWebPush() {
     );
 
     await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "repos", "push-subscriptions.repo.ts"),
+      `import crypto from "node:crypto";
+import { db } from "@/lib/db";
+import { pushSubscriptions } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+
+export type PushSubscriptionInput = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
+export async function upsertPushSubscription(userId: string, sub: PushSubscriptionInput) {
+  // Drizzle doesn't have cross-db upsert helpers consistently; do a simple best-effort:
+  // delete then insert (unique on user+endpoint).
+  await db
+    .delete(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, sub.endpoint)));
+
+  const rows = await db
+    .insert(pushSubscriptions)
+    .values({
+      id: crypto.randomUUID(),
+      userId,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+    })
+    .returning();
+  return rows[0] ?? null;
+}
+
+export async function deletePushSubscription(userId: string, endpoint: string) {
+  await db
+    .delete(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
+}
+
+export async function listPushSubscriptions(userId: string) {
+  return await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)).limit(50);
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "services", "push.service.ts"),
+      `import webpush from "web-push";
+import { configureWebPush } from "@/lib/pwa/push";
+import { deletePushSubscription, listPushSubscriptions } from "@/lib/repos/push-subscriptions.repo";
+
+export async function pushService_sendToUser(input: {
+  userId: string;
+  payload: {
+    title: string;
+    body?: string;
+    url?: string;
+    tag?: string;
+    actions?: Array<{ action: string; title: string; icon?: string }>;
+  };
+}) {
+  configureWebPush();
+  const subs = await listPushSubscriptions(input.userId);
+  const json = JSON.stringify({
+    title: input.payload.title,
+    body: input.payload.body,
+    tag: input.payload.tag,
+    actions: input.payload.actions ?? [],
+    data: { url: input.payload.url ?? "/" },
+  });
+
+  const results = await Promise.allSettled(
+    subs.map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } } as any,
+          json,
+          { TTL: 86400 }
+        );
+        return { ok: true as const };
+      } catch (e: any) {
+        if (e?.statusCode === 410) {
+          await deletePushSubscription(input.userId, s.endpoint);
+        }
+        throw e;
+      }
+    })
+  );
+
+  return {
+    attempted: subs.length,
+    sent: results.filter((r) => r.status === "fulfilled").length,
+    failed: results.filter((r) => r.status === "rejected").length,
+  };
+}
+`
+    );
+
+    await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "subscribe", "route.ts"),
       `import { NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { auth } from "@/lib/auth/auth";
+import { upsertPushSubscription } from "@/lib/repos/push-subscriptions.repo";
 
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
-  const body = await req.json().catch(() => null);
-  // TODO: store subscription in DB (enterprise: push_subscriptions table keyed by userId + endpoint)
-  return NextResponse.json({ ok: true, requestId, subscription: body }, { headers: { "x-request-id": requestId } });
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) {
+    return NextResponse.json({ ok: false, error: "unauthorized", requestId }, { status: 401 });
+  }
+
+  const body = await req.json();
+  if (!body?.endpoint || !body?.keys?.p256dh || !body?.keys?.auth) {
+    return NextResponse.json({ ok: false, error: "invalid_subscription", requestId }, { status: 400 });
+  }
+
+  await upsertPushSubscription(session.user.id, body);
+  return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
 }
 `
     );
@@ -295,10 +408,24 @@ export async function POST(req: Request) {
       path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe", "route.ts"),
       `import { NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { auth } from "@/lib/auth/auth";
+import { deletePushSubscription } from "@/lib/repos/push-subscriptions.repo";
 
-export async function POST() {
+export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
-  // TODO: remove subscription from DB
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) {
+    return NextResponse.json({ ok: false, error: "unauthorized", requestId }, { status: 401 });
+  }
+
+  // Accept either { endpoint } or full subscription JSON.
+  const body = await req.json().catch(() => ({} as any));
+  const endpoint = body?.endpoint ?? body?.subscription?.endpoint;
+  if (typeof endpoint !== "string" || !endpoint) {
+    return NextResponse.json({ ok: false, error: "invalid_endpoint", requestId }, { status: 400 });
+  }
+
+  await deletePushSubscription(session.user.id, endpoint);
   return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
 }
 `
@@ -307,13 +434,28 @@ export async function POST() {
       path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "send", "route.ts"),
       `import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { configureWebPush } from "@/lib/pwa/push";
+import { auth } from "@/lib/auth/auth";
+import { pushService_sendToUser } from "@/lib/services/push.service";
 
-export async function POST() {
+export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
-  configureWebPush();
-  // TODO: send to user subscriptions from DB via web-push
-  return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) {
+    return NextResponse.json({ ok: false, error: "unauthorized", requestId }, { status: 401 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const title = typeof body?.title === "string" ? body.title : "Notification";
+  const res = await pushService_sendToUser({
+    userId: session.user.id,
+    payload: {
+      title,
+      body: typeof body?.body === "string" ? body.body : undefined,
+      url: typeof body?.url === "string" ? body.url : "/",
+      tag: typeof body?.tag === "string" ? body.tag : undefined,
+      actions: Array.isArray(body?.actions) ? body.actions : undefined,
+    },
+  });
+  return NextResponse.json({ ok: true, requestId, ...res }, { headers: { "x-request-id": requestId } });
 }
 `
     );

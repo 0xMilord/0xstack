@@ -1,10 +1,12 @@
 export type ModuleId =
   | "orgs"
+  | "cache"
   | "seo"
   | "blogMdx"
   | "billing-dodo"
   | "storage-gcs"
   | "email-resend"
+  | "pwa"
   | "observability"
   | "jobs";
 
@@ -17,6 +19,7 @@ export type ModuleContext = {
     billing: false | "dodo";
     storage: false | "gcs";
     email: false | "resend";
+    cache: boolean;
     pwa: boolean;
     observability: { sentry: boolean; otel: boolean };
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
