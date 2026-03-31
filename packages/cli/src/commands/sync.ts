@@ -6,10 +6,10 @@ export function registerSyncCommand(cli: CAC) {
   cli
     .command("sync", "Reconcile repo with 0xstack.config (non-destructive)")
     .option("--dir <dir>", "Project directory (default: current)")
-    .option("--profile <profile>", "Profile to apply (default: minimal)")
+    .option("--profile <profile>", "Profile preset to apply (default: core)")
     .action(async (options) => {
       const dir = path.resolve(process.cwd(), options.dir ?? ".");
-      const profile = options.profile ?? "minimal";
+      const profile = options.profile ?? "core";
       await runSync({ projectRoot: dir, profile });
     });
 }

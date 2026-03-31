@@ -32,6 +32,6 @@ export async function runAddModule(input: AddInput) {
   else throw new Error(`Unknown module: ${mod}`);
 
   await fs.writeFile(cfgPath, next, "utf8");
-  await runBaseline({ projectRoot: input.projectRoot, profile: "minimal", packageManager: "pnpm" });
+  await runBaseline({ projectRoot: input.projectRoot, profile: "core", packageManager: "pnpm" });
 }
 

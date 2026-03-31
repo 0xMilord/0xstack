@@ -59,7 +59,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xstack factory: CL
   - **Config system**
     - `0xstack.config.ts` scaffold
     - `defineConfig()` + Zod schema + defaults
-    - profiles: `milord`, `minimal`
+  - profiles: `full`, `core`
     - module flags: auth (fixed), orgs, blogMdx, seo, billing(dodo/false), storage(gcs/false), observability, jobs
   - **Deterministic pipeline engine**
     - named steps with duration, skip conditions, and clear failure output
@@ -134,8 +134,8 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xstack factory: CL
     - runs validate + sync steps through pipeline engine
 
 - **Acceptance checks**
-  - `baseline --profile=minimal` does not expose blog/billing/storage routes.
-  - `baseline --profile=milord` activates all configured modules.
+  - `baseline --profile=core` does not expose blog/billing/storage routes.
+  - `baseline --profile=full` activates all configured modules.
 
 ---
 
@@ -214,7 +214,7 @@ Build window: **7 days**. Goal: ship a **working v1** of the 0xstack factory: CL
   - **Stretch (PRD)**: `npx 0xstack upgrade` codemods hook point (may ship as a no-op placeholder in v1).
 
 - **Acceptance checks**
-  - Running `init` then `baseline` then `doctor` succeeds for both `minimal` and `milord` profiles (or produces actionable guidance for missing env).
+  - Running `init` then `baseline` then `doctor` succeeds for both `core` and `full` profiles (or produces actionable guidance for missing env).
   - Regenerating docs does not overwrite user-authored text outside markers.
 
 ---

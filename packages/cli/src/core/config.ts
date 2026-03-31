@@ -136,8 +136,8 @@ export default defineConfig({
     blogMdx: ${JSON.stringify(initModules.blogMdx)},
   },
   profiles: {
-    minimal: { modules: { orgs: true, billing: false, storage: false, email: false, seo: false, blogMdx: false } },
-    milord: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", seo: true, blogMdx: true, jobs: { enabled: true, driver: "cron-only" } } },
+    core: { modules: { orgs: true, billing: false, storage: false, email: false, seo: false, blogMdx: false } },
+    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", seo: true, blogMdx: true, jobs: { enabled: true, driver: "cron-only" } } },
   },
 });
 `;

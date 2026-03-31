@@ -347,8 +347,8 @@ pnpm dev
 
 ## 0xstack commands
 \`\`\`bash
-npx 0xstack baseline --profile minimal
-npx 0xstack doctor --profile minimal
+npx 0xstack baseline --profile core
+npx 0xstack doctor --profile core
 npx 0xstack docs-sync
 \`\`\`
 `

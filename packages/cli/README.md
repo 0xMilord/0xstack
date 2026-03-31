@@ -20,8 +20,8 @@ pnpm add -g 0xstack
 ```bash
 npx 0xstack init
 cd my-app
-npx 0xstack baseline --profile milord
-npx 0xstack doctor --profile milord
+npx 0xstack baseline --profile full
+npx 0xstack doctor --profile full
 pnpm dev
 ```
 
@@ -30,8 +30,8 @@ pnpm alternative:
 ```bash
 pnpm dlx 0xstack init
 cd my-app
-pnpm dlx 0xstack baseline --profile milord
-pnpm dlx 0xstack doctor --profile milord
+pnpm dlx 0xstack baseline --profile full
+pnpm dlx 0xstack doctor --profile full
 pnpm dev
 ```
 

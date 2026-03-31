@@ -32,7 +32,7 @@ async function listDirFilesOneLevel(dirPath: string) {
 }
 
 export async function runDocsSync(input: DocsSyncInput) {
-  const state = await computeProjectState(input.projectRoot, "minimal");
+  const state = await computeProjectState(input.projectRoot, "core");
   const inv = [
     "## Inventory",
     "",
@@ -85,10 +85,10 @@ export async function runDocsSync(input: DocsSyncInput) {
     "### 0xstack maintenance commands",
     "```bash",
     "# baseline: enforce schema, generate Better Auth tables, create migrations, activate modules",
-    "npx 0xstack baseline --profile minimal",
+    "npx 0xstack baseline --profile core",
     "",
     "# doctor: validate architecture boundaries + env + required files",
-    "npx 0xstack doctor --profile minimal",
+    "npx 0xstack doctor --profile core",
     "",
     "# docs sync: regenerate inventories + subsystem READMEs",
     "npx 0xstack docs-sync",
@@ -96,8 +96,8 @@ export async function runDocsSync(input: DocsSyncInput) {
     "",
     "pnpm alternative:",
     "```bash",
-    "pnpm dlx 0xstack baseline --profile minimal",
-    "pnpm dlx 0xstack doctor --profile minimal",
+    "pnpm dlx 0xstack baseline --profile core",
+    "pnpm dlx 0xstack doctor --profile core",
     "pnpm dlx 0xstack docs-sync",
     "```",
     "",

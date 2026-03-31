@@ -7,8 +7,8 @@
 ```bash
 npx 0xstack init
 cd my-app
-npx 0xstack baseline --profile milord
-npx 0xstack doctor --profile milord
+npx 0xstack baseline --profile full
+npx 0xstack doctor --profile full
 pnpm dev
 ```
 
@@ -65,7 +65,7 @@ Idempotent “enterprise reconciliation”:
 - generates docs (README/PRD/ARCH/ERD + subsystem READMEs)
 
 ```bash
-npx 0xstack baseline --profile milord
+npx 0xstack baseline --profile full
 ```
 
 ### `doctor`
@@ -75,7 +75,7 @@ Validates:
 - boundary rules (routes must not import repos directly)
 
 ```bash
-npx 0xstack doctor --profile milord
+npx 0xstack doctor --profile full
 ```
 
 ### `generate <domain>`
@@ -100,8 +100,8 @@ npx 0xstack docs-sync
 
 ```bash
 pnpm dlx 0xstack init
-pnpm dlx 0xstack baseline --profile milord
-pnpm dlx 0xstack doctor --profile milord
+pnpm dlx 0xstack baseline --profile full
+pnpm dlx 0xstack doctor --profile full
 pnpm dlx 0xstack docs-sync
 pnpm dlx 0xstack generate materials --with-api
 ```

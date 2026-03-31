@@ -101,8 +101,8 @@ Required command semantics:
 
 Profiles:
 - Support `--profile=<name>`:
-  - `npx 0xstack baseline --profile=milord` (your “everything on” default)
-  - `npx 0xstack baseline --profile=minimal` (auth+orgs only)
+  - `npx 0xstack baseline --profile=full` (everything on)
+  - `npx 0xstack baseline --profile=core` (auth+orgs only)
   - Profiles are just config presets applied to `0xstack.config.*`.
 
 #### CLI wrapping policy (must-have)
@@ -280,7 +280,7 @@ Recommended tooling:
 
 Minimum config schema:
 - **`profiles`** (must-have):
-  - named presets that set `modules` + conventions (e.g. `milord`, `minimal`, `saas`, `content`)
+  - named presets that set `modules` + conventions (e.g. `full`, `core`, `saas`, `content`)
 - **`app`**:
   - `name`, `description`, `baseUrl` (used for SEO canonicals/sitemaps)
   - `envMode`: `strict` (default) | `warn`
