@@ -12,6 +12,7 @@ export type InitAnswers = {
     billing: false | "dodo";
     storage: false | "gcs";
     email: false | "resend";
+    cache: boolean;
     pwa: boolean;
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
     observability: { sentry: boolean; otel: boolean };
@@ -68,6 +69,7 @@ export async function promptInitDefaults(cwd: string): Promise<InitAnswers> {
           { title: "Billing (Dodo)", value: "billing" },
           { title: "Storage (GCS signed URLs)", value: "storage" },
           { title: "Email (Resend + templates)", value: "email" },
+          { title: "Cache (L1 LRU + Next Data Cache + tags)", value: "cache" },
           { title: "PWA (manifest + service worker + offline + push infra)", value: "pwa" },
           { title: "Jobs (cron-only endpoints)", value: "jobs" },
           { title: "Observability: Sentry", value: "sentry" },
@@ -100,6 +102,7 @@ export async function promptInitDefaults(cwd: string): Promise<InitAnswers> {
       billing: enabled.has("billing") ? "dodo" : false,
       storage: enabled.has("storage") ? "gcs" : false,
       email: enabled.has("email") ? "resend" : false,
+      cache: true,
       pwa: enabled.has("pwa"),
       jobs: { enabled: enabled.has("jobs"), driver: "cron-only" },
       observability: { sentry: enabled.has("sentry"), otel: enabled.has("otel") },

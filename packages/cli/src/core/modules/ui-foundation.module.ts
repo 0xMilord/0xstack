@@ -27,7 +27,7 @@ async function patchRootLayout(projectRoot: string) {
     src = src.replace(
       /import\s+"\.\/globals\.css";\s*/m,
       (m) =>
-        `${m}\nimport { Providers } from "@/app/providers";\nimport { SiteHeader } from "@/lib/components/layout/site-header";\nimport { SiteFooter } from "@/lib/components/layout/site-footer";\n`
+        `${m}\nimport { Providers } from "@/app/providers";\nimport { SiteHeader } from "@/components/layout/site-header";\nimport { SiteFooter } from "@/components/layout/site-footer";\n`
     );
   }
 
@@ -39,14 +39,17 @@ export const uiFoundationModule: Module = {
   install: async () => {},
   activate: async (ctx) => {
     // Layout components
-    await ensureDir(path.join(ctx.projectRoot, "lib", "components", "layout"));
+    await ensureDir(path.join(ctx.projectRoot, "components", "layout"));
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "lib", "components", "layout", "site-header.tsx"),
+      path.join(ctx.projectRoot, "components", "layout", "site-header.tsx"),
       `import Link from "next/link";
-import { ThemeToggle } from "@/lib/components/layout/theme-toggle";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { loadViewer } from "@/lib/loaders/viewer.loader";
+import { signOutAction } from "@/lib/actions/auth.actions";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const viewer = await loadViewer();
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
@@ -69,9 +72,27 @@ export function SiteHeader() {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild size="sm">
-            <Link href="/get-started">Get started</Link>
-          </Button>
+          {viewer ? (
+            <>
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/app/orgs">App</Link>
+              </Button>
+              <form action={signOutAction}>
+                <Button type="submit" variant="ghost" size="sm">
+                  Sign out
+                </Button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/login">Sign in</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/get-started">Get started</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>
@@ -81,7 +102,7 @@ export function SiteHeader() {
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "lib", "components", "layout", "site-footer.tsx"),
+      path.join(ctx.projectRoot, "components", "layout", "site-footer.tsx"),
       `import Link from "next/link";
 
 export function SiteFooter() {
@@ -101,7 +122,7 @@ export function SiteFooter() {
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "lib", "components", "layout", "theme-toggle.tsx"),
+      path.join(ctx.projectRoot, "components", "layout", "theme-toggle.tsx"),
       `"use client";
 
 import { Moon, Sun } from "lucide-react";
@@ -127,6 +148,21 @@ export function ThemeToggle() {
 `
     );
 
+    // Back-compat re-exports (older apps imported from lib/*)
+    await ensureDir(path.join(ctx.projectRoot, "lib", "components", "layout"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "components", "layout", "site-header.tsx"),
+      `export * from "@/components/layout/site-header";\n`
+    );
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "components", "layout", "site-footer.tsx"),
+      `export * from "@/components/layout/site-footer";\n`
+    );
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "components", "layout", "theme-toggle.tsx"),
+      `export * from "@/components/layout/theme-toggle";\n`
+    );
+
     // Providers: theme + react-query
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "providers.tsx"),
@@ -142,6 +178,63 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </ThemeProvider>
+  );
+}
+`
+    );
+
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "settings"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "settings", "page.tsx"),
+      `import Link from "next/link";
+import { loadViewer } from "@/lib/loaders/viewer.loader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { signOutAction } from "@/lib/actions/auth.actions";
+
+export default async function Page() {
+  const viewer = await loadViewer();
+  return (
+    <main className="mx-auto max-w-4xl p-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="text-sm text-muted-foreground">
+          {viewer ? "Signed in as " + (viewer.email ?? viewer.userId) : "You are not signed in."}
+        </p>
+      </header>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Account</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Button asChild variant="secondary">
+              <Link href="/app/orgs">Organizations</Link>
+            </Button>
+            <form action={signOutAction}>
+              <Button type="submit" variant="outline" disabled={!viewer}>
+                Sign out
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Billing & storage</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Button asChild variant="secondary">
+              <Link href="/pricing">Pricing</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/app/assets">Assets</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }
 `

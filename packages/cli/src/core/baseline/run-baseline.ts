@@ -216,7 +216,10 @@ async function maybeUpgradeShellPage(filePath: string, nextSrc: string) {
     prev.includes("mx-auto max-w-3xl p-6") &&
     prev.includes("<h1") &&
     prev.length < 220;
+  const hasBrokenTemplatePlaceholders = prev.includes("{title}") || prev.includes("{subtitle}");
   if (!prev || isShell) {
+    await writeFileEnsured(filePath, nextSrc);
+  } else if (hasBrokenTemplatePlaceholders) {
     await writeFileEnsured(filePath, nextSrc);
   }
 }

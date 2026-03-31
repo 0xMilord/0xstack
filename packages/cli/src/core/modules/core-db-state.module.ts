@@ -22,9 +22,28 @@ export const coreDbStateModule: Module = {
       path.join(ctx.projectRoot, "lib", "repos", "assets.repo.ts"),
       `import { db } from "@/lib/db";
 import { assets } from "@/lib/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
 
 export async function insertAsset(input: typeof assets.$inferInsert) {
   const rows = await db.insert(assets).values(input).returning();
+  return rows[0] ?? null;
+}
+
+export async function listAssetsForUser(userId: string) {
+  return await db
+    .select()
+    .from(assets)
+    .where(and(eq(assets.ownerUserId, userId), isNull(assets.orgId)))
+    .orderBy(assets.createdAt)
+    .limit(200);
+}
+
+export async function listAssetsForOrg(orgId: string) {
+  return await db.select().from(assets).where(eq(assets.orgId, orgId)).orderBy(assets.createdAt).limit(200);
+}
+
+export async function deleteAssetById(assetId: string) {
+  const rows = await db.delete(assets).where(eq(assets.id, assetId)).returning();
   return rows[0] ?? null;
 }
 `
@@ -82,9 +101,39 @@ export async function getOrgById(id: string) {
     );
 
     await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "repos", "user-profiles.repo.ts"),
+      `import { db } from "@/lib/db";
+import { userProfiles } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+export async function getUserProfile(userId: string) {
+  const rows = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function ensureUserProfile(userId: string) {
+  const existing = await getUserProfile(userId);
+  if (existing) return existing;
+  const rows = await db.insert(userProfiles).values({ userId }).returning();
+  return rows[0] ?? null;
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "services", "profiles.service.ts"),
+      `import { ensureUserProfile } from "@/lib/repos/user-profiles.repo";
+
+export async function profilesService_ensureForUser(userId: string) {
+  return await ensureUserProfile(userId);
+}
+`
+    );
+
+    await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "repos", "org-members.repo.ts"),
       `import { db } from "@/lib/db";
-import { orgMembers } from "@/lib/db/schema";
+import { orgMembers, orgs } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export async function addMember(input: typeof orgMembers.$inferInsert) {
@@ -93,8 +142,13 @@ export async function addMember(input: typeof orgMembers.$inferInsert) {
 }
 
 export async function listOrgsForUser(userId: string) {
-  // join via raw SQL-free approach: fetch memberships then map
-  return await db.select().from(orgMembers).where(eq(orgMembers.userId, userId)).limit(200);
+  const rows = await db
+    .select({ org: orgs, membership: orgMembers })
+    .from(orgMembers)
+    .innerJoin(orgs, eq(orgs.id, orgMembers.orgId))
+    .where(eq(orgMembers.userId, userId))
+    .limit(200);
+  return rows;
 }
 
 export async function isMember(orgId: string, userId: string) {
@@ -128,6 +182,51 @@ export async function orgsService_createForUser(input: { userId: string; name: s
     );
 
     await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "query-keys", "orgs.keys.ts"),
+      `export const orgsKeys = {
+  all: ["orgs"] as const,
+  mine: () => [...orgsKeys.all, "mine"] as const,
+  active: () => [...orgsKeys.all, "active"] as const,
+};
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "mutation-keys", "orgs.keys.ts"),
+      `export const orgsMutations = {
+  create: ["orgs", "create"] as const,
+  setActive: ["orgs", "setActive"] as const,
+};
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "loaders", "orgs.loader.ts"),
+      `import { cache } from "react";
+import { headers } from "next/headers";
+import { withServerCache, CACHE_TTL, cacheTags } from "@/lib/cache";
+import { viewerService_getViewer } from "@/lib/services/viewer.service";
+import { orgsService_listForUser } from "@/lib/services/orgs.service";
+
+const loadMyOrgsCached = withServerCache(
+  async () => {
+    const h = await headers();
+    const viewer = await viewerService_getViewer(h as any);
+    if (!viewer?.userId) return [];
+    return await orgsService_listForUser(viewer.userId);
+  },
+  {
+    key: () => ["orgs", "mine"],
+    tags: () => [cacheTags.dashboard],
+    revalidate: CACHE_TTL.DASHBOARD,
+  }
+);
+
+export const loadMyOrgs = cache(loadMyOrgsCached);
+`
+    );
+
+    await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "rules", "orgs.rules.ts"),
       `import { z } from "zod";
 
@@ -142,6 +241,7 @@ export const createOrgInput = z.object({
       `"use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { requireAuth } from "@/lib/auth/server";
 import { createOrgInput } from "@/lib/rules/orgs.rules";
 import { orgsService_createForUser } from "@/lib/services/orgs.service";
@@ -150,27 +250,36 @@ export async function createOrg(input: unknown) {
   const viewer = await requireAuth();
   const data = createOrgInput.parse(input);
   const org = await orgsService_createForUser({ userId: viewer.userId, name: data.name });
+  cookies().set("ox_org", String(org?.id ?? ""), { httpOnly: true, sameSite: "lax", path: "/" });
   revalidatePath("/app/orgs");
   return { ok: true, org };
+}
+
+export async function setActiveOrg(input: { orgId: string }) {
+  const viewer = await requireAuth();
+  // basic guard: cookie is only set after auth; membership check happens in services when used.
+  cookies().set("ox_org", String(input.orgId), { httpOnly: true, sameSite: "lax", path: "/" });
+  revalidatePath("/app");
+  return { ok: true, userId: viewer.userId };
 }
 `
     );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "app", "orgs", "page.tsx"),
-      `import { orgsService_listForUser } from "@/lib/services/orgs.service";
-import { getViewer } from "@/lib/auth/server";
+      `import { loadMyOrgs } from "@/lib/loaders/orgs.loader";
 import { createOrg } from "@/lib/actions/orgs.actions";
+import { setActiveOrg } from "@/lib/actions/orgs.actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function Page() {
-  const viewer = await getViewer();
-  const memberships = viewer?.userId ? await orgsService_listForUser(viewer.userId) : [];
+  const rows = await loadMyOrgs();
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="mx-auto max-w-4xl p-6">
       <h1 className="text-2xl font-semibold">Organizations</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Create an org and start building.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Create an org, select it, then continue into the app.</p>
 
       <form
         className="mt-6 flex gap-2"
@@ -183,7 +292,28 @@ export default async function Page() {
         <Button type="submit">Create</Button>
       </form>
 
-      <pre className="mt-6 rounded border p-4 text-xs">{JSON.stringify(memberships, null, 2)}</pre>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {rows.map((r: any) => (
+          <Card key={r.org.id}>
+            <CardHeader>
+              <CardTitle className="text-base">{r.org.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Role: {r.membership.role}</p>
+              <form
+                action={async () => {
+                  "use server";
+                  await setActiveOrg({ orgId: r.org.id });
+                }}
+              >
+                <Button type="submit" variant="secondary">
+                  Use org
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </main>
   );
 }
