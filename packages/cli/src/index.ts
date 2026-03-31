@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { cac } from "cac";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { registerInitCommand } from "./commands/init";
 import { registerWrapperCommands } from "./commands/wrappers";
 import { registerBaselineCommand } from "./commands/baseline";
@@ -12,7 +15,18 @@ import { registerAddCommand } from "./commands/add";
 const cli = cac("0xstack");
 
 cli.help();
-cli.version("0.0.0");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkgPath = path.join(__dirname, "..", "package.json");
+const version = (() => {
+  try {
+    const raw = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+    return raw.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+cli.version(version);
 
 registerInitCommand(cli);
 registerWrapperCommands(cli);

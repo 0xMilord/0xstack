@@ -15,11 +15,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "REPLACE_ME_GIT_URL"
+    "url": "https://github.com/0xmilord/0xstack"
   },
-  "homepage": "REPLACE_ME_HOMEPAGE",
+  "homepage": "https://github.com/0xmilord/0xstack",
   "bugs": {
-    "url": "REPLACE_ME_ISSUES_URL"
+    "url": "https://github.com/0xmilord/0xstack/issues"
   },
   "keywords": [
     "cli",
