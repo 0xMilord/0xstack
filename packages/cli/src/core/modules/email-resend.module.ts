@@ -103,48 +103,109 @@ export async function sendResendEmail(input: { to: string; subject: string; html
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "email", "templates", "verify-email.tsx"),
       `import * as React from "react";
-import { Html, Head, Preview, Body, Container, Section, Text, Button, Hr } from "@react-email/components";
+import {
+  Body,
+  Button,
+  Container,
+  Head,
+  Hr,
+  Html,
+  Link,
+  Preview,
+  Section,
+  Text,
+} from "@react-email/components";
 
-export function VerifyEmailTemplate(props: { appName: string; userName: string; verificationUrl: string }) {
-  const { appName, userName, verificationUrl } = props;
+const base = {
+  bg: "#0a0a0a",
+  panel: "#0f0f0f",
+  border: "#262626",
+  text: "#fafafa",
+  muted: "#a3a3a3",
+  subtle: "#737373",
+  brand: "#ffffff",
+  brandText: "#000000",
+};
+
+function Shell(props: { appName: string; preview: string; children: React.ReactNode }) {
   return (
     <Html>
       <Head />
-      <Preview>Verify your email for {appName}</Preview>
-      <Body style={{ backgroundColor: "#ffffff", color: "#0a0a0a", margin: 0, fontFamily: "ui-sans-serif, system-ui" }}>
-        <Container style={{ padding: "24px", maxWidth: "560px" }}>
-          <Section>
-            <Text style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 12px" }}>{appName}</Text>
-            <Text style={{ margin: "0 0 12px" }}>Hi {userName},</Text>
-            <Text style={{ margin: "0 0 16px" }}>Confirm your email to finish setting up your account.</Text>
-            <Button
-              href={verificationUrl}
-              style={{
-                backgroundColor: "#000000",
-                color: "#ffffff",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                textDecoration: "none",
-                display: "inline-block",
-                fontWeight: 600,
-              }}
-            >
-              Verify email
-            </Button>
-            <Text style={{ margin: "16px 0 0", fontSize: "12px", color: "#525252" }}>
-              If the button doesn’t work, copy and paste this URL into your browser:
+      <Preview>{props.preview}</Preview>
+      <Body style={{ backgroundColor: base.bg, color: base.text, margin: 0, padding: 0, fontFamily: "ui-sans-serif, system-ui" }}>
+        <Container style={{ maxWidth: "560px", padding: "28px 20px" }}>
+          <Section style={{ marginBottom: "14px" }}>
+            <Text style={{ margin: 0, fontSize: "13px", color: base.muted, letterSpacing: "0.2px" }}>
+              {props.appName}
             </Text>
-            <Text style={{ margin: "8px 0 0", fontSize: "12px", color: "#525252", wordBreak: "break-all" }}>
-              {verificationUrl}
-            </Text>
-            <Hr style={{ borderColor: "#e5e5e5", margin: "24px 0" }} />
-            <Text style={{ margin: 0, fontSize: "12px", color: "#737373" }}>
-              If you didn’t request this, you can safely ignore this email.
+          </Section>
+          <Section style={{ backgroundColor: base.panel, border: "1px solid " + base.border, borderRadius: "14px", padding: "22px" }}>
+            {props.children}
+          </Section>
+          <Section style={{ padding: "14px 2px 0" }}>
+            <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
+              Sent by {props.appName}. If you didn’t request this, you can ignore it.
             </Text>
           </Section>
         </Container>
       </Body>
     </Html>
+  );
+}
+
+function monoLink(url: string) {
+  return (
+    <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.muted, wordBreak: "break-all", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+      {url}
+    </Text>
+  );
+}
+
+export function VerifyEmailTemplate(props: { appName: string; userName: string; verificationUrl: string }) {
+  const { appName, userName, verificationUrl } = props;
+  return (
+    <Shell appName={appName} preview={"Verify your email for " + appName}>
+      <Section>
+        <Text style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 650, letterSpacing: "-0.2px" }}>
+          Verify your email
+        </Text>
+        <Text style={{ margin: "0 0 14px", fontSize: "14px", color: base.muted }}>
+          Hi {userName}, confirm this email to finish setting up your account.
+        </Text>
+
+        <Section style={{ margin: "16px 0 10px" }}>
+          <Button
+            href={verificationUrl}
+            style={{
+              backgroundColor: base.brand,
+              color: base.brandText,
+              padding: "12px 16px",
+              borderRadius: "12px",
+              textDecoration: "none",
+              display: "inline-block",
+              fontWeight: 700,
+              fontSize: "14px",
+            }}
+          >
+            Verify email
+          </Button>
+        </Section>
+
+        <Text style={{ margin: "14px 0 0", fontSize: "12px", color: base.subtle }}>
+          If the button doesn’t work, open this link:
+        </Text>
+        {monoLink(verificationUrl)}
+
+        <Hr style={{ borderColor: base.border, margin: "18px 0" }} />
+
+        <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
+          For security, this link may expire. If it does, sign in and request a new verification email.
+        </Text>
+        <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.subtle }}>
+          Need help? Contact support.
+        </Text>
+      </Section>
+    </Shell>
   );
 }
 `
@@ -153,48 +214,109 @@ export function VerifyEmailTemplate(props: { appName: string; userName: string; 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "email", "templates", "reset-password.tsx"),
       `import * as React from "react";
-import { Html, Head, Preview, Body, Container, Section, Text, Button, Hr } from "@react-email/components";
+import {
+  Body,
+  Button,
+  Container,
+  Head,
+  Hr,
+  Html,
+  Link,
+  Preview,
+  Section,
+  Text,
+} from "@react-email/components";
 
-export function ResetPasswordTemplate(props: { appName: string; userName: string; resetLink: string }) {
-  const { appName, userName, resetLink } = props;
+const base = {
+  bg: "#0a0a0a",
+  panel: "#0f0f0f",
+  border: "#262626",
+  text: "#fafafa",
+  muted: "#a3a3a3",
+  subtle: "#737373",
+  brand: "#ffffff",
+  brandText: "#000000",
+};
+
+function Shell(props: { appName: string; preview: string; children: React.ReactNode }) {
   return (
     <Html>
       <Head />
-      <Preview>Reset your password for {appName}</Preview>
-      <Body style={{ backgroundColor: "#ffffff", color: "#0a0a0a", margin: 0, fontFamily: "ui-sans-serif, system-ui" }}>
-        <Container style={{ padding: "24px", maxWidth: "560px" }}>
-          <Section>
-            <Text style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 12px" }}>{appName}</Text>
-            <Text style={{ margin: "0 0 12px" }}>Hi {userName},</Text>
-            <Text style={{ margin: "0 0 16px" }}>Use the link below to reset your password.</Text>
-            <Button
-              href={resetLink}
-              style={{
-                backgroundColor: "#000000",
-                color: "#ffffff",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                textDecoration: "none",
-                display: "inline-block",
-                fontWeight: 600,
-              }}
-            >
-              Reset password
-            </Button>
-            <Text style={{ margin: "16px 0 0", fontSize: "12px", color: "#525252" }}>
-              If the button doesn’t work, copy and paste this URL into your browser:
+      <Preview>{props.preview}</Preview>
+      <Body style={{ backgroundColor: base.bg, color: base.text, margin: 0, padding: 0, fontFamily: "ui-sans-serif, system-ui" }}>
+        <Container style={{ maxWidth: "560px", padding: "28px 20px" }}>
+          <Section style={{ marginBottom: "14px" }}>
+            <Text style={{ margin: 0, fontSize: "13px", color: base.muted, letterSpacing: "0.2px" }}>
+              {props.appName}
             </Text>
-            <Text style={{ margin: "8px 0 0", fontSize: "12px", color: "#525252", wordBreak: "break-all" }}>
-              {resetLink}
-            </Text>
-            <Hr style={{ borderColor: "#e5e5e5", margin: "24px 0" }} />
-            <Text style={{ margin: 0, fontSize: "12px", color: "#737373" }}>
-              If you didn’t request this, you can safely ignore this email.
+          </Section>
+          <Section style={{ backgroundColor: base.panel, border: "1px solid " + base.border, borderRadius: "14px", padding: "22px" }}>
+            {props.children}
+          </Section>
+          <Section style={{ padding: "14px 2px 0" }}>
+            <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
+              Sent by {props.appName}. If you didn’t request this, you can ignore it.
             </Text>
           </Section>
         </Container>
       </Body>
     </Html>
+  );
+}
+
+function monoLink(url: string) {
+  return (
+    <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.muted, wordBreak: "break-all", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+      {url}
+    </Text>
+  );
+}
+
+export function ResetPasswordTemplate(props: { appName: string; userName: string; resetLink: string }) {
+  const { appName, userName, resetLink } = props;
+  return (
+    <Shell appName={appName} preview={"Reset your password for " + appName}>
+      <Section>
+        <Text style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 650, letterSpacing: "-0.2px" }}>
+          Reset your password
+        </Text>
+        <Text style={{ margin: "0 0 14px", fontSize: "14px", color: base.muted }}>
+          Hi {userName}, use the link below to choose a new password.
+        </Text>
+
+        <Section style={{ margin: "16px 0 10px" }}>
+          <Button
+            href={resetLink}
+            style={{
+              backgroundColor: base.brand,
+              color: base.brandText,
+              padding: "12px 16px",
+              borderRadius: "12px",
+              textDecoration: "none",
+              display: "inline-block",
+              fontWeight: 700,
+              fontSize: "14px",
+            }}
+          >
+            Reset password
+          </Button>
+        </Section>
+
+        <Text style={{ margin: "14px 0 0", fontSize: "12px", color: base.subtle }}>
+          If the button doesn’t work, open this link:
+        </Text>
+        {monoLink(resetLink)}
+
+        <Hr style={{ borderColor: base.border, margin: "18px 0" }} />
+
+        <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
+          If you suspect someone else requested this email, secure your account after you sign in.
+        </Text>
+        <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.subtle }}>
+          Need help? Contact support.
+        </Text>
+      </Section>
+    </Shell>
   );
 }
 `
@@ -206,7 +328,6 @@ export function ResetPasswordTemplate(props: { appName: string; userName: string
 import { sendResendEmail } from "@/lib/email/resend";
 import { VerifyEmailTemplate } from "@/lib/email/templates/verify-email";
 import { ResetPasswordTemplate } from "@/lib/email/templates/reset-password";
-import { env } from "@/lib/env/server";
 import { getMilordConfig } from "@/lib/0xstack/config";
 
 function appName() {
@@ -214,6 +335,16 @@ function appName() {
 }
 
 export async function sendVerifyEmail(input: { to: string; userName: string; verificationUrl: string }) {
+  const text = [
+    \`Verify your email for \${appName()}\`,
+    "",
+    \`Hello \${input.userName},\`,
+    "",
+    "Verify email:",
+    input.verificationUrl,
+    "",
+    "If you didn’t request this, you can ignore this email.",
+  ].join("\\n");
   const html = await render(
     VerifyEmailTemplate({ appName: appName(), userName: input.userName, verificationUrl: input.verificationUrl })
   );
@@ -221,11 +352,21 @@ export async function sendVerifyEmail(input: { to: string; userName: string; ver
     to: input.to,
     subject: \`Verify your email for \${appName()}\`,
     html,
-    text: \`Verify your email: \${input.verificationUrl}\`,
+    text,
   });
 }
 
 export async function sendResetPasswordEmail(input: { to: string; userName: string; resetLink: string }) {
+  const text = [
+    \`Reset your password for \${appName()}\`,
+    "",
+    \`Hello \${input.userName},\`,
+    "",
+    "Reset password:",
+    input.resetLink,
+    "",
+    "If you didn’t request this, you can ignore this email.",
+  ].join("\\n");
   const html = await render(
     ResetPasswordTemplate({ appName: appName(), userName: input.userName, resetLink: input.resetLink })
   );
@@ -233,7 +374,7 @@ export async function sendResetPasswordEmail(input: { to: string; userName: stri
     to: input.to,
     subject: \`Reset your password for \${appName()}\`,
     html,
-    text: \`Reset your password: \${input.resetLink}\`,
+    text,
   });
 }
 `

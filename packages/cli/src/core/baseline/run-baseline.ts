@@ -702,6 +702,7 @@ export async function runBaseline(input: BaselineInput) {
             billing: cfg.modules.billing,
             storage: cfg.modules.storage,
             email: cfg.modules.email,
+            cache: !!cfg.modules.cache,
             pwa: !!cfg.modules.pwa,
             observability: cfg.modules.observability,
             jobs: cfg.modules.jobs,
@@ -772,7 +773,7 @@ export const authClient = createAuthClient({
     {
       name: "generate docs (README/PRD/ARCH/ERD + lib/*/README.md)",
       run: async () => {
-        await runDocsSync({ projectRoot: root });
+        await runDocsSync({ projectRoot: root, profile: input.profile });
         return { kind: "ok" };
       },
     },

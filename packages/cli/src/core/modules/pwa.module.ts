@@ -328,10 +328,34 @@ export async function listPushSubscriptions(userId: string) {
     );
 
     await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "services", "push-subscriptions.service.ts"),
+      `import type { PushSubscriptionInput } from "@/lib/repos/push-subscriptions.repo";
+import {
+  upsertPushSubscription,
+  deletePushSubscription,
+  listPushSubscriptions,
+} from "@/lib/repos/push-subscriptions.repo";
+
+export async function pushSubscriptionsService_subscribe(userId: string, sub: PushSubscriptionInput) {
+  return await upsertPushSubscription(userId, sub);
+}
+
+export async function pushSubscriptionsService_unsubscribe(userId: string, endpoint: string) {
+  return await deletePushSubscription(userId, endpoint);
+}
+
+export async function pushSubscriptionsService_list(userId: string) {
+  return await listPushSubscriptions(userId);
+}
+`
+    );
+
+    await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "services", "push.service.ts"),
       `import webpush from "web-push";
 import { configureWebPush } from "@/lib/pwa/push";
-import { deletePushSubscription, listPushSubscriptions } from "@/lib/repos/push-subscriptions.repo";
+import { deletePushSubscription } from "@/lib/repos/push-subscriptions.repo";
+import { pushSubscriptionsService_list } from "@/lib/services/push-subscriptions.service";
 
 export async function pushService_sendToUser(input: {
   userId: string;
@@ -344,7 +368,7 @@ export async function pushService_sendToUser(input: {
   };
 }) {
   configureWebPush();
-  const subs = await listPushSubscriptions(input.userId);
+  const subs = await pushSubscriptionsService_list(input.userId);
   const json = JSON.stringify({
     title: input.payload.title,
     body: input.payload.body,
@@ -385,7 +409,7 @@ export async function pushService_sendToUser(input: {
       `import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/lib/auth/auth";
-import { upsertPushSubscription } from "@/lib/repos/push-subscriptions.repo";
+import { pushSubscriptionsService_subscribe } from "@/lib/services/push-subscriptions.service";
 
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
@@ -399,7 +423,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "invalid_subscription", requestId }, { status: 400 });
   }
 
-  await upsertPushSubscription(session.user.id, body);
+  await pushSubscriptionsService_subscribe(session.user.id, body);
   return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
 }
 `
@@ -409,7 +433,7 @@ export async function POST(req: Request) {
       `import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/lib/auth/auth";
-import { deletePushSubscription } from "@/lib/repos/push-subscriptions.repo";
+import { pushSubscriptionsService_unsubscribe } from "@/lib/services/push-subscriptions.service";
 
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
@@ -425,7 +449,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "invalid_endpoint", requestId }, { status: 400 });
   }
 
-  await deletePushSubscription(session.user.id, endpoint);
+  await pushSubscriptionsService_unsubscribe(session.user.id, endpoint);
   return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
 }
 `

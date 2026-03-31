@@ -6,8 +6,6 @@ export const cacheModule: Module = {
   id: "cache",
   install: async () => {},
   activate: async (ctx) => {
-    if (!ctx.modules.cache) return;
-
     await ensureDir(path.join(ctx.projectRoot, "lib", "cache"));
 
     await writeFileEnsured(
@@ -27,12 +25,14 @@ export const cacheTags = {
   posts: "posts",
   trending: "trending",
   dashboard: "dashboard",
+  viewer: "viewer",
 
   // entity helpers
   project: (slug: string) => \`project-slug:\${slug}\`,
   company: (slug: string) => \`company:\${slug}\`,
   user: (username: string) => \`user:\${username}\`,
   dashboardUser: (userId: string) => \`dashboard:\${userId}\`,
+  viewerUser: (userId: string) => \`viewer:\${userId}\`,
 } as const;
 `
     );
@@ -85,6 +85,9 @@ export function withServerCache<A extends any[], T>(
   opt: CacheOptions<A>
 ) {
   return async (...args: A) => {
+    if (process.env.OXSTACK_CACHE_DISABLED === "1") {
+      return await fn(...args);
+    }
     const keyParts = opt.key(...args);
     const key = stableKey(keyParts);
 

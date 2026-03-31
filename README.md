@@ -113,6 +113,8 @@ Enabled via `0xstack.config.ts` profiles/modules.
 - **Billing (Dodo)**: checkout/portal/webhook + ledger + reconciliation tables
 - **Storage (GCS)**: signed upload + `assets` index
 - **Email (Resend)**: verification + reset emails via React Email templates
+- **Cache (L1+L2)**: `lib/cache/*` (L1 LRU + Next `unstable_cache` + tag revalidation helpers)
+- **PWA**: `public/manifest.webmanifest`, custom `public/sw.js`, offline page, and push notification foundations (VAPID + DB-backed subscriptions)
 - **Jobs / Observability**: baseline infra
 
 ## Local development (this repo)

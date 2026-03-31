@@ -12,10 +12,12 @@ import { coreDbStateModule } from "./core-db-state.module";
 import { emailResendModule } from "./email-resend.module";
 import { pwaModule } from "./pwa.module";
 import { cacheModule } from "./cache.module";
+import { authCoreModule } from "./auth-core.module";
 
 export function getModules(): Module[] {
   return [
     uiFoundationModule,
+    authCoreModule,
     cacheModule,
     coreDbStateModule,
     securityApiModule,

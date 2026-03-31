@@ -1,5 +1,6 @@
 export type ModuleId =
   | "orgs"
+  | "auth-core"
   | "cache"
   | "seo"
   | "blogMdx"

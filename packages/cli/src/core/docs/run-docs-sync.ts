@@ -3,7 +3,7 @@ import path from "node:path";
 import { computeProjectState } from "../project/project-state";
 import { replaceAutoSection } from "./markers";
 
-export type DocsSyncInput = { projectRoot: string };
+export type DocsSyncInput = { projectRoot: string; profile?: string };
 
 async function readOrEmpty(p: string) {
   try {
@@ -32,7 +32,7 @@ async function listDirFilesOneLevel(dirPath: string) {
 }
 
 export async function runDocsSync(input: DocsSyncInput) {
-  const state = await computeProjectState(input.projectRoot, "core");
+  const state = await computeProjectState(input.projectRoot, input.profile ?? "core");
   const inv = [
     "## Inventory",
     "",
@@ -49,7 +49,76 @@ export async function runDocsSync(input: DocsSyncInput) {
 
   const prd = replaceAutoSection(await readOrEmpty(prdPath), inv);
   const arch = replaceAutoSection(await readOrEmpty(archPath), inv);
-  const erd = replaceAutoSection(await readOrEmpty(erdPath), inv);
+  const erdPrev = await readOrEmpty(erdPath);
+
+  // ERD: best-effort parse from Drizzle SQL migrations (tables + FKs).
+  async function buildErdFromMigrations() {
+    const migDir = path.join(input.projectRoot, "drizzle", "migrations");
+    let entries: string[] = [];
+    try {
+      entries = (await fs.readdir(migDir)).filter((f) => f.endsWith(".sql"));
+    } catch {
+      entries = [];
+    }
+    const sqls = await Promise.all(entries.map((f) => readOrEmpty(path.join(migDir, f))));
+    const sql = sqls.join("\n\n");
+    const tables: Record<string, { cols: string[]; fks: string[] }> = {};
+
+    // CREATE TABLE "name" ( ... );
+    const createRe = /create table\s+"?([a-zA-Z0-9_]+)"?\s*\(([\s\S]*?)\);\s*/gi;
+    let m: RegExpExecArray | null;
+    while ((m = createRe.exec(sql))) {
+      const name = m[1];
+      const body = m[2];
+      const cols = body
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => !!l && !l.toLowerCase().startsWith("constraint"))
+        .map((l) => l.replace(/,$/, ""));
+      tables[name] = tables[name] ?? { cols: [], fks: [] };
+      tables[name].cols = cols;
+    }
+
+    // ALTER TABLE "a" ADD CONSTRAINT ... FOREIGN KEY ("x") REFERENCES "b"("y")
+    const fkRe =
+      /alter table\s+"?([a-zA-Z0-9_]+)"?\s+add constraint\s+"?([a-zA-Z0-9_]+)"?\s+foreign key\s*\("?([a-zA-Z0-9_]+)"?\)\s+references\s+"?([a-zA-Z0-9_]+)"?\s*\("?([a-zA-Z0-9_]+)"?\)/gi;
+    while ((m = fkRe.exec(sql))) {
+      const fromT = m[1];
+      const fromC = m[3];
+      const toT = m[4];
+      const toC = m[5];
+      tables[fromT] = tables[fromT] ?? { cols: [], fks: [] };
+      tables[fromT].fks.push(`${fromT}.${fromC} -> ${toT}.${toC}`);
+    }
+
+    const lines: string[] = [];
+    lines.push("## Entities");
+    lines.push("");
+    const names = Object.keys(tables).sort();
+    if (names.length === 0) {
+      lines.push("- (no migrations detected yet)");
+      return lines.join("\n");
+    }
+    for (const t of names) {
+      lines.push(`### \`${t}\``);
+      lines.push("");
+      const cols = tables[t].cols.length ? tables[t].cols : ["(columns not detected)"];
+      lines.push("**Columns**");
+      lines.push("");
+      lines.push(...cols.map((c) => `- \`${c}\``));
+      if (tables[t].fks.length) {
+        lines.push("");
+        lines.push("**Relations (FKs)**");
+        lines.push("");
+        lines.push(...tables[t].fks.map((x) => `- \`${x}\``));
+      }
+      lines.push("");
+    }
+    return lines.join("\n").trimEnd();
+  }
+
+  const erdBody = await buildErdFromMigrations();
+  const erd = replaceAutoSection(erdPrev, [inv, "", erdBody].join("\n"));
 
   await writeEnsured(prdPath, prd || `# PRD\n\n${inv}\n`);
   await writeEnsured(archPath, arch || `# ARCHITECTURE\n\n${inv}\n`);
