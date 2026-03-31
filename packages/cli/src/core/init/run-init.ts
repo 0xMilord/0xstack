@@ -210,6 +210,9 @@ export async function runInit(input: InitInput) {
         );
         spinner.succeed("shadcn/ui ready");
 
+        // Re-apply globals.css theme after shadcn modifies it.
+        await writeFileEnsured(path.join(projectRoot, "app", "globals.css"), getGlobalsCss(input.theme ?? "default"));
+
         // Public pages: real sections (hero/features/FAQ/CTA), not stubs.
         const mkSimplePage = (title: string) =>
           `export default function Page() { return <main className="mx-auto max-w-3xl p-6"><h1 className="text-2xl font-semibold">${title}</h1></main>; }\n`;

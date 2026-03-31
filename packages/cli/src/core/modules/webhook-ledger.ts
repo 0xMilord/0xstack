@@ -4,7 +4,7 @@ import { ensureDir, writeFileEnsured } from "./fs-utils";
 import { ensureWebhookEventsTable } from "../generate/schema-edit";
 
 export const webhookLedgerModule: Module = {
-  id: "orgs",
+  id: "webhook-ledger",
   install: async () => {},
   activate: async (ctx) => {
     // Core table + repo used by multiple webhook providers.

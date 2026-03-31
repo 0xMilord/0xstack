@@ -3,7 +3,7 @@ import { ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
 
 export const securityApiModule: Module = {
-  id: "orgs",
+  id: "security-api",
   install: async () => {},
   activate: async (ctx) => {
     // This is core: API guards exist even if no external routes are enabled yet.

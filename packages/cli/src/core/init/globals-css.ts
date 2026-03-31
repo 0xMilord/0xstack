@@ -699,7 +699,14 @@ export const GLOBALS_CSS_THEMES: Record<GlobalsTheme, string> = {
 };
 
 export function getGlobalsCss(theme: GlobalsTheme) {
-  return GLOBALS_CSS_THEMES[theme] ?? GLOBALS_CSS_THEMES.default;
+  const raw = GLOBALS_CSS_THEMES[theme] ?? GLOBALS_CSS_THEMES.default;
+  const stripped = raw.replace(/^@import\s+"tailwindcss";\s*/m, "").trimStart();
+  // shadcn (Tailwind v4) expects these extra imports; keep them consistent across themes.
+  return `@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+${stripped}`;
 }
 
 // Back-compat

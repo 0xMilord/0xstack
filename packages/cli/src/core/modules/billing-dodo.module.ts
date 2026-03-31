@@ -36,6 +36,8 @@ export const billingDodoModule: Module = {
   DODO_PAYMENTS_WEBHOOK_KEY: z.string().min(1),
   DODO_PAYMENTS_ENVIRONMENT: z.enum(["test_mode", "live_mode"]),
   DODO_PAYMENTS_RETURN_URL: z.string().url(),
+  // Used by /pricing. Dodo "price id" or equivalent identifier (per your Dodo dashboard).
+  DODO_PAYMENTS_STARTER_PRICE_ID: z.string().min(1),
 });
 `
     );
@@ -176,6 +178,132 @@ export const POST = Webhooks({
     await reconcileBillingEvent(payload);
   },
 });
+`
+    );
+
+    // Plug-and-play UX pages
+    await ensureDir(path.join(ctx.projectRoot, "app", "billing", "success"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "billing", "cancel"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "billing"));
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "pricing", "page.tsx"),
+      `import Link from "next/link";
+import { env } from "@/lib/env/server";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function Page() {
+  const priceId = env.DODO_PAYMENTS_STARTER_PRICE_ID;
+  const href = "/api/v1/billing/checkout?price_id=" + encodeURIComponent(priceId);
+
+  return (
+    <main className="mx-auto max-w-5xl p-6">
+      <header className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Pricing</h1>
+        <p className="text-sm text-muted-foreground">Start a subscription and manage billing from your dashboard.</p>
+      </header>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Starter</CardTitle>
+            <CardDescription>Production-ready baseline for a single team.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Auth + orgs</li>
+              <li>Storage + assets index</li>
+              <li>Billing reconciliation tables</li>
+              <li>PWA + cache + observability foundations</li>
+            </ul>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="w-full sm:w-auto">
+              <Link href={href}>Start subscription</Link>
+            </Button>
+            <Button asChild variant="secondary" className="w-full sm:w-auto">
+              <Link href="/app/billing">Manage billing</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "billing", "success", "page.tsx"),
+      `import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-3xl p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Payment successful</h1>
+      <p className="text-sm text-muted-foreground">Your subscription should be active shortly after webhook reconciliation.</p>
+      <div className="flex gap-2">
+        <Button asChild><Link href="/app/billing">Go to billing</Link></Button>
+        <Button asChild variant="secondary"><Link href="/app">Go to app</Link></Button>
+      </div>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "billing", "cancel", "page.tsx"),
+      `import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-3xl p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Checkout cancelled</h1>
+      <p className="text-sm text-muted-foreground">No payment was taken. You can restart checkout anytime.</p>
+      <div className="flex gap-2">
+        <Button asChild><Link href="/pricing">Back to pricing</Link></Button>
+        <Button asChild variant="secondary"><Link href="/">Home</Link></Button>
+      </div>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "billing", "page.tsx"),
+      `import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-5xl p-6 space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Billing</h1>
+        <p className="text-sm text-muted-foreground">Checkout, customer portal, and subscription status live here.</p>
+      </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row">
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/pricing">View pricing</Link>
+          </Button>
+          <Button asChild variant="secondary" className="w-full sm:w-auto">
+            <Link href="/api/v1/billing/portal">Open customer portal</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
 `
     );
   },

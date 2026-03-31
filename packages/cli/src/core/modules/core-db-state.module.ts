@@ -4,7 +4,7 @@ import type { Module } from "./types";
 import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgsTables } from "../generate/schema-edit";
 
 export const coreDbStateModule: Module = {
-  id: "orgs",
+  id: "core-db-state",
   install: async () => {},
   activate: async (ctx) => {
     await ensureOrgsTables(ctx.projectRoot);

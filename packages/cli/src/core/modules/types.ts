@@ -1,7 +1,11 @@
 export type ModuleId =
   | "orgs"
+  | "ui-foundation"
   | "auth-core"
   | "cache"
+  | "core-db-state"
+  | "security-api"
+  | "webhook-ledger"
   | "seo"
   | "blogMdx"
   | "billing-dodo"

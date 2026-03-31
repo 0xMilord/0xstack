@@ -574,6 +574,9 @@ export async function runBaseline(input: BaselineInput) {
         if (cfg.modules.pwa) {
           deps.push("web-push", "idb");
         }
+        if (cfg.modules.observability?.sentry) {
+          deps.push("@sentry/nextjs");
+        }
 
         const cmd = pmCmd(input.packageManager);
         const install = async (pkgs: string[], dev: boolean) => {

@@ -35,7 +35,7 @@ async function patchRootLayout(projectRoot: string) {
 }
 
 export const uiFoundationModule: Module = {
-  id: "orgs",
+  id: "ui-foundation",
   install: async () => {},
   activate: async (ctx) => {
     // Layout components

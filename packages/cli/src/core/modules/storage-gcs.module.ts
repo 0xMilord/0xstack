@@ -247,6 +247,141 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ assetId: str
 }
 `
     );
+
+    // Plug-and-play UI: /app/app/assets
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "assets"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "assets", "page.tsx"),
+      `"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assetsKeys } from "@/lib/query-keys/assets.keys";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+
+type Asset = {
+  id: string;
+  bucket: string;
+  objectKey: string;
+  contentType?: string | null;
+  createdAt?: string | Date;
+};
+
+async function apiList(): Promise<Asset[]> {
+  const res = await fetch("/api/v1/storage/assets");
+  if (!res.ok) throw new Error("Failed to load assets");
+  const json = await res.json();
+  return json.assets ?? [];
+}
+
+async function apiSignRead(assetId: string): Promise<{ url: string }> {
+  const res = await fetch("/api/v1/storage/sign-read", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ assetId }),
+  });
+  if (!res.ok) throw new Error("Failed to sign read URL");
+  const json = await res.json();
+  return { url: json.url };
+}
+
+async function apiDelete(assetId: string) {
+  const res = await fetch("/api/v1/storage/assets/" + encodeURIComponent(assetId), { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete asset");
+}
+
+export default function Page() {
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({ queryKey: assetsKeys.mine(), queryFn: apiList });
+  const assets = data ?? [];
+
+  const [assetId, setAssetId] = useState("");
+
+  const del = useMutation({
+    mutationFn: apiDelete,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: assetsKeys.mine() });
+    },
+  });
+
+  const open = useMutation({
+    mutationFn: apiSignRead,
+    onSuccess: (x) => {
+      window.open(x.url, "_blank", "noopener,noreferrer");
+    },
+  });
+
+  return (
+    <main className="mx-auto max-w-5xl p-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Assets</h1>
+        <p className="text-sm text-muted-foreground">List, open (signed read), and delete uploaded assets.</p>
+      </header>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base">Quick actions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="text-sm font-medium">Asset ID</label>
+            <Input value={assetId} onChange={(e) => setAssetId(e.target.value)} placeholder="paste asset id…" />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!assetId || open.isPending}
+              onClick={() => open.mutate(assetId)}
+            >
+              Open
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!assetId || del.isPending}
+              onClick={() => del.mutate(assetId)}
+            >
+              Delete
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-lg font-semibold">Your assets</h2>
+        {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+        {error ? <p className="text-sm text-destructive">{String(error)}</p> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {assets.map((a) => (
+            <Card key={a.id}>
+              <CardHeader>
+                <CardTitle className="text-sm">{a.id}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  <span className="text-foreground">Key:</span> {a.objectKey}
+                </p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => open.mutate(a.id)}>
+                    Open
+                  </Button>
+                  <Button type="button" variant="destructive" size="sm" onClick={() => del.mutate(a.id)}>
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+`
+    );
   },
   validate: async () => {},
   sync: async () => {},

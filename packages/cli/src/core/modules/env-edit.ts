@@ -16,12 +16,23 @@ export async function ensureEnvSchemaModuleWiring(projectRoot: string) {
 
   src = ensureImport(src, `import { BillingEnvSchema } from "./billing";`);
   src = ensureImport(src, `import { StorageEnvSchema } from "./storage";`);
+  src = ensureImport(src, `import { EmailEnvSchema } from "./email";`);
+  src = ensureImport(src, `import { PwaEnvSchema } from "./pwa";`);
+  src = ensureImport(src, `import { ObservabilityEnvSchema } from "./observability";`);
 
   // Ensure EnvSchema composes optional module schemas.
   if (!src.includes(".and(BillingEnvSchema.partial())")) {
     src = src.replace(
       /export const EnvSchema = z\.object\(\{([\s\S]*?)\}\);\s*/m,
-      (m) => m.replace(/\}\);\s*$/m, `}).and(BillingEnvSchema.partial()).and(StorageEnvSchema.partial());\n`)
+      (m) =>
+        m.replace(
+          /\}\);\s*$/m,
+          `}).and(BillingEnvSchema.partial())
+  .and(StorageEnvSchema.partial())
+  .and(EmailEnvSchema.partial())
+  .and(PwaEnvSchema.partial())
+  .and(ObservabilityEnvSchema.partial());\n`
+        )
     );
   }
 
