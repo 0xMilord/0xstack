@@ -119,6 +119,7 @@ export async function storageService_createSignedUpload(input: {
   const assetId = crypto.randomUUID();
   await insertAsset({
     id: assetId,
+    provider: "gcs",
     ownerUserId: input.ownerUserId,
     orgId: input.orgId,
     bucket: env.GCS_BUCKET!,

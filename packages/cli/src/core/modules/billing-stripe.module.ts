@@ -15,7 +15,11 @@ export const billingStripeModule: Module = {
     ];
 
     if (!enabled) {
-      for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
+      // Only remove shared billing routes when billing is fully disabled.
+      // If another billing provider is enabled, it owns these routes.
+      if (ctx.modules.billing === false) {
+        for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
+      }
       await backupAndRemove(ctx.projectRoot, "lib/env/billing-stripe.ts");
       await backupAndRemove(ctx.projectRoot, "lib/billing/stripe.ts");
       return;

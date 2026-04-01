@@ -14,7 +14,11 @@ export const billingDodoModule: Module = {
       "app/api/v1/billing/webhook/route.ts",
     ];
     if (!enabled) {
-      for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
+      // Only remove shared billing routes when billing is fully disabled.
+      // If another billing provider is enabled, it owns these routes.
+      if (ctx.modules.billing === false) {
+        for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
+      }
       await backupAndRemove(ctx.projectRoot, "lib/billing/dodo.webhooks.ts");
       await backupAndRemove(ctx.projectRoot, "lib/billing/plans.ts");
       await backupAndRemove(ctx.projectRoot, "lib/services/billing.service.ts");

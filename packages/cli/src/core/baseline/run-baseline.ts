@@ -38,6 +38,21 @@ async function writeFileEnsured(p: string, content: string) {
   await fs.writeFile(p, content, "utf8");
 }
 
+async function ensureOptionalEnvSchemaStubs(root: string) {
+  await ensureDir(path.join(root, "lib", "env"));
+  const stubs: Array<{ file: string; exportName: string }> = [
+    { file: "billing-stripe.ts", exportName: "BillingStripeEnvSchema" },
+    { file: "storage-s3.ts", exportName: "StorageS3EnvSchema" },
+    { file: "storage-supabase.ts", exportName: "StorageSupabaseEnvSchema" },
+  ];
+  for (const s of stubs) {
+    const p = path.join(root, "lib", "env", s.file);
+    const exists = await fileExists(p);
+    if (exists) continue;
+    await writeFileEnsured(p, `import { z } from "zod";\n\nexport const ${s.exportName} = z.object({});\n`);
+  }
+}
+
 async function ensureKeysIndex(root: string, dirRel: "lib/query-keys" | "lib/mutation-keys") {
   const dir = path.join(root, ...dirRel.split("/"));
   await ensureDir(dir);
@@ -529,6 +544,13 @@ export async function runBaseline(input: BaselineInput) {
       run: async () => {
         await writeDefaultConfig(root, path.basename(root));
         await ensureConfigFileKeysUpToDate(root);
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "ensure optional env schema stubs",
+      run: async () => {
+        await ensureOptionalEnvSchemaStubs(root);
         return { kind: "ok" };
       },
     },
