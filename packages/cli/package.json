@@ -1,10 +1,14 @@
 {
-  "name": "0xstack",
+  "name": "@0xmilord/0xstack",
   "version": "0.1.0",
   "private": false,
   "type": "module",
   "bin": {
     "0xstack": "dist/index.js"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
   },
   "files": [
     "dist"
