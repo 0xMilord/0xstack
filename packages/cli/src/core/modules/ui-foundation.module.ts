@@ -263,8 +263,16 @@ export default async function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "page.tsx"),
       `import Link from "next/link";
+import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "0xstack",
+  description: "Production-ready Next.js starter: auth, orgs, billing, storage, jobs, and enterprise guardrails.",
+  pathname: "/",
+});
 
 export default function Page() {
   return (
@@ -306,8 +314,16 @@ export default function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "about", "page.tsx"),
       `import Link from "next/link";
+import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "About",
+  description: "Learn what 0xstack generates and the architectural conventions it enforces.",
+  pathname: "/about",
+});
 
 export default function Page() {
   return (
@@ -346,7 +362,15 @@ export default function Page() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "contact", "page.tsx"),
-      `import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+      `import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Contact",
+  description: "Contact the team behind this app.",
+  pathname: "/contact",
+});
 
 export default function Page() {
   return (
@@ -371,7 +395,16 @@ export default function Page() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "terms", "page.tsx"),
-      `export default function Page() {
+      `import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Terms",
+  description: "Terms of service for this app.",
+  pathname: "/terms",
+});
+
+export default function Page() {
   return (
     <main className="mx-auto max-w-4xl p-6 space-y-4">
       <h1 className="text-3xl font-semibold tracking-tight">Terms</h1>
@@ -386,7 +419,16 @@ export default function Page() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "privacy", "page.tsx"),
-      `export default function Page() {
+      `import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Privacy",
+  description: "Privacy policy for this app.",
+  pathname: "/privacy",
+});
+
+export default function Page() {
   return (
     <main className="mx-auto max-w-4xl p-6 space-y-4">
       <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>

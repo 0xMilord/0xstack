@@ -3,6 +3,60 @@ import fs from "node:fs/promises";
 import { backupAndRemove, ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
 
+async function patchRootLayoutForSeo(projectRoot: string) {
+  const layoutPath = path.join(projectRoot, "app", "layout.tsx");
+  let src = await fs.readFile(layoutPath, "utf8").catch(() => "");
+  if (!src) return;
+  if (src.includes("0xstack:SEO")) return;
+
+  // Add imports for metadata + JSON-LD helpers (best-effort).
+  if (!src.includes('from "@/lib/seo/metadata"') || !src.includes('from "@/lib/seo/jsonld"')) {
+    // Prefer inserting after globals.css import (layout templates always have it).
+    if (src.match(/import\s+["']\.\/globals\.css["'];/)) {
+      src = src.replace(
+        /import\s+["']\.\/globals\.css["'];\s*/m,
+        (m) =>
+          `${m}import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";\n`
+      );
+    } else {
+      src = `import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";\n${src}`;
+    }
+  }
+
+  // Ensure `Metadata` type is imported when we add `metadata` export.
+  if (!src.includes('from "next"') || !src.includes("Metadata")) {
+    // If they already import from next, add Metadata to that import.
+    if (src.match(/import\s+\{\s*[^}]*\}\s+from\s+"next";/)) {
+      src = src.replace(/import\s+\{\s*([^}]*)\}\s+from\s+"next";/, (full, inner) => {
+        if (String(inner).includes("Metadata")) return full;
+        return `import { ${String(inner).trim()}, Metadata } from "next";`;
+      });
+    } else if (!src.includes('import type { Metadata } from "next"')) {
+      src = src.replace(/import\s+"\.\/globals\.css";\s*/m, (m) => `${m}import type { Metadata } from "next";\n`);
+    }
+  }
+
+  // Add metadata export near top of file.
+  if (!src.includes("export const metadata")) {
+    const exportDefaultIdx = src.search(/\bexport\s+default\s+(async\s+)?function\s+RootLayout\b/);
+    if (exportDefaultIdx !== -1) {
+      src =
+        src.slice(0, exportDefaultIdx) +
+        `// 0xstack:SEO\nexport const metadata: Metadata = getSiteMetadata();\n\n` +
+        src.slice(exportDefaultIdx);
+    }
+  }
+
+  // Inject sitewide JSON-LD into the body wrapper.
+  // Note: works with most create-next-app and our ui-foundation patch.
+  src = src.replace(
+    /<body([^>]*)>/m,
+    `<body$1>\n        {/* 0xstack:SEO */}\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd()) }} />\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd()) }} />`
+  );
+
+  await fs.writeFile(layoutPath, src, "utf8");
+}
+
 export const seoModule: Module = {
   id: "seo",
   install: async () => {},
@@ -13,6 +67,7 @@ export const seoModule: Module = {
       await backupAndRemove(ctx.projectRoot, "app/opengraph-image.tsx");
       await backupAndRemove(ctx.projectRoot, "app/twitter-image.tsx");
       await backupAndRemove(ctx.projectRoot, "lib/seo/jsonld.ts");
+      await backupAndRemove(ctx.projectRoot, "lib/seo/metadata.ts");
       await backupAndRemove(ctx.projectRoot, "lib/seo/runtime.ts");
       return;
     }
@@ -34,8 +89,102 @@ export function getSeoRuntimeConfig() {
     );
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "seo", "jsonld.ts"),
-      `export function safeJsonLd<T>(data: T): string {
+      `import { env } from "@/lib/env/server";
+
+export function safeJsonLd<T>(data: T): string {
   return JSON.stringify(data).replace(/</g, "\\\\u003c");
+}
+
+export function organizationJsonLd() {
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name,
+    url,
+  } as const;
+}
+
+export function websiteJsonLd() {
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name,
+    url,
+  } as const;
+}
+`
+    );
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "seo", "metadata.ts"),
+      `import type { Metadata } from "next";
+import { env } from "@/lib/env/server";
+
+export function getSiteUrl() {
+  return env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}
+
+export function absoluteUrl(pathname: string) {
+  const siteUrl = getSiteUrl();
+  return new URL(pathname.startsWith("/") ? pathname : \`/\${pathname}\`, siteUrl).toString();
+}
+
+export function getSiteMetadata(): Metadata {
+  const siteUrl = getSiteUrl();
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const description = env.NEXT_PUBLIC_APP_DESCRIPTION ?? "Production-ready Next.js starter.";
+  const og = absoluteUrl("/opengraph-image");
+
+  return {
+    metadataBase: new URL(siteUrl),
+    title: { default: name, template: "%s · " + name },
+    description,
+    alternates: { canonical: "/" },
+    openGraph: {
+      type: "website",
+      url: siteUrl,
+      title: name,
+      description,
+      siteName: name,
+      images: [{ url: og, width: 1200, height: 630, alt: name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: name,
+      description,
+      images: [og],
+    },
+  };
+}
+
+export function getPageMetadata(input: { title: string; description?: string; pathname: string }): Metadata {
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const description = input.description ?? env.NEXT_PUBLIC_APP_DESCRIPTION ?? "Production-ready Next.js starter.";
+  const url = absoluteUrl(input.pathname);
+  const og = absoluteUrl("/opengraph-image");
+
+  return {
+    title: input.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      title: input.title,
+      description,
+      siteName: name,
+      images: [{ url: og, width: 1200, height: 630, alt: name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: input.title,
+      description,
+      images: [og],
+    },
+  };
 }
 `
     );
@@ -126,22 +275,7 @@ export default function Image() {
       `export { default, size, contentType, runtime } from "./opengraph-image";\n`
     );
 
-    // Patch root metadata defaults if still create-next-app template.
-    const layoutPath = path.join(ctx.projectRoot, "app", "layout.tsx");
-    const layoutSrc = await fs.readFile(layoutPath, "utf8").catch(() => "");
-    if (layoutSrc && layoutSrc.includes('title: "Create Next App"')) {
-      const next = layoutSrc.replace(
-        /export const metadata: Metadata = \{\s*title: "Create Next App",\s*description: "Generated by create next app",\s*\};/m,
-        `export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: { default: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack", template: "%s · " + (process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack") },
-  description: "Production-ready Next.js starter.",
-  openGraph: { type: "website", title: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack" },
-  twitter: { card: "summary_large_image", title: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack" },
-};`
-      );
-      await fs.writeFile(layoutPath, next, "utf8");
-    }
+    await patchRootLayoutForSeo(ctx.projectRoot);
   },
   validate: async () => {},
   sync: async () => {},

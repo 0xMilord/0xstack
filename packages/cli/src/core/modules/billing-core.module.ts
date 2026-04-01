@@ -317,12 +317,20 @@ export function useInvalidateBilling() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "pricing", "page.tsx"),
       `import Link from "next/link";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
 import { getBillingPlans } from "@/lib/billing/plans";
 import { startCheckoutAction } from "@/lib/actions/billing.actions";
+import { getPageMetadata } from "@/lib/seo/metadata";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Pricing",
+  description: "Plans and pricing. Start a subscription and manage billing from your dashboard.",
+  pathname: "/pricing",
+});
 
 export default async function Page() {
   const orgId = getActiveOrgIdFromCookies(await cookies());
@@ -374,7 +382,15 @@ export default async function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "billing", "success", "page.tsx"),
       `import Link from "next/link";
+import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
 import { buttonVariants } from "@/components/ui/button";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Billing success",
+  description: "Your checkout completed successfully.",
+  pathname: "/billing/success",
+});
 
 export default function Page() {
   return (
@@ -394,7 +410,15 @@ export default function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "billing", "cancel", "page.tsx"),
       `import Link from "next/link";
+import type { Metadata } from "next";
+import { getPageMetadata } from "@/lib/seo/metadata";
 import { buttonVariants } from "@/components/ui/button";
+
+export const metadata: Metadata = getPageMetadata({
+  title: "Billing canceled",
+  description: "Checkout was canceled. You can restart it any time.",
+  pathname: "/billing/cancel",
+});
 
 export default function Page() {
   return (
