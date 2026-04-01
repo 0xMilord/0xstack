@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a bug in the 0xstack CLI
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please include the details below so we can reproduce quickly.
+  - type: input
+    id: version
+    attributes:
+      label: CLI version
+      description: Output of `0xstack --version` (or the version you installed)
+      placeholder: "@0xmilord/0xstack@0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      description: Include the exact command and flags
+      placeholder: "npx @0xmilord/0xstack baseline --profile full"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / logs
+      description: Paste logs and stack traces (redact secrets)
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Windows 11 / macOS / Ubuntu"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: "node -v"
+    validations:
+      required: true
+

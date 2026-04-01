@@ -1,152 +1,143 @@
-# 0xstack
+<p align="center">
+  <img src="./assets/0xstack.svg" width="130" alt="0xstack logo">
+</p>
 
-`0xstack` is a **starter-system CLI**: it scaffolds and continuously reconciles a production-grade Next.js app with a strict architecture and config-gated “enterprise modules”.
+<h1 align="center">
+  0xstack
+</h1>
 
-## TL;DR
+<p align="center">
+  Opinionated starter-system CLI for building and maintaining production-grade Next.js apps with Supabase Postgres + Drizzle.
+</p>
+
+<p align="center">
+  Generate a project once, then keep it correct over time with <code>baseline</code>, <code>doctor</code>, and <code>sync</code>.
+</p>
+
+<div align="center">
+
+[![NPM version][npm-image]][npm-url] [![Downloads][downloads-image]][npm-url] [![License][license-image]][license-url] [![PRs Welcome][contribute-image]][contribute-url]
+
+</div>
+
+## Table of contents
+
+- [What is 0xstack?](#what-is-0xstack)
+- [Core ideas](#core-ideas)
+- [Getting started](#getting-started)
+- [CLI commands](#cli-commands)
+- [Release process](#release-process)
+- [Contributing](#contributing)
+
+## What is 0xstack?
+
+0xstack is a **starter system** (not just a template):
+
+- **Scaffold** a new app via `init`
+- **Install + activate** modules via `baseline` (config-driven)
+- **Verify** architecture and env via `doctor`
+- **Reconcile** your repo + docs over time via `sync`
+
+The generated app targets a consistent architecture for:
+
+- Supabase Postgres (DB)
+- Drizzle (schema/repos)
+- Better Auth (auth)
+- Two entry points:
+  - **Internal** server actions (RSC-first app)
+  - **External** stable HTTP routes (integrations/clients)
+
+## Core ideas
+
+- **Installed ≠ activated**: modules can exist but stay dormant unless enabled in config.
+- **Two highways**:
+  - Read: `RSC page → loader → repo → DB`
+  - Write: `Client UI → server action → rules → (service) → repo → DB`
+- **Operator mindset**: the CLI is designed to run repeatedly and keep projects consistent.
+
+## Getting started
+
+This package is published to **npmjs**, which means it works with **npm / pnpm / yarn / bun**.
+
+### npm
 
 ```bash
-npx 0xstack init
-cd my-app
-npx 0xstack baseline --profile full
-npx 0xstack doctor --profile full
-pnpm dev
+npx @0xmilord/0xstack init
 ```
 
-pnpm alternative:
+### pnpm
 
 ```bash
-pnpm dlx 0xstack init
+pnpm dlx @0xmilord/0xstack init
 ```
 
-## Keywords / Glossary
+### yarn
 
-- **baseline**: the idempotent “make it correct” command (deps + auth schema generate + migrations + module activation + docs)
-- **doctor**: static verification (env, required files, boundary rules)
-- **sync**: reconcile repo structure + docs (non-destructive)
-- **module**: a capability that can be installed but **only activated when enabled** in config (routes/files removed when disabled)
-- **CQRS read path**: `page (RSC)` → `lib/loaders/*` → `lib/services/*` → `lib/repos/*` → DB (cached via `lib/cache/*`)
-- **CQRS write path**: `server actions` (`lib/actions/*`) → `lib/services/*` → `lib/repos/*` → DB → `revalidate` (tags/paths)
-- **external API highway**: HTTP routes under `app/api/v1/*` (must call `lib/services/*`; never repos directly)
+```bash
+yarn dlx @0xmilord/0xstack init
+```
 
-## What it generates (app output)
+### bun
 
-- **Next.js App Router** + TypeScript + Tailwind + shadcn/ui
-- **Flat structure**:
-  - routes: `app/*`
-  - everything else: `lib/*`
-  - **no `src/`**, **no `()` route groups**
-- **Auth**: Better Auth only (**text IDs**)
-- **DB**: Postgres + Drizzle ORM + migrations
-- **Architecture layers**:
-  - `lib/db/*`: DB client + schema export surface
-  - `lib/repos/*`: DB access
-  - `lib/services/*`: business logic + permissions
-  - `lib/rules/*`: Zod schemas for inputs
-  - `lib/actions/*`: Server Actions (writes)
-  - `lib/loaders/*`: cached reads
-  - `app/api/v1/*`: external HTTP APIs
-- **Docs**: root `README.md`, `PRD.md`, `ARCHITECTURE.md`, `ERD.md`, and `lib/*/README.md`
+```bash
+bunx @0xmilord/0xstack init
+```
 
-## CQRS-style architecture (why it feels “enterprise”)
-
-- **Reads are explicit**: loaders are the *only* place RSC pages should fetch read models. Loaders are cache-wrapped.
-- **Writes are explicit**: server actions are the *only* place internal UI should mutate the DB.
-- **One business layer**: both loaders and actions call the same `lib/services/*` methods (so rules/permissions are centralized).
-- **Clear boundaries**: UI/routes must not import repos directly (enforced by `doctor`).
-
-## Commands (npm/npx first)
+## CLI commands
 
 ### `init`
-Scaffold a new app (interactive). Supports creating into a new folder or current folder.
+
+Scaffold a new app (interactive):
 
 ```bash
-npx 0xstack init
+npx @0xmilord/0xstack init
 ```
 
 ### `baseline`
-Idempotent “enterprise reconciliation”:
 
-- installs deps for enabled modules
-- generates Better Auth schema
-- ensures core tables + module tables
-- generates Drizzle migrations (and migrates if `DATABASE_URL` is set)
-- activates enabled modules (writes routes + lib wiring)
-- upgrades public/auth pages (if still shell templates)
-- generates docs (README/PRD/ARCH/ERD + subsystem READMEs)
+Idempotent “make it correct” command (deps + schema + migrations + module activation + docs):
 
 ```bash
-npx 0xstack baseline --profile full
+npx @0xmilord/0xstack baseline --profile full
 ```
 
 ### `doctor`
-Validates:
 
-- env schema presence
-- required files for enabled modules
-- boundary rules (routes must not import repos directly)
+Static checks for env + invariants + boundary rules:
 
 ```bash
-npx 0xstack doctor --profile full
+npx @0xmilord/0xstack doctor --profile full
+```
+
+### `sync`
+
+Non-destructive reconciliation (docs + hygiene):
+
+```bash
+npx @0xmilord/0xstack sync
 ```
 
 ### `generate <domain>`
-Generates a domain end-to-end:
 
-- schema table (text IDs)
-- repo/service/actions/loaders/rules
-- optional API route (`--with-api`)
-- app route page under `/app/<plural>`
+Generate a new domain module end-to-end:
 
 ```bash
-npx 0xstack generate materials --with-api
+npx @0xmilord/0xstack generate materials --with-api
 ```
 
-### `docs-sync`
-Regenerate docs inventories using stable markers:
+## Release process
 
-```bash
-npx 0xstack docs-sync
-```
+See [`RELEASING.md`](RELEASING.md).
 
-### pnpm alternative
+## Contributing
 
-```bash
-pnpm dlx 0xstack init
-pnpm dlx 0xstack baseline --profile full
-pnpm dlx 0xstack doctor --profile full
-pnpm dlx 0xstack docs-sync
-pnpm dlx 0xstack generate materials --with-api
-```
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please read it before opening a PR.
 
-## Modules (overview)
-Enabled via `0xstack.config.ts` profiles/modules.
-
-- **Auth (Better Auth, always-on)**:
-  - Auth handler route `app/api/auth/[...all]/route.ts`
-  - Auth pages: `/login`, `/get-started` (signup), `/forgot-password`, `/reset-password`
-  - Viewer domain: `lib/loaders/viewer.loader.ts`, `lib/services/viewer.service.ts`, `lib/hooks/client/use-viewer.ts`
-  - Profile bootstrapping: `user_profiles` row ensured on first session read
-- **Orgs (always-on)**:
-  - Tables: `orgs`, `org_members`
-  - UI: `/app/app/orgs` create + select active org
-- **SEO**: robots/sitemap + OG/Twitter images + JSON-LD helpers
-- **Blog (MDX)**: content loader + routes + RSS
-- **Billing (Dodo)**: checkout/portal/webhook + ledger + reconciliation tables (state sync into `billing_customers` + `billing_subscriptions`)
-- **Storage (GCS)**:
-  - Signed upload + signed read
-  - `assets` indexing table
-  - Assets list + delete endpoints (plus UI wiring via Settings links)
-- **Email (Resend)**: verification + reset emails via React Email templates (wired into Better Auth)
-- **Cache (L1+L2)**: `lib/cache/*` (L1 LRU + Next `unstable_cache` + tag revalidation helpers)
-- **PWA**: `public/manifest.webmanifest`, custom `public/sw.js`, offline page, push foundations (VAPID + DB-backed subscriptions)
-- **Jobs / Observability**:
-  - `lib/utils/logger.ts` structured logger
-  - Jobs endpoints under `app/api/v1/jobs/*` when enabled
-
-## Local development (this repo)
-```bash
-pnpm install
-pnpm -r build
-node packages/cli/dist/index.js --help
-```
+[downloads-image]: https://img.shields.io/npm/dm/%40oxmilord%2F0xstack
+[npm-url]: https://www.npmjs.com/package/@0xmilord/0xstack
+[npm-image]: https://img.shields.io/npm/v/%40oxmilord%2F0xstack
+[license-url]: ./LICENSE
+[license-image]: https://img.shields.io/npm/l/%40oxmilord%2F0xstack
+[contribute-url]: ./CONTRIBUTING.md
+[contribute-image]: https://img.shields.io/badge/PRs-welcome-blue.svg
 
