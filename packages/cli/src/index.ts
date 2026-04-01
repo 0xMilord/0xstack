@@ -11,6 +11,9 @@ import { registerSyncCommand } from "./commands/sync";
 import { registerDocsSyncCommand } from "./commands/docs-sync";
 import { registerGenerateCommand } from "./commands/generate";
 import { registerAddCommand } from "./commands/add";
+import { registerGitCommands } from "./commands/git";
+import { registerReleaseCommand } from "./commands/release";
+import { registerUpgradeCommand } from "./commands/upgrade";
 
 const cli = cac("0xstack");
 
@@ -36,6 +39,9 @@ registerSyncCommand(cli);
 registerDocsSyncCommand(cli);
 registerGenerateCommand(cli);
 registerAddCommand(cli);
+registerGitCommands(cli);
+registerReleaseCommand(cli);
+registerUpgradeCommand(cli);
 
 try {
   cli.parse();

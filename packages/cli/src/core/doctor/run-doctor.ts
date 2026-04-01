@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { computeProjectState } from "../project/project-state";
 import { logger } from "../logger";
+import { applyProfile, loadConfig } from "../config";
+import { expectedDepsForConfig } from "../deps";
 
 async function exists(p: string) {
   try {
@@ -53,6 +55,22 @@ export async function runDoctor(input: DoctorInput) {
     if (!(await exists(p))) note(`Missing required file: ${f}`);
   }
 
+  // Dependency parity (missing deps are errors; extra deps are allowed)
+  try {
+    const cfg = applyProfile(await loadConfig(input.projectRoot), input.profile);
+    const expected = expectedDepsForConfig(cfg);
+    const pkgPath = path.join(input.projectRoot, "package.json");
+    const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as any;
+    const deps = new Set<string>(Object.keys(pkg?.dependencies ?? {}));
+    const devDeps = new Set<string>(Object.keys(pkg?.devDependencies ?? {}));
+    const missingDeps = expected.deps.filter((d) => !deps.has(d));
+    const missingDevDeps = expected.devDeps.filter((d) => !devDeps.has(d));
+    if (missingDeps.length) note(`Missing dependencies for enabled modules: ${missingDeps.join(", ")}`);
+    if (missingDevDeps.length) note(`Missing devDependencies for enabled modules: ${missingDevDeps.join(", ")}`);
+  } catch {
+    note("Unable to validate dependency parity (package.json/config unreadable)");
+  }
+
   const checkFiles = async (label: string, files: string[]) => {
     const missing: string[] = [];
     for (const f of files) {
@@ -71,6 +89,9 @@ export async function runDoctor(input: DoctorInput) {
   requireEnvKey("BETTER_AUTH_SECRET");
   requireEnvKey("BETTER_AUTH_URL");
   requireEnvKey("NEXT_PUBLIC_APP_URL");
+
+  // Query/mutation keys conventions
+  await checkFiles("keys.indices", ["lib/query-keys/index.ts", "lib/mutation-keys/index.ts"]);
 
   // Always-on foundations (per-layer sanity)
   await checkFiles("foundation.ui", [
@@ -291,6 +312,30 @@ export async function runDoctor(input: DoctorInput) {
     }
   } catch {
     // ignore
+  }
+
+  // Migration drift (journal ↔ files)
+  try {
+    if (await exists(journal)) {
+      const j = JSON.parse(await fs.readFile(journal, "utf8")) as any;
+      const entries: Array<{ tag: string; idx: number }> = Array.isArray(j?.entries) ? j.entries : [];
+      for (const e of entries) {
+        const tag = String(e.tag ?? "");
+        if (!tag) continue;
+        const sqlPath = path.join(input.projectRoot, "drizzle", "migrations", `${tag}.sql`);
+        if (!(await exists(sqlPath))) note(`Migration drift: journal entry ${tag} missing file drizzle/migrations/${tag}.sql`);
+      }
+      const metaDir = path.join(input.projectRoot, "drizzle", "migrations", "meta");
+      const metaFiles = (await exists(metaDir)) ? await fs.readdir(metaDir).catch(() => []) : [];
+      const snapshotFiles = metaFiles.filter((f) => f.endsWith("_snapshot.json"));
+      const expectedSnapshots = entries.map((e) => String(e.tag ?? "")).filter(Boolean);
+      // Best-effort: ensure at least one snapshot exists when journal has entries
+      if (entries.length > 0 && snapshotFiles.length === 0) {
+        note("Migration drift: journal has entries but no meta/*_snapshot.json files exist.");
+      }
+    }
+  } catch {
+    note("Unable to validate drizzle journal/migration drift (journal unreadable).");
   }
 
   // Architecture boundary enforcement (static scan, v1)

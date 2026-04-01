@@ -38,6 +38,21 @@ async function writeFileEnsured(p: string, content: string) {
   await fs.writeFile(p, content, "utf8");
 }
 
+async function ensureKeysIndex(root: string, dirRel: "lib/query-keys" | "lib/mutation-keys") {
+  const dir = path.join(root, ...dirRel.split("/"));
+  await ensureDir(dir);
+  const entries = await fs.readdir(dir).catch(() => []);
+  const keyFiles = entries
+    .filter((f) => f.endsWith(".keys.ts"))
+    .filter((f) => f !== "index.ts")
+    .sort((a, b) => a.localeCompare(b));
+  const content =
+    `// 0xstack:auto-generated\n` +
+    keyFiles.map((f) => `export * from "./${f.replace(/\.ts$/, "")}";`).join("\n") +
+    (keyFiles.length ? "\n" : "");
+  await writeFileEnsured(path.join(dir, "index.ts"), content);
+}
+
 async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
   const p = path.join(projectRoot, "lib", "0xstack", "config.ts");
   const src = await fs.readFile(p, "utf8").catch(() => "");
@@ -712,6 +727,14 @@ export async function runBaseline(input: BaselineInput) {
             jobs: cfg.modules.jobs,
           },
         });
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "ensure query/mutation key indices",
+      run: async () => {
+        await ensureKeysIndex(root, "lib/query-keys");
+        await ensureKeysIndex(root, "lib/mutation-keys");
         return { kind: "ok" };
       },
     },

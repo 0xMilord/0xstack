@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { applyProfile, loadConfig } from "../config";
 import { expectedDepsForConfig } from "../deps";
+import { diffSnapshots, snapshotFiles } from "../exec";
 
 export type SyncInput = { projectRoot: string; profile: string; apply: boolean };
 
@@ -40,11 +41,59 @@ export async function runSync(input: SyncInput) {
     logger.warn("Dep drift check skipped (unable to read package.json/config).");
   }
 
+  // File-level impact (best-effort): surface obvious removals when modules are disabled.
+  try {
+    const cfg = applyProfile(await loadConfig(input.projectRoot), input.profile);
+    const absentIfDisabled: string[] = [];
+    const addAll = (xs: string[]) => absentIfDisabled.push(...xs);
+    if (cfg.modules.billing !== "dodo") {
+      addAll([
+        "app/api/v1/billing/checkout/route.ts",
+        "app/api/v1/billing/portal/route.ts",
+        "app/api/v1/billing/webhook/route.ts",
+        "app/app/(workspace)/billing/page.tsx",
+      ]);
+    }
+    if (cfg.modules.storage !== "gcs") {
+      addAll([
+        "app/api/v1/storage/sign-upload/route.ts",
+        "app/api/v1/storage/sign-read/route.ts",
+        "app/api/v1/storage/assets/route.ts",
+        "app/api/v1/storage/assets/[assetId]/route.ts",
+        "app/app/(workspace)/assets/page.tsx",
+      ]);
+    }
+    if (!cfg.modules.blogMdx) addAll(["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts"]);
+    if (!cfg.modules.seo) addAll(["app/robots.ts", "app/sitemap.ts", "app/opengraph-image.tsx", "app/twitter-image.tsx"]);
+    if (cfg.modules.email !== "resend") addAll(["lib/email/auth-emails.ts"]);
+    if (!cfg.modules.pwa) addAll(["app/api/v1/pwa/push/subscribe/route.ts", "public/manifest.webmanifest"]);
+    if (!cfg.modules.jobs?.enabled) addAll(["app/api/v1/jobs/reconcile/route.ts"]);
+
+    const present: string[] = [];
+    for (const rel of absentIfDisabled) {
+      const p = path.join(input.projectRoot, ...rel.split("/"));
+      try {
+        await fs.access(p);
+        present.push(rel);
+      } catch {
+        // absent ok
+      }
+    }
+    if (present.length) {
+      logger.info(`- removals (if apply): ${present.length} disabled-module files currently present`);
+      for (const f of present.slice(0, 25)) logger.info(`  - would remove: ${f}`);
+      if (present.length > 25) logger.info("  - ...");
+    }
+  } catch {
+    // ignore
+  }
+
   if (!input.apply) {
     logger.info("No changes applied. Re-run with `--apply` to execute baseline + docs sync.");
     return;
   }
 
+  const before = await snapshotFiles(input.projectRoot);
   await runPipeline([
     {
       name: "baseline (reconcile deps/files)",
@@ -61,5 +110,11 @@ export async function runSync(input: SyncInput) {
       },
     },
   ]);
+  const after = await snapshotFiles(input.projectRoot);
+  const diff = diffSnapshots(before, after);
+  logger.info(`Sync applied. Files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
+  for (const f of diff.added.slice(0, 15)) logger.info(`  + ${path.relative(input.projectRoot, f).replaceAll("\\", "/")}`);
+  for (const f of diff.changed.slice(0, 15)) logger.info(`  ~ ${path.relative(input.projectRoot, f).replaceAll("\\", "/")}`);
+  for (const f of diff.removed.slice(0, 15)) logger.info(`  - ${path.relative(input.projectRoot, f).replaceAll("\\", "/")}`);
 }
 

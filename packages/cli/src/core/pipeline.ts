@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import ora from "ora";
 
 export type StepResult =
   | { kind: "ok"; meta?: Record<string, unknown> }
@@ -16,10 +17,12 @@ export type Step = {
 
 export async function runPipeline(steps: Step[]) {
   const ctx: StepContext = { now: () => Date.now() };
+  const useSpinner = !!process.stdout.isTTY;
 
   for (const step of steps) {
     const start = Date.now();
-    logger.stepStart(step.name);
+    const spinner = useSpinner ? ora(step.name).start() : null;
+    if (!useSpinner) logger.stepStart(step.name);
 
     const retries = Math.max(0, step.retry?.retries ?? 0);
     const backoffMs = Math.max(0, step.retry?.backoffMs ?? 250);
@@ -30,12 +33,18 @@ export async function runPipeline(steps: Step[]) {
       try {
         const result = await step.run(ctx);
         const ms = Date.now() - start;
-        logger.stepEnd(step.name, ms, result.kind);
+        if (spinner) {
+          if (result.kind === "skip") spinner.info(`${step.name} (${ms}ms)`);
+          else spinner.succeed(`${step.name} (${ms}ms)`);
+        } else {
+          logger.stepEnd(step.name, ms, result.kind);
+        }
         break;
       } catch (err) {
         if (attempt >= retries) {
           const ms = Date.now() - start;
-          logger.stepFail(step.name, ms);
+          if (spinner) spinner.fail(`${step.name} (${ms}ms)`);
+          else logger.stepFail(step.name, ms);
           if (step.retry?.onErrorHint) {
             logger.warn(`Hint: ${step.retry.onErrorHint}`);
           }
