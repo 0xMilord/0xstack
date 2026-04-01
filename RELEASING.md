@@ -73,6 +73,7 @@ pnpm changeset
 ```
 
 Pick the bump type:
+
 - **patch**: bugfix, internal improvements
 - **minor**: new backwards-compatible features
 - **major**: breaking changes
@@ -181,4 +182,3 @@ npx @0xmilord/0xstack --help
 ```
 
 If you want the shorter `npx 0xstack ...`, you’d need to publish an **unscoped** `0xstack` package name (separate decision).
-

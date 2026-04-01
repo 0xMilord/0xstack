@@ -45,6 +45,7 @@ pnpm changeset
 ```
 
 Notes:
+
 - Choose **patch/minor/major** appropriately.
 - Docs-only changes can skip a changeset.
 
@@ -53,4 +54,3 @@ Notes:
 - Keep PR titles clear (what + why).
 - Update docs when you change CLI behavior.
 - Ensure `pnpm -C packages/cli typecheck` and `pnpm -C packages/cli build` pass.
-
