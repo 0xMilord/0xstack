@@ -9,7 +9,10 @@ export type ModuleId =
   | "seo"
   | "blogMdx"
   | "billing-dodo"
+  | "billing-stripe"
   | "storage-gcs"
+  | "storage-s3"
+  | "storage-supabase"
   | "email-resend"
   | "pwa"
   | "observability"
@@ -21,8 +24,8 @@ export type ModuleContext = {
   modules: {
     seo: boolean;
     blogMdx: boolean;
-    billing: false | "dodo";
-    storage: false | "gcs";
+    billing: false | "dodo" | "stripe";
+    storage: false | "gcs" | "s3" | "supabase";
     email: false | "resend";
     cache: boolean;
     pwa: boolean;

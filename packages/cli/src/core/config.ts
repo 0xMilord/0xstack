@@ -16,8 +16,8 @@ export const ConfigSchema = z.object({
     .object({
       auth: z.literal("better-auth").default("better-auth"),
       orgs: z.boolean().default(true),
-      billing: z.union([z.literal(false), z.literal("dodo")]).default(false),
-      storage: z.union([z.literal(false), z.literal("gcs")]).default(false),
+      billing: z.union([z.literal(false), z.literal("dodo"), z.literal("stripe")]).default(false),
+      storage: z.union([z.literal(false), z.literal("gcs"), z.literal("s3"), z.literal("supabase")]).default(false),
       email: z.union([z.literal(false), z.literal("resend")]).default(false),
       cache: z.boolean().default(true),
       pwa: z.boolean().default(false),
@@ -63,8 +63,8 @@ export const ConfigSchema = z.object({
         modules: z
           .object({
             orgs: z.boolean().optional(),
-            billing: z.union([z.literal(false), z.literal("dodo")]).optional(),
-            storage: z.union([z.literal(false), z.literal("gcs")]).optional(),
+            billing: z.union([z.literal(false), z.literal("dodo"), z.literal("stripe")]).optional(),
+            storage: z.union([z.literal(false), z.literal("gcs"), z.literal("s3"), z.literal("supabase")]).optional(),
             email: z.union([z.literal(false), z.literal("resend")]).optional(),
             cache: z.boolean().optional(),
             pwa: z.boolean().optional(),

@@ -13,7 +13,10 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
   if (cfg.modules.blogMdx) deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "rehype-slug", "rehype-autolink-headings");
   if (cfg.modules.seo) deps.push("schema-dts");
   if (cfg.modules.billing === "dodo") deps.push("@dodopayments/nextjs", "standardwebhooks");
+  if (cfg.modules.billing === "stripe") deps.push("stripe");
   if (cfg.modules.storage === "gcs") deps.push("@google-cloud/storage");
+  if (cfg.modules.storage === "s3") deps.push("@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner");
+  if (cfg.modules.storage === "supabase") deps.push("@supabase/supabase-js");
   if (cfg.modules.email === "resend") deps.push("resend", "@react-email/components", "@react-email/render");
   if (cfg.modules.cache) deps.push("lru-cache");
   if (cfg.modules.pwa) deps.push("web-push", "idb");

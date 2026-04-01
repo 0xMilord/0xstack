@@ -89,6 +89,7 @@ export async function ensureAssetsTable(projectRoot: string) {
     "assets",
     `export const assets = pgTable("assets", {
   id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
   ownerUserId: text("owner_user_id"),
   orgId: text("org_id"),
   bucket: text("bucket").notNull(),
@@ -125,9 +126,11 @@ export async function ensureBillingTables(projectRoot: string) {
     `export const billingCustomers = pgTable("billing_customers", {
   userId: text("user_id").notNull(),
   dodoCustomerId: text("dodo_customer_id").notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   uniq: uniqueIndex("billing_customers_dodo_customer_id").on(t.dodoCustomerId),
+  uniqStripe: uniqueIndex("billing_customers_stripe_customer_id").on(t.stripeCustomerId),
 }));`
   );
   await upsertDomainTable(

@@ -575,9 +575,12 @@ export async function runBaseline(input: BaselineInput) {
         if (cfg.modules.billing === "dodo") {
           deps.push("@dodopayments/nextjs", "standardwebhooks");
         }
-        if (cfg.modules.storage === "gcs") {
-          deps.push("@google-cloud/storage");
+        if (cfg.modules.billing === "stripe") {
+          deps.push("stripe");
         }
+        if (cfg.modules.storage === "gcs") deps.push("@google-cloud/storage");
+        if (cfg.modules.storage === "s3") deps.push("@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner");
+        if (cfg.modules.storage === "supabase") deps.push("@supabase/supabase-js");
         if (cfg.modules.email === "resend") {
           deps.push("resend", "@react-email/components", "@react-email/render");
         }
