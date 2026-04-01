@@ -9,7 +9,11 @@ export const storageSupabaseModule: Module = {
   activate: async (ctx) => {
     const enabled = ctx.modules.storage === "supabase";
     if (!enabled) {
-      await backupAndRemove(ctx.projectRoot, "lib/env/storage-supabase.ts");
+      // Only remove env schema when storage is fully disabled. If another provider is enabled,
+      // we keep a stub so lib/env/schema.ts imports always resolve.
+      if (ctx.modules.storage === false) {
+        await backupAndRemove(ctx.projectRoot, "lib/env/storage-supabase.ts");
+      }
       await backupAndRemove(ctx.projectRoot, "lib/storage/supabase.ts");
       return;
     }

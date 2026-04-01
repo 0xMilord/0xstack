@@ -16,7 +16,11 @@ export const storageS3Module: Module = {
     ];
     if (!enabled) {
       // S3 provider files (do not remove shared assets CQRS/UI which are owned by the selected provider module)
-      await backupAndRemove(ctx.projectRoot, "lib/env/storage-s3.ts");
+      // Only remove env schema when storage is fully disabled. If another provider is enabled,
+      // we keep a stub so lib/env/schema.ts imports always resolve.
+      if (ctx.modules.storage === false) {
+        await backupAndRemove(ctx.projectRoot, "lib/env/storage-s3.ts");
+      }
       await backupAndRemove(ctx.projectRoot, "lib/storage/s3.ts");
       return;
     }

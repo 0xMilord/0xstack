@@ -20,7 +20,11 @@ export const billingStripeModule: Module = {
       if (ctx.modules.billing === false) {
         for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
       }
-      await backupAndRemove(ctx.projectRoot, "lib/env/billing-stripe.ts");
+      // Only remove env schema when billing is fully disabled. If another provider is enabled,
+      // we keep a stub so lib/env/schema.ts imports always resolve.
+      if (ctx.modules.billing === false) {
+        await backupAndRemove(ctx.projectRoot, "lib/env/billing-stripe.ts");
+      }
       await backupAndRemove(ctx.projectRoot, "lib/billing/stripe.ts");
       return;
     }
