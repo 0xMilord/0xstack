@@ -12,7 +12,7 @@ Thanks for taking the time to contribute.
 
 ### Prerequisites
 
-- Node.js (LTS recommended)
+- Node.js 24
 - pnpm (this repo uses `pnpm@10.12.2`)
 
 ### Install

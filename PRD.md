@@ -1284,7 +1284,7 @@ Requirements:
 - `doctor` must verify tests exist for generated domains (warn-only by default, error in strict profile).
 
 ## Tech choices (recommended defaults)
-- Runtime: Node.js LTS
+- Runtime: Node.js 24
 - Framework: Next.js (App Router), TypeScript
 - DB: Supabase Postgres
 - ORM: Drizzle

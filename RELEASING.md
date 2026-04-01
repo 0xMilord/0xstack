@@ -33,6 +33,11 @@ This repo uses **Changesets** + **GitHub Actions** to bump versions, publish to 
 
 ## Day-to-day development commands
 
+### Prerequisites
+
+- Node.js 24
+- pnpm (this repo uses `pnpm@10.12.2`)
+
 ### Install dependencies
 
 ```bash
