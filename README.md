@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <strong>0xstack</strong> (npm: <code>@0xstack/0xstack</code>) — a production-minded <strong>Next.js starter</strong> and <strong>CLI factory</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>. Not the same as <strong>T3 Stack</strong> — see <a href="#comparison-t3-stack-tanstack-starters-and-0xstack">comparison</a> below.
+  <strong>0xstack</strong> (npm: <code>0xstack</code>) — a production-minded <strong>Next.js starter</strong> and <strong>CLI factory</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>. Not the same as <strong>T3 Stack</strong> — see <a href="#comparison-t3-stack-tanstack-starters-and-0xstack">comparison</a> below.
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
 
 ## Naming: 0xstack vs oxstack
 
-The project name is **0xstack** ( **`@0xstack/0xstack`** on npm ) — a leading **zero**, not the letter **o**. Common web search typo: **oxstack**. This section uses both spellings so search engines and readers land in the right place.
+The project name is **0xstack** ( **`0xstack`** on npm ) — a leading **zero**, not the letter **o**. Common web search typo: **oxstack**. This section uses both spellings so search engines and readers land in the right place.
 
 ## Who is this for?
 
@@ -88,7 +88,7 @@ Any **Postgres** works with **`DATABASE_URL`**. Docs and examples often mention 
 Yes: generated apps prefer **Server Actions** for writes, **`lib/rules`** + **`lib/services`** + **`lib/repos`**, and **`doctor`** checks for common boundary mistakes.
 
 **npm package name?**  
-**`@0xstack/0xstack`** — search **“0xstack npm”** or **“@0xstack/0xstack”** to install.
+**`0xstack`** — search **“0xstack npm”** to install.
 
 ## What is 0xstack?
 
@@ -179,7 +179,7 @@ These are **optional modules** (off until enabled in config):
 - **SEO / MDX blog** if you ship a minimal internal app first
 - **PWA**, **Sentry**, **OpenTelemetry**, **background jobs** stubs
 
-Run `npx @0xstack/0xstack doctor` after enabling a module to see missing deps, files, and env keys for that profile.
+Run `npx 0xstack doctor` after enabling a module to see missing deps, files, and env keys for that profile.
 
 ## Modules (capabilities)
 
@@ -207,7 +207,7 @@ Enable combinations with **`init`** flags, **`wizard`**, **`add <module>`** (see
 
 ## CLI commands
 
-All commands support **`--dir <path>`** where noted (default: current working directory). Package ID on npm is **`@0xstack/0xstack`**; examples use `npx` — use `pnpm dlx` / `yarn dlx` / `bunx` equivalently.
+All commands support **`--dir <path>`** where noted (default: current working directory). Package ID on npm is **`0xstack`**; examples use `npx` — use `pnpm dlx` / `yarn dlx` / `bunx` equivalently.
 
 ### Lifecycle
 
@@ -268,33 +268,33 @@ This package is published to **npm**, and works with **npm / pnpm / yarn / bun**
 ### npm
 
 ```bash
-npx @0xstack/0xstack init
+npx 0xstack init
 ```
 
 ### pnpm
 
 ```bash
-pnpm dlx @0xstack/0xstack init
+pnpm dlx 0xstack init
 ```
 
 ### yarn
 
 ```bash
-yarn dlx @0xstack/0xstack init
+yarn dlx 0xstack init
 ```
 
 ### bun
 
 ```bash
-bunx @0xstack/0xstack init
+bunx 0xstack init
 ```
 
 Typical flow after init:
 
 ```bash
-npx @0xstack/0xstack baseline --profile full
+npx 0xstack baseline --profile full
 cp .env.example .env.local
-npx @0xstack/0xstack doctor --profile full
+npx 0xstack doctor --profile full
 pnpm dev
 ```
 
@@ -306,10 +306,10 @@ See [`RELEASING.md`](RELEASING.md).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please read it before opening a PR.
 
-[downloads-image]: https://img.shields.io/npm/dm/%400xstack%2F0xstack
-[npm-url]: https://www.npmjs.com/package/@0xstack/0xstack
-[npm-image]: https://img.shields.io/npm/v/%400xstack%2F0xstack
+[downloads-image]: https://img.shields.io/npm/dm/0xstack
+[npm-url]: https://www.npmjs.com/package/0xstack
+[npm-image]: https://img.shields.io/npm/v/0xstack
 [license-url]: ./LICENSE
-[license-image]: https://img.shields.io/npm/l/%400xstack%2F0xstack
+[license-image]: https://img.shields.io/npm/l/0xstack
 [contribute-url]: ./CONTRIBUTING.md
 [contribute-image]: https://img.shields.io/badge/PRs-welcome-blue.svg

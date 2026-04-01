@@ -1,5 +1,5 @@
 {
-  "name": "@0xstack/0xstack",
+  "name": "0xstack",
   "version": "0.1.1",
   "private": false,
   "type": "module",

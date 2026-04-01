@@ -1,4 +1,4 @@
-# @0xstack/0xstack
+# 0xstack
 
 ## 0.1.1
 

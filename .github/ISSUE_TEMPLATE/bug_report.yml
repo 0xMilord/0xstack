@@ -11,7 +11,7 @@ body:
     attributes:
       label: CLI version
       description: Output of `0xstack --version` (or the version you installed)
-      placeholder: "@0xstack/0xstack@0.1.0"
+      placeholder: "0xstack@0.1.1"
     validations:
       required: true
   - type: textarea
@@ -19,7 +19,7 @@ body:
     attributes:
       label: Command you ran
       description: Include the exact command and flags
-      placeholder: "npx @0xstack/0xstack baseline --profile full"
+      placeholder: "npx 0xstack baseline --profile full"
     validations:
       required: true
   - type: textarea
