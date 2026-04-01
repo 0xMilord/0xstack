@@ -124,12 +124,11 @@ export async function ensureBillingTables(projectRoot: string) {
     projectRoot,
     "billingCustomers",
     `export const billingCustomers = pgTable("billing_customers", {
-  userId: text("user_id").notNull(),
-  dodoCustomerId: text("dodo_customer_id").notNull(),
+  userId: text("user_id").primaryKey(),
+  dodoCustomerId: text("dodo_customer_id"),
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
-  uniq: uniqueIndex("billing_customers_dodo_customer_id").on(t.dodoCustomerId),
   uniqStripe: uniqueIndex("billing_customers_stripe_customer_id").on(t.stripeCustomerId),
 }));`
   );

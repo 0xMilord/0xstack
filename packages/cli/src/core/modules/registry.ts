@@ -1,11 +1,13 @@
 import type { Module, ModuleContext } from "./types";
 import { seoModule } from "./seo.module";
 import { blogMdxModule } from "./blog.module";
+import { billingCoreModule } from "./billing-core.module";
 import { billingDodoModule } from "./billing-dodo.module";
 import { billingStripeModule } from "./billing-stripe.module";
 import { storageGcsModule } from "./storage-gcs.module";
 import { storageS3Module } from "./storage-s3.module";
 import { storageSupabaseModule } from "./storage-supabase.module";
+import { storageCoreModule } from "./storage-core.module";
 import { observabilityModule } from "./observability.module";
 import { jobsModule } from "./jobs.module";
 import { securityApiModule } from "./security-api.module";
@@ -29,11 +31,13 @@ export function getModules(): Module[] {
     jobsModule,
     seoModule,
     blogMdxModule,
+    billingCoreModule,
     billingDodoModule,
     billingStripeModule,
     storageGcsModule,
     storageS3Module,
     storageSupabaseModule,
+    storageCoreModule,
     emailResendModule,
     pwaModule,
   ];

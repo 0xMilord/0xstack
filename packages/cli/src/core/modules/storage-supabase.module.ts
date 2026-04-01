@@ -8,18 +8,19 @@ export const storageSupabaseModule: Module = {
   install: async () => {},
   activate: async (ctx) => {
     const enabled = ctx.modules.storage === "supabase";
+
     if (!enabled) {
-      // Only remove env schema when storage is fully disabled. If another provider is enabled,
-      // we keep a stub so lib/env/schema.ts imports always resolve.
       if (ctx.modules.storage === false) {
         await backupAndRemove(ctx.projectRoot, "lib/env/storage-supabase.ts");
       }
       await backupAndRemove(ctx.projectRoot, "lib/storage/supabase.ts");
+      await backupAndRemove(ctx.projectRoot, "lib/storage/providers/supabase.ts");
       return;
     }
 
     await ensureDir(path.join(ctx.projectRoot, "lib", "env"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "storage"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "storage", "providers"));
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "env", "storage-supabase.ts"),
@@ -45,8 +46,39 @@ import { env } from "@/lib/env/server";
 }
 `
     );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "storage", "providers", "supabase.ts"),
+      `import { env } from "@/lib/env/server";
+import { getSupabaseAdmin } from "@/lib/storage/supabase";
+import type { ProviderSignReadResult, ProviderSignUploadResult } from "@/lib/storage/provider";
+
+export async function providerSignUpload(input: { objectKey: string; contentType: string }): Promise<ProviderSignUploadResult> {
+  const supabase = getSupabaseAdmin();
+  const bucket = env.SUPABASE_STORAGE_BUCKET!;
+  const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(input.objectKey);
+  if (error) throw error;
+  const token = data.token;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = \`Bearer \${token}\`;
+  headers["Content-Type"] = input.contentType;
+  return { uploadUrl: data.signedUrl, headers };
+}
+
+export async function providerSignRead(input: { bucket: string; objectKey: string }): Promise<ProviderSignReadResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.storage.from(input.bucket).createSignedUrl(input.objectKey, 600);
+  if (error) throw error;
+  return { url: data.signedUrl };
+}
+
+export async function providerDeleteObject(input: { bucket: string; objectKey: string }) {
+  const supabase = getSupabaseAdmin();
+  await supabase.storage.from(input.bucket).remove([input.objectKey]);
+}
+`
+    );
   },
   validate: async () => {},
   sync: async () => {},
 };
-

@@ -15,14 +15,8 @@ export const billingStripeModule: Module = {
     ];
 
     if (!enabled) {
-      // Only remove shared billing routes when billing is fully disabled.
-      // If another billing provider is enabled, it owns these routes.
       if (ctx.modules.billing === false) {
         for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
-      }
-      // Only remove env schema when billing is fully disabled. If another provider is enabled,
-      // we keep a stub so lib/env/schema.ts imports always resolve.
-      if (ctx.modules.billing === false) {
         await backupAndRemove(ctx.projectRoot, "lib/env/billing-stripe.ts");
       }
       await backupAndRemove(ctx.projectRoot, "lib/billing/stripe.ts");
@@ -42,8 +36,8 @@ export const billingStripeModule: Module = {
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
   STRIPE_RETURN_URL: z.string().url(),
-  // Minimal v1 plan registry (align with Dodo plan registry later)
   STRIPE_STARTER_PRICE_ID: z.string().min(1),
+  STRIPE_PLANS_JSON: z.string().min(1).optional(),
 });
 `
     );
@@ -53,8 +47,43 @@ export const billingStripeModule: Module = {
       path.join(ctx.projectRoot, "lib", "billing", "stripe.ts"),
       `import Stripe from "stripe";
 import { env } from "@/lib/env/server";
-\nexport function getStripe() {
-  return new Stripe(env.STRIPE_SECRET_KEY!, { apiVersion: "2025-01-27" as any });
+import { getStripeCustomerIdForUser } from "@/lib/repos/billing.repo";
+
+export function getStripe() {
+  return new Stripe(env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2024-11-20.acacia",
+    typescript: true,
+  });
+}
+
+export async function stripeCreateCheckoutSession(input: { priceId: string; orgId: string; userId: string }) {
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    line_items: [{ price: input.priceId, quantity: 1 }],
+    success_url: env.STRIPE_RETURN_URL!,
+    cancel_url: env.STRIPE_RETURN_URL!,
+    metadata: { orgId: input.orgId, userId: input.userId },
+    subscription_data: {
+      metadata: { orgId: input.orgId, userId: input.userId },
+    },
+  });
+  const url = session.url;
+  if (!url) throw new Error("stripe_checkout_no_url");
+  return url;
+}
+
+export async function stripeCreateBillingPortalUrl(input: { userId: string }) {
+  const stripe = getStripe();
+  const customerId = await getStripeCustomerIdForUser(input.userId);
+  if (!customerId) throw new Error("stripe_no_customer");
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: env.STRIPE_RETURN_URL!,
+  });
+  const url = portal.url;
+  if (!url) throw new Error("stripe_portal_no_url");
+  return url;
 }
 `
     );
@@ -65,7 +94,7 @@ import { env } from "@/lib/env/server";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { guardApiRequest, toApiErrorResponse } from "@/lib/security/api";
-import { getStripe } from "@/lib/billing/stripe";
+import { stripeCreateCheckoutSession } from "@/lib/billing/stripe";
 import { env } from "@/lib/env/server";
 \nexport async function POST(req: Request) {
   const requestId = crypto.randomUUID();
@@ -74,16 +103,16 @@ import { env } from "@/lib/env/server";
     if (!session?.user?.id) await guardApiRequest(req);
     const body = (await req.json().catch(() => null)) as null | { priceId?: string; quantity?: number; orgId?: string };
     const priceId = body?.priceId ?? env.STRIPE_STARTER_PRICE_ID!;
-    const quantity = typeof body?.quantity === "number" && body.quantity > 0 ? Math.floor(body.quantity) : 1;
-    const stripe = getStripe();
-    const checkout = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: priceId, quantity }],
-      success_url: env.STRIPE_RETURN_URL!,
-      cancel_url: env.STRIPE_RETURN_URL!,
-      metadata: { orgId: body?.orgId ?? "", userId: session?.user?.id ?? "" },
-    });
-    return NextResponse.json({ ok: true, requestId, url: checkout.url }, { headers: { "x-request-id": requestId } });
+    const orgId = body?.orgId ?? "";
+    const userId = session?.user?.id ?? "";
+    if (!orgId || !userId) {
+      return NextResponse.json(
+        { ok: false, requestId, code: "INVALID_INPUT", message: "orgId and authenticated user required" },
+        { status: 400, headers: { "x-request-id": requestId } }
+      );
+    }
+    const url = await stripeCreateCheckoutSession({ priceId, orgId, userId });
+    return NextResponse.json({ ok: true, requestId, url }, { headers: { "x-request-id": requestId } });
   } catch (err) {
     return toApiErrorResponse(err, requestId);
   }
@@ -97,23 +126,19 @@ import { env } from "@/lib/env/server";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { guardApiRequest, toApiErrorResponse } from "@/lib/security/api";
-import { getStripe } from "@/lib/billing/stripe";
-import { env } from "@/lib/env/server";
+import { stripeCreateBillingPortalUrl } from "@/lib/billing/stripe";
 \nexport async function GET(req: Request) {
   const requestId = crypto.randomUUID();
   try {
     const session = await auth.api.getSession({ headers: req.headers });
     if (!session?.user?.id) await guardApiRequest(req);
-    const stripe = getStripe();
-    // Minimal v1: caller must pass customerId. In app UX we will resolve via DB.
     const url = new URL(req.url);
-    const customerId = url.searchParams.get("customerId");
-    if (!customerId) return NextResponse.json({ ok: false, requestId, code: "INVALID_INPUT", message: "customerId required" }, { status: 400, headers: { "x-request-id": requestId } });
-    const portal = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: env.STRIPE_RETURN_URL!,
-    });
-    return NextResponse.json({ ok: true, requestId, url: portal.url }, { headers: { "x-request-id": requestId } });
+    const asJson = url.searchParams.get("format") === "json";
+    const portalUrl = await stripeCreateBillingPortalUrl({ userId: session.user.id });
+    if (asJson) {
+      return NextResponse.json({ ok: true, requestId, url: portalUrl }, { headers: { "x-request-id": requestId } });
+    }
+    return NextResponse.redirect(portalUrl);
   } catch (err) {
     return toApiErrorResponse(err, requestId);
   }
@@ -129,6 +154,7 @@ import { toApiErrorResponse } from "@/lib/security/api";
 import { getStripe } from "@/lib/billing/stripe";
 import { env } from "@/lib/env/server";
 import { reconcileBillingEvent } from "@/lib/services/billing.service";
+import { upsertWebhookEvent } from "@/lib/repos/webhook-events.repo";
 \nexport async function POST(req: Request) {
   const requestId = crypto.randomUUID();
   try {
@@ -137,7 +163,13 @@ import { reconcileBillingEvent } from "@/lib/services/billing.service";
     if (!sig) return NextResponse.json({ ok: false, requestId, code: "UNAUTHORIZED", message: "missing_stripe_signature" }, { status: 401, headers: { "x-request-id": requestId } });
     const stripe = getStripe();
     const event = stripe.webhooks.constructEvent(raw, sig, env.STRIPE_WEBHOOK_SECRET!);
-    await reconcileBillingEvent({ ...event, provider: "stripe" });
+    await upsertWebhookEvent({
+      provider: "stripe",
+      eventId: String(event.id),
+      eventType: event.type,
+      payloadJson: event as unknown,
+    });
+    await reconcileBillingEvent({ ...(event as any), provider: "stripe" });
     return NextResponse.json({ ok: true, requestId }, { headers: { "x-request-id": requestId } });
   } catch (err) {
     return toApiErrorResponse(err, requestId);
@@ -149,4 +181,3 @@ import { reconcileBillingEvent } from "@/lib/services/billing.service";
   validate: async () => {},
   sync: async () => {},
 };
-
