@@ -16,7 +16,7 @@
 
 <div align="center">
 
-[![NPM version][npm-image]][npm-url] [![Downloads][downloads-image]][npm-url] [![License][license-image]][license-url] [![PRs Welcome][contribute-image]][contribute-url]
+[![NPM version][npm-image]][https://www.npmjs.com/package/0xstack] [![Downloads][downloads-image]][https://www.npmjs.com/package/0xstack] [![License][license-image]][license-url] [![PRs Welcome][contribute-image]][contribute-url]
 
 </div>
 
