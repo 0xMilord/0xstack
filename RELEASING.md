@@ -1,4 +1,4 @@
-# Releasing `@0xmilord/0xstack` (maintenance + publishing)
+# Releasing `@0xstack/0xstack` (maintenance + publishing)
 
 This repo uses **Changesets** + **GitHub Actions** to bump versions, publish to **npmjs**, and create **GitHub Releases**.
 
@@ -28,7 +28,7 @@ This repo uses **Changesets** + **GitHub Actions** to bump versions, publish to 
 
 `packages/cli/package.json` should have:
 
-- `"name": "@0xmilord/0xstack"`
+- `"name": "@0xstack/0xstack"`
 - `"publishConfig": { "registry": "https://registry.npmjs.org", "access": "public" }`
 
 ## Day-to-day development commands
@@ -129,15 +129,15 @@ pnpm release
 ### Install (any manager)
 
 ```bash
-npm i -g @0xmilord/0xstack
+npm i -g @0xstack/0xstack
 ```
 
 Or:
 
 ```bash
-pnpm add -g @0xmilord/0xstack
-yarn global add @0xmilord/0xstack
-bun add -g @0xmilord/0xstack
+pnpm add -g @0xstack/0xstack
+yarn global add @0xstack/0xstack
+bun add -g @0xstack/0xstack
 ```
 
 ### Run
@@ -178,7 +178,7 @@ bun add -g @0xmilord/0xstack
 Because this is scoped, the canonical command is:
 
 ```bash
-npx @0xmilord/0xstack --help
+npx @0xstack/0xstack --help
 ```
 
 If you want the shorter `npx 0xstack ...`, you’d need to publish an **unscoped** `0xstack` package name (separate decision).

@@ -14,6 +14,10 @@ import { registerAddCommand } from "./commands/add";
 import { registerGitCommands } from "./commands/git";
 import { registerReleaseCommand } from "./commands/release";
 import { registerUpgradeCommand } from "./commands/upgrade";
+import { registerWizardCommand } from "./commands/wizard";
+import { registerConfigCommands } from "./commands/config-commands";
+import { registerDepsCommand } from "./commands/deps-command";
+import { registerModulesListCommand } from "./commands/modules-list";
 
 const cli = cac("0xstack");
 
@@ -32,6 +36,10 @@ const version = (() => {
 cli.version(version);
 
 registerInitCommand(cli);
+registerWizardCommand(cli);
+registerConfigCommands(cli);
+registerDepsCommand(cli);
+registerModulesListCommand(cli);
 registerWrapperCommands(cli);
 registerBaselineCommand(cli);
 registerDoctorCommand(cli);

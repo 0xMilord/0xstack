@@ -105,8 +105,8 @@ export async function writeDefaultConfig(
   modules?: {
     seo: boolean;
     blogMdx: boolean;
-    billing: false | "dodo";
-    storage: false | "gcs";
+    billing: false | "dodo" | "stripe";
+    storage: false | "gcs" | "s3" | "supabase";
     email?: false | "resend";
     pwa?: boolean;
     cache?: boolean;
@@ -121,6 +121,9 @@ export async function writeDefaultConfig(
   } catch {
     // continue
   }
+
+  const initObs = modules?.observability ?? { sentry: false, otel: false };
+  const initJobs = modules?.jobs ?? { enabled: false, driver: "cron-only" as const };
 
   const initModules = {
     orgs: true,
@@ -138,6 +141,7 @@ export async function writeDefaultConfig(
 export default defineConfig({
   app: { name: ${JSON.stringify(appName)}, baseUrl: "http://localhost:3000" },
   modules: {
+    auth: "better-auth",
     // init enables core (auth fixed) + your selected modules.
     orgs: true,
     billing: ${JSON.stringify(initModules.billing)},
@@ -147,10 +151,12 @@ export default defineConfig({
     pwa: ${JSON.stringify(initModules.pwa)},
     seo: ${JSON.stringify(initModules.seo)},
     blogMdx: ${JSON.stringify(initModules.blogMdx)},
+    observability: { sentry: ${initObs.sentry}, otel: ${initObs.otel} },
+    jobs: { enabled: ${initJobs.enabled}, driver: ${JSON.stringify(initJobs.driver)} },
   },
   profiles: {
-    core: { modules: { orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false } },
-    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", cache: true, pwa: true, seo: true, blogMdx: true, jobs: { enabled: true, driver: "cron-only" } } },
+    core: { modules: { orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false, observability: { sentry: false, otel: false }, jobs: { enabled: false, driver: "cron-only" } } },
+    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", cache: true, pwa: true, seo: true, blogMdx: true, observability: { sentry: false, otel: false }, jobs: { enabled: true, driver: "cron-only" } } },
   },
 });
 `;

@@ -7,9 +7,17 @@ This doc is an **audit + change map** for expanding:
 - Storage: `gcs` (existing) → add `s3`, `supabase`
 - Billing: `dodo` (existing) → add `stripe` (optionally keep both available via config)
 
-## Current state (what exists now)
+## Implementation status (CLI)
+
+- **Storage**: `storage-core` owns shared routes, CQRS, UI, and `storage.service` (dynamic provider imports). `storage-gcs` / `storage-s3` / `storage-supabase` emit env + `lib/storage/providers/*` only.
+- **Billing**: `billing-core` owns shared plans, service (Dodo + Stripe reconcile), loaders, actions, pricing + workspace UX. `billing-dodo` / `billing-stripe` emit provider routes + vendor helpers only.
+- **Init**: Interactive prompts include billing (none / Dodo / Stripe) and storage (none / GCS / S3 / Supabase).
+- **Doctor**: Checks are provider-aware for both domains.
+- **Schema**: `billing_customers.user_id` is the primary key; `dodo_customer_id` / `stripe_customer_id` are optional with upsert merge.
+
+## Previous audit — Current state (legacy note)
 ### Storage
-- **Only provider supported**: `storage: false | "gcs"`
+- **Originally only**: `storage: false | "gcs"` (now extended—see above)
   - Config: `packages/cli/src/core/config.ts`
   - Module: `packages/cli/src/core/modules/storage-gcs.module.ts`
 - Generated app has:

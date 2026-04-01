@@ -56,9 +56,22 @@ export function registerWrapperCommands(cli: CAC) {
 
   // Convenience alias: `0xstack drizzle ...` is already covered above.
   // Keep commands flat and explicit (no nested subcommands needed).
-  cli.command("wrap", "Show wrapper info").action(() => {
-    const rel = path.relative(process.cwd(), process.cwd());
-    logger.info(`Wrappers are executed in cwd: ${rel || "."}`);
+  cli.command("wrap", "Show wrapper commands and audit hints").action(() => {
+    const cwd = process.cwd();
+    logger.info(`Wrappers run in cwd: ${cwd}`);
+    logger.info("");
+    logger.info("Passthrough commands (each logs the underlying command + file diff):");
+    logger.info("  0xstack shadcn [...args]   — shadcn@latest");
+    logger.info("  0xstack auth [...args]      — auth@latest (Better Auth CLI)");
+    logger.info("  0xstack drizzle [...args]  — drizzle-kit via package manager");
+    logger.info("");
+    logger.info("Operator helpers:");
+    logger.info("  0xstack wizard            — TUI to reconfigure modules (existing repo)");
+    logger.info("  0xstack config-print      — resolved config JSON");
+    logger.info("  0xstack config-validate   — Zod check");
+    logger.info("  0xstack deps              — expected app deps from config");
+    logger.info("  0xstack deps --cli        — this CLI's package.json deps");
+    logger.info("  0xstack modules           — ids for `0xstack add`");
   });
 }
 

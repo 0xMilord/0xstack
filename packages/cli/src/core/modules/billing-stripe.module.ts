@@ -50,10 +50,7 @@ import { env } from "@/lib/env/server";
 import { getStripeCustomerIdForUser } from "@/lib/repos/billing.repo";
 
 export function getStripe() {
-  return new Stripe(env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2024-11-20.acacia",
-    typescript: true,
-  });
+  return new Stripe(env.STRIPE_SECRET_KEY!, { apiVersion: "2024-11-20.acacia" });
 }
 
 export async function stripeCreateCheckoutSession(input: { priceId: string; orgId: string; userId: string }) {

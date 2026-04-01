@@ -1,5 +1,5 @@
 {
-  "name": "@0xmilord/0xstack",
+  "name": "@0xstack/0xstack",
   "version": "0.1.0",
   "private": false,
   "type": "module",
@@ -19,7 +19,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/0xmilord/0xstack"
+    "url": "git+https://github.com/0xmilord/0xstack.git"
   },
   "homepage": "https://github.com/0xmilord/0xstack",
   "bugs": {

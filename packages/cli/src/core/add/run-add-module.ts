@@ -26,10 +26,17 @@ export async function runAddModule(input: AddInput) {
   if (mod === "seo") next = enable(next, "seo", "true");
   else if (mod === "blogMdx") next = enable(next, "blogMdx", "true");
   else if (mod === "billing-dodo" || mod === "billing") next = enable(next, "billing", `"dodo"`);
+  else if (mod === "billing-stripe") next = enable(next, "billing", `"stripe"`);
   else if (mod === "storage-gcs" || mod === "storage") next = enable(next, "storage", `"gcs"`);
+  else if (mod === "storage-s3") next = enable(next, "storage", `"s3"`);
+  else if (mod === "storage-supabase") next = enable(next, "storage", `"supabase"`);
   else if (mod === "email-resend" || mod === "email") next = enable(next, "email", `"resend"`);
   else if (mod === "jobs") next = src.replace(/jobs:\s*\{[^}]*\}/m, `jobs: { enabled: true, driver: "cron-only" }`);
-  else throw new Error(`Unknown module: ${mod}`);
+  else
+    throw new Error(
+      `Unknown module: ${mod}. ` +
+        `Use: seo, blogMdx, billing|billing-dodo, billing-stripe, storage|storage-gcs, storage-s3, storage-supabase, email|email-resend, jobs`
+    );
 
   await fs.writeFile(cfgPath, next, "utf8");
   await runBaseline({ projectRoot: input.projectRoot, profile: "core", packageManager: "pnpm" });

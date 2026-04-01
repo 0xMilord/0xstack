@@ -8,10 +8,12 @@ export function registerSyncCommand(cli: CAC) {
     .option("--dir <dir>", "Project directory (default: current)")
     .option("--profile <profile>", "Profile preset to apply (default: core)")
     .option("--apply", "Apply changes (default: plan only)")
+    .option("--pm <pm>", "Package manager when applying baseline: pnpm|npm (default: pnpm)")
     .action(async (options) => {
       const dir = path.resolve(process.cwd(), options.dir ?? ".");
       const profile = options.profile ?? "core";
-      await runSync({ projectRoot: dir, profile, apply: !!options.apply });
+      const pm = options.pm === "npm" ? "npm" : "pnpm";
+      await runSync({ projectRoot: dir, profile, apply: !!options.apply, packageManager: pm });
     });
 }
 

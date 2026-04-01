@@ -62,25 +62,25 @@ This package is published to **npmjs**, which means it works with **npm / pnpm /
 ### npm
 
 ```bash
-npx @0xmilord/0xstack init
+npx @0xstack/0xstack init
 ```
 
 ### pnpm
 
 ```bash
-pnpm dlx @0xmilord/0xstack init
+pnpm dlx @0xstack/0xstack init
 ```
 
 ### yarn
 
 ```bash
-yarn dlx @0xmilord/0xstack init
+yarn dlx @0xstack/0xstack init
 ```
 
 ### bun
 
 ```bash
-bunx @0xmilord/0xstack init
+bunx @0xstack/0xstack init
 ```
 
 ## CLI commands
@@ -90,7 +90,7 @@ bunx @0xmilord/0xstack init
 Scaffold a new app (interactive):
 
 ```bash
-npx @0xmilord/0xstack init
+npx @0xstack/0xstack init
 ```
 
 ### `baseline`
@@ -98,7 +98,7 @@ npx @0xmilord/0xstack init
 Idempotent “make it correct” command (deps + schema + migrations + module activation + docs):
 
 ```bash
-npx @0xmilord/0xstack baseline --profile full
+npx @0xstack/0xstack baseline --profile full
 ```
 
 ### `doctor`
@@ -106,7 +106,7 @@ npx @0xmilord/0xstack baseline --profile full
 Static checks for env + invariants + boundary rules:
 
 ```bash
-npx @0xmilord/0xstack doctor --profile full
+npx @0xstack/0xstack doctor --profile full
 ```
 
 ### `sync`
@@ -114,7 +114,7 @@ npx @0xmilord/0xstack doctor --profile full
 Non-destructive reconciliation (docs + hygiene):
 
 ```bash
-npx @0xmilord/0xstack sync
+npx @0xstack/0xstack sync
 ```
 
 ### `generate <domain>`
@@ -122,7 +122,7 @@ npx @0xmilord/0xstack sync
 Generate a new domain module end-to-end:
 
 ```bash
-npx @0xmilord/0xstack generate materials --with-api
+npx @0xstack/0xstack generate materials --with-api
 ```
 
 ## Release process
@@ -133,11 +133,11 @@ See [`RELEASING.md`](RELEASING.md).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please read it before opening a PR.
 
-[downloads-image]: https://img.shields.io/npm/dm/%40oxmilord%2F0xstack
-[npm-url]: https://www.npmjs.com/package/@0xmilord/0xstack
-[npm-image]: https://img.shields.io/npm/v/%40oxmilord%2F0xstack
+[downloads-image]: https://img.shields.io/npm/dm/%40oxstack%2F0xstack
+[npm-url]: https://www.npmjs.com/package/@0xstack/0xstack
+[npm-image]: https://img.shields.io/npm/v/%40oxstack%2F0xstack
 [license-url]: ./LICENSE
-[license-image]: https://img.shields.io/npm/l/%40oxmilord%2F0xstack
+[license-image]: https://img.shields.io/npm/l/%40oxstack%2F0xstack
 [contribute-url]: ./CONTRIBUTING.md
 [contribute-image]: https://img.shields.io/badge/PRs-welcome-blue.svg
 

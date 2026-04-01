@@ -133,74 +133,136 @@ export async function runDoctor(input: DoctorInput) {
   ]);
   await checkFiles("foundation.api-keys.ux", ["app/app/(workspace)/api-keys/page.tsx", "lib/actions/api-keys.actions.ts", "lib/loaders/api-keys.loader.ts"]);
 
+  const billingApis = [
+    "app/api/v1/billing/checkout/route.ts",
+    "app/api/v1/billing/portal/route.ts",
+    "app/api/v1/billing/webhook/route.ts",
+  ];
+  const billingUx = [
+    "app/pricing/page.tsx",
+    "app/billing/success/page.tsx",
+    "app/billing/cancel/page.tsx",
+    "app/app/(workspace)/billing/page.tsx",
+  ];
+  const billingShared = [
+    "lib/billing/runtime.ts",
+    "lib/loaders/billing.loader.ts",
+    "lib/query-keys/billing.keys.ts",
+    "lib/billing/plans.ts",
+    "lib/actions/billing.actions.ts",
+    "lib/services/billing.service.ts",
+    "lib/hooks/client/use-billing.client.ts",
+  ];
+
   if (modules.billing === "dodo") {
     const billingEnvPath = path.join(input.projectRoot, "lib/env/billing.ts");
-    if (!(await exists(billingEnvPath))) note("Billing enabled but missing lib/env/billing.ts");
+    if (!(await exists(billingEnvPath))) note("Billing (Dodo) enabled but missing lib/env/billing.ts");
     const billingEnv = (await exists(billingEnvPath)) ? await fs.readFile(billingEnvPath, "utf8") : "";
     for (const key of ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY", "DODO_PAYMENTS_ENVIRONMENT", "DODO_PAYMENTS_RETURN_URL"]) {
       if (!billingEnv.includes(key)) note(`Billing env schema missing key: ${key}`);
     }
-    await checkFiles("billing.dodo.apis", [
-      "app/api/v1/billing/checkout/route.ts",
-      "app/api/v1/billing/portal/route.ts",
-      "app/api/v1/billing/webhook/route.ts",
-    ]);
-    await checkFiles("billing.dodo.ux", [
-      "app/pricing/page.tsx",
-      "app/billing/success/page.tsx",
-      "app/billing/cancel/page.tsx",
-      "app/app/(workspace)/billing/page.tsx",
-    ]);
-    await checkFiles("billing.dodo.read", ["lib/loaders/billing.loader.ts", "lib/query-keys/billing.keys.ts"]);
-    await checkFiles("billing.dodo.core", ["lib/services/billing.service.ts", "lib/repos/billing.repo.ts"]);
-    await checkFiles("billing.dodo.plans", ["lib/billing/plans.ts", "lib/actions/billing.actions.ts"]);
+    await checkFiles("billing.dodo.vendor", ["lib/billing/dodo.webhooks.ts"]);
   }
-  if (modules.billing !== "dodo") {
+
+  if (modules.billing === "stripe") {
+    const stripeEnvPath = path.join(input.projectRoot, "lib/env/billing-stripe.ts");
+    if (!(await exists(stripeEnvPath))) note("Billing (Stripe) enabled but missing lib/env/billing-stripe.ts");
+    const stripeEnv = (await exists(stripeEnvPath)) ? await fs.readFile(stripeEnvPath, "utf8") : "";
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_RETURN_URL", "STRIPE_STARTER_PRICE_ID"]) {
+      if (!stripeEnv.includes(key)) note(`Stripe billing env schema missing key: ${key}`);
+    }
+    await checkFiles("billing.stripe.vendor", ["lib/billing/stripe.ts"]);
+  }
+
+  if (modules.billing === "dodo" || modules.billing === "stripe") {
+    await checkFiles("billing.apis", billingApis);
+    await checkFiles("billing.ux", billingUx);
+    await checkFiles("billing.core", [...billingShared, "lib/repos/billing.repo.ts"]);
+  }
+
+  if (modules.billing === false) {
     await checkAbsent("billing.disabled", [
-      "app/api/v1/billing/checkout/route.ts",
-      "app/api/v1/billing/portal/route.ts",
-      "app/api/v1/billing/webhook/route.ts",
-      "app/pricing/page.tsx",
-      "app/billing/success/page.tsx",
-      "app/billing/cancel/page.tsx",
-      "app/app/(workspace)/billing/page.tsx",
-      "lib/loaders/billing.loader.ts",
-      "lib/query-keys/billing.keys.ts",
-      "lib/billing/plans.ts",
-      "lib/actions/billing.actions.ts",
-      "lib/services/billing.service.ts",
+      ...billingApis,
+      ...billingUx,
+      ...billingShared,
+      "lib/billing/dodo.webhooks.ts",
+      "lib/billing/stripe.ts",
     ]);
   }
+
+  const storageApis = [
+    "app/api/v1/storage/sign-upload/route.ts",
+    "app/api/v1/storage/sign-read/route.ts",
+    "app/api/v1/storage/assets/route.ts",
+    "app/api/v1/storage/assets/[assetId]/route.ts",
+  ];
+  const storageUi = [
+    "app/app/(workspace)/assets/page.tsx",
+    "app/app/(workspace)/assets/assets-client.tsx",
+    "app/app/(workspace)/assets/[assetId]/page.tsx",
+  ];
+  const storageShared = [
+    "lib/storage/runtime.ts",
+    "lib/storage/provider.ts",
+    "lib/services/storage.service.ts",
+    "lib/loaders/assets.loader.ts",
+    "lib/actions/assets.actions.ts",
+    "lib/query-keys/assets.keys.ts",
+    "lib/hooks/client/use-assets.client.ts",
+  ];
+
   if (modules.storage === "gcs") {
     const storageEnvPath = path.join(input.projectRoot, "lib/env/storage.ts");
-    if (!(await exists(storageEnvPath))) note("Storage enabled but missing lib/env/storage.ts");
+    if (!(await exists(storageEnvPath))) note("Storage (GCS) enabled but missing lib/env/storage.ts");
     const storageEnv = (await exists(storageEnvPath)) ? await fs.readFile(storageEnvPath, "utf8") : "";
     for (const key of ["GCS_BUCKET", "GCS_PROJECT_ID"]) {
-      if (!storageEnv.includes(key)) note(`Storage env schema missing key: ${key}`);
+      if (!storageEnv.includes(key)) note(`GCS storage env schema missing key: ${key}`);
     }
-    await checkFiles("storage.gcs.apis", [
-      "app/api/v1/storage/sign-upload/route.ts",
-      "app/api/v1/storage/sign-read/route.ts",
-      "app/api/v1/storage/assets/route.ts",
-      "app/api/v1/storage/assets/[assetId]/route.ts",
-    ]);
-    await checkFiles("storage.gcs.core", ["lib/storage/gcs.ts", "lib/services/storage.service.ts", "lib/repos/assets.repo.ts"]);
-    await checkFiles("storage.gcs.cqrs", ["lib/loaders/assets.loader.ts", "lib/actions/assets.actions.ts"]);
-    await checkFiles("storage.gcs.ui", ["app/app/(workspace)/assets/page.tsx", "app/app/(workspace)/assets/assets-client.tsx", "app/app/(workspace)/assets/[assetId]/page.tsx"]);
+    await checkFiles("storage.gcs.provider", ["lib/storage/providers/gcs.ts"]);
   }
-  if (modules.storage !== "gcs") {
+
+  if (modules.storage === "s3") {
+    const s3EnvPath = path.join(input.projectRoot, "lib/env/storage-s3.ts");
+    if (!(await exists(s3EnvPath))) note("Storage (S3) enabled but missing lib/env/storage-s3.ts");
+    const s3Env = (await exists(s3EnvPath)) ? await fs.readFile(s3EnvPath, "utf8") : "";
+    for (const key of ["S3_REGION", "S3_BUCKET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) {
+      if (!s3Env.includes(key)) note(`S3 storage env schema missing key: ${key}`);
+    }
+    await checkFiles("storage.s3.provider", ["lib/storage/s3.ts", "lib/storage/providers/s3.ts"]);
+  }
+
+  if (modules.storage === "supabase") {
+    const supEnvPath = path.join(input.projectRoot, "lib/env/storage-supabase.ts");
+    if (!(await exists(supEnvPath))) note("Storage (Supabase) enabled but missing lib/env/storage-supabase.ts");
+    const supEnv = (await exists(supEnvPath)) ? await fs.readFile(supEnvPath, "utf8") : "";
+    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STORAGE_BUCKET"]) {
+      if (!supEnv.includes(key)) note(`Supabase storage env schema missing key: ${key}`);
+    }
+    await checkFiles("storage.supabase.provider", ["lib/storage/supabase.ts", "lib/storage/providers/supabase.ts"]);
+  }
+
+  if (modules.storage === "gcs" || modules.storage === "s3" || modules.storage === "supabase") {
+    await checkFiles("storage.apis", storageApis);
+    await checkFiles("storage.cqrs", [
+      ...storageShared.filter((f) => !f.includes("hooks")),
+      "lib/mutation-keys/assets.keys.ts",
+    ]);
+    await checkFiles("storage.ui", storageUi);
+    await checkFiles("storage.repo", ["lib/repos/assets.repo.ts"]);
+  }
+
+  if (modules.storage === false) {
     await checkAbsent("storage.disabled", [
-      "app/api/v1/storage/sign-upload/route.ts",
-      "app/api/v1/storage/sign-read/route.ts",
-      "app/api/v1/storage/assets/route.ts",
-      "app/api/v1/storage/assets/[assetId]/route.ts",
-      "app/app/(workspace)/assets/page.tsx",
-      "app/app/(workspace)/assets/assets-client.tsx",
-      "app/app/(workspace)/assets/[assetId]/page.tsx",
+      ...storageApis,
+      ...storageUi,
+      ...storageShared,
+      "lib/storage/providers/gcs.ts",
+      "lib/storage/providers/s3.ts",
+      "lib/storage/providers/supabase.ts",
       "lib/storage/gcs.ts",
-      "lib/services/storage.service.ts",
-      "lib/loaders/assets.loader.ts",
-      "lib/actions/assets.actions.ts",
+      "lib/storage/s3.ts",
+      "lib/storage/supabase.ts",
+      "lib/mutation-keys/assets.keys.ts",
     ]);
   }
 
@@ -352,7 +414,8 @@ export async function runDoctor(input: DoctorInput) {
       if (b.re.test(src)) {
         const rel = path.relative(input.projectRoot, f).replaceAll("\\", "/");
         const isWebhookLedgerAllowed =
-          rel.endsWith("app/api/v1/billing/webhook/route.ts") && src.includes("webhook-events.repo");
+          (rel.endsWith("app/api/v1/billing/webhook/route.ts") || rel.endsWith("app/api/v1/billing/webhook/route.tsx")) &&
+          src.includes("webhook-events.repo");
         if (isWebhookLedgerAllowed) continue;
         note(`Boundary violation in ${path.relative(input.projectRoot, f)}: ${b.msg}`);
       }

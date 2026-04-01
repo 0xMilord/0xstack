@@ -9,7 +9,7 @@ import { applyProfile, loadConfig } from "../config";
 import { expectedDepsForConfig } from "../deps";
 import { diffSnapshots, snapshotFiles } from "../exec";
 
-export type SyncInput = { projectRoot: string; profile: string; apply: boolean };
+export type SyncInput = { projectRoot: string; profile: string; apply: boolean; packageManager?: "pnpm" | "npm" };
 
 export async function runSync(input: SyncInput) {
   const state = await computeProjectState(input.projectRoot, input.profile);
@@ -46,21 +46,26 @@ export async function runSync(input: SyncInput) {
     const cfg = applyProfile(await loadConfig(input.projectRoot), input.profile);
     const absentIfDisabled: string[] = [];
     const addAll = (xs: string[]) => absentIfDisabled.push(...xs);
-    if (cfg.modules.billing !== "dodo") {
+    if (cfg.modules.billing === false) {
       addAll([
         "app/api/v1/billing/checkout/route.ts",
         "app/api/v1/billing/portal/route.ts",
         "app/api/v1/billing/webhook/route.ts",
+        "app/pricing/page.tsx",
+        "app/billing/success/page.tsx",
+        "app/billing/cancel/page.tsx",
         "app/app/(workspace)/billing/page.tsx",
       ]);
     }
-    if (cfg.modules.storage !== "gcs") {
+    if (cfg.modules.storage === false) {
       addAll([
         "app/api/v1/storage/sign-upload/route.ts",
         "app/api/v1/storage/sign-read/route.ts",
         "app/api/v1/storage/assets/route.ts",
         "app/api/v1/storage/assets/[assetId]/route.ts",
         "app/app/(workspace)/assets/page.tsx",
+        "app/app/(workspace)/assets/assets-client.tsx",
+        "app/app/(workspace)/assets/[assetId]/page.tsx",
       ]);
     }
     if (!cfg.modules.blogMdx) addAll(["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts"]);
@@ -98,7 +103,11 @@ export async function runSync(input: SyncInput) {
     {
       name: "baseline (reconcile deps/files)",
       run: async () => {
-        await runBaseline({ projectRoot: input.projectRoot, profile: input.profile, packageManager: "pnpm" });
+        await runBaseline({
+          projectRoot: input.projectRoot,
+          profile: input.profile,
+          packageManager: input.packageManager ?? "pnpm",
+        });
         return { kind: "ok" };
       },
     },
