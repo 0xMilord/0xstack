@@ -1,10 +1,30 @@
 import type { CAC } from "cac";
 import path from "node:path";
+import { execa } from "execa";
 import { diffSnapshots, execCmd, snapshotFiles } from "../core/exec";
 import { logger } from "../core/logger";
 import { detectPackageManager, pmDlx, pmExec } from "../core/pm";
 
 type WrapperId = "shadcn" | "auth" | "drizzle";
+
+async function tryLogInstalledVersion(cwd: string, packageName: string) {
+  try {
+    const { stdout } = await execa("npm", ["ls", packageName, "--depth=0", "--json"], {
+      cwd,
+      reject: false,
+    });
+    if (!stdout?.trim()) return;
+    const j = JSON.parse(stdout) as {
+      dependencies?: Record<string, { version?: string }>;
+      devDependencies?: Record<string, { version?: string }>;
+    };
+    const v =
+      j.dependencies?.[packageName]?.version ?? j.devDependencies?.[packageName]?.version;
+    if (v) logger.info(`Installed ${packageName} (npm ls): ${v}`);
+  } catch {
+    // ignore
+  }
+}
 
 function registerWrapper(cli: CAC, id: WrapperId) {
   cli
@@ -19,6 +39,7 @@ function registerWrapper(cli: CAC, id: WrapperId) {
         const fullArgs = [...dlxArgs, "shadcn@latest", ...args];
         logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
         await execCmd(cmd, fullArgs, { cwd });
+        logger.info("Version: shadcn resolved via dlx at runtime (see lockfile after install).");
         const after = await snapshotFiles(cwd);
         const diff = diffSnapshots(before, after);
         logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
@@ -31,6 +52,7 @@ function registerWrapper(cli: CAC, id: WrapperId) {
         const fullArgs = [...dlxArgs, "auth@latest", ...args];
         logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
         await execCmd(cmd, fullArgs, { cwd });
+        await tryLogInstalledVersion(cwd, "better-auth");
         const after = await snapshotFiles(cwd);
         const diff = diffSnapshots(before, after);
         logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
@@ -42,6 +64,7 @@ function registerWrapper(cli: CAC, id: WrapperId) {
       const fullArgs = [...execArgs, "drizzle-kit", ...args];
       logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
       await execCmd(cmd, fullArgs, { cwd });
+      await tryLogInstalledVersion(cwd, "drizzle-kit");
       const after = await snapshotFiles(cwd);
       const diff = diffSnapshots(before, after);
       logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);

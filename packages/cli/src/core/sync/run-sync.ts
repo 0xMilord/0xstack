@@ -5,19 +5,41 @@ import { computeProjectState } from "../project/project-state";
 import { logger } from "../logger";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { applyProfile, loadConfig } from "../config";
+import { applyProfile, ConfigSchema, loadConfig } from "../config";
 import { expectedDepsForConfig } from "../deps";
-import { diffSnapshots, snapshotFiles } from "../exec";
+import { diffSnapshots, execCmd, snapshotFiles } from "../exec";
 
-export type SyncInput = { projectRoot: string; profile: string; apply: boolean; packageManager?: "pnpm" | "npm" };
+export type SyncInput = {
+  projectRoot: string;
+  profile: string;
+  apply: boolean;
+  packageManager?: "pnpm" | "npm";
+  lint?: boolean;
+};
+
+function pmCmd(pm: "pnpm" | "npm") {
+  return pm === "npm" ? "npm" : "pnpm";
+}
 
 export async function runSync(input: SyncInput) {
+  try {
+    const raw = await loadConfig(input.projectRoot);
+    ConfigSchema.parse(raw);
+    applyProfile(raw, input.profile);
+    logger.info("Config + profile merge: schema valid.");
+  } catch (e) {
+    logger.error(`0xstack config invalid: ${e instanceof Error ? e.message : String(e)}`);
+    throw e;
+  }
+
   const state = await computeProjectState(input.projectRoot, input.profile);
   logger.info("Sync plan:");
   logger.info(`- apply: ${input.apply ? "yes" : "no (plan only)"}`);
   logger.info(`- profile: ${state.appliedProfile}`);
   logger.info(`- modules: ${JSON.stringify(state.modules)}`);
   logger.info(`- detected routes: ${state.routes.length}`);
+  logger.info("- PRD reconcile hints: run `0xstack drizzle generate` after schema changes; use `--apply` for baseline + docs.");
+  logger.info("- Env: ensure `.env.local` satisfies `lib/env/schema.ts` for enabled modules (doctor checks file-level keys).");
 
   // Dependency drift (best-effort)
   try {
@@ -69,7 +91,16 @@ export async function runSync(input: SyncInput) {
       ]);
     }
     if (!cfg.modules.blogMdx) addAll(["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts"]);
-    if (!cfg.modules.seo) addAll(["app/robots.ts", "app/sitemap.ts", "app/opengraph-image.tsx", "app/twitter-image.tsx"]);
+    if (!cfg.modules.seo) {
+      addAll([
+        "app/robots.ts",
+        "app/sitemap.ts",
+        "app/opengraph-image.tsx",
+        "app/twitter-image.tsx",
+        "lib/seo/jsonld.ts",
+        "lib/seo/runtime.ts",
+      ]);
+    }
     if (cfg.modules.email !== "resend") addAll(["lib/email/auth-emails.ts"]);
     if (!cfg.modules.pwa) addAll(["app/api/v1/pwa/push/subscribe/route.ts", "public/manifest.webmanifest"]);
     if (!cfg.modules.jobs?.enabled) addAll(["app/api/v1/jobs/reconcile/route.ts"]);
@@ -95,6 +126,7 @@ export async function runSync(input: SyncInput) {
 
   if (!input.apply) {
     logger.info("No changes applied. Re-run with `--apply` to execute baseline + docs sync.");
+    logger.info("Optional: `--apply --lint` runs `pnpm|npm run lint` when a lint script exists.");
     return;
   }
 
@@ -119,6 +151,25 @@ export async function runSync(input: SyncInput) {
       },
     },
   ]);
+
+  if (input.lint) {
+    try {
+      const pkgPath = path.join(input.projectRoot, "package.json");
+      const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { scripts?: Record<string, string> };
+      const pm = input.packageManager ?? "pnpm";
+      if (pkg.scripts?.lint) {
+        logger.info("Running lint script (sync --lint)…");
+        const cmd = pmCmd(pm);
+        const args = pm === "npm" ? ["run", "lint"] : ["run", "lint"];
+        await execCmd(cmd, args, { cwd: input.projectRoot });
+      } else {
+        logger.warn("sync --lint skipped: no `lint` script in package.json");
+      }
+    } catch (e) {
+      logger.warn(`sync --lint failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   const after = await snapshotFiles(input.projectRoot);
   const diff = diffSnapshots(before, after);
   logger.info(`Sync applied. Files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);

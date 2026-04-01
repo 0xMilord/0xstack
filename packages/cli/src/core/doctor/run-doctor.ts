@@ -32,14 +32,16 @@ async function listFilesRecursive(dir: string, exts: string[]) {
   return out;
 }
 
-export type DoctorInput = { projectRoot: string; profile: string };
+export type DoctorInput = { projectRoot: string; profile: string; strict?: boolean };
 
 export async function runDoctor(input: DoctorInput) {
   const state = await computeProjectState(input.projectRoot, input.profile);
   const modules = state.modules as any;
 
   const issues: string[] = [];
+  const strictOnly: string[] = [];
   const note = (msg: string) => issues.push(msg);
+  const noteStrict = (msg: string) => strictOnly.push(msg);
 
   const checkAbsent = async (label: string, files: string[]) => {
     const present: string[] = [];
@@ -269,13 +271,20 @@ export async function runDoctor(input: DoctorInput) {
   // Module-gated surfaces
   const mustHaveSeo = !!modules.seo;
   if (mustHaveSeo) {
-    for (const f of ["app/robots.ts", "app/sitemap.ts", "lib/seo/jsonld.ts"]) {
+    for (const f of ["app/robots.ts", "app/sitemap.ts", "lib/seo/jsonld.ts", "lib/seo/runtime.ts"]) {
       if (!(await exists(path.join(input.projectRoot, f)))) note(`SEO enabled but missing: ${f}`);
     }
     await checkFiles("seo.social-images", ["app/opengraph-image.tsx", "app/twitter-image.tsx"]);
   }
   if (!mustHaveSeo) {
-    await checkAbsent("seo.disabled", ["app/robots.ts", "app/sitemap.ts", "lib/seo/jsonld.ts", "app/opengraph-image.tsx", "app/twitter-image.tsx"]);
+    await checkAbsent("seo.disabled", [
+      "app/robots.ts",
+      "app/sitemap.ts",
+      "lib/seo/jsonld.ts",
+      "lib/seo/runtime.ts",
+      "app/opengraph-image.tsx",
+      "app/twitter-image.tsx",
+    ]);
   }
 
   const mustHaveBlog = !!modules.blogMdx;
@@ -466,8 +475,47 @@ export async function runDoctor(input: DoctorInput) {
     }
   }
 
-  if (issues.length) {
-    throw new Error(`doctor failed (${input.profile}):\n- ${issues.join("\n- ")}`);
+  if (!(await exists(path.join(input.projectRoot, "eslint.0xstack-boundaries.mjs")))) {
+    noteStrict("Missing eslint.0xstack-boundaries.mjs — run `0xstack baseline` for PRD no-restricted-imports wiring.");
+  }
+  if (!(await exists(path.join(input.projectRoot, "lib", "services", "module-factories.ts")))) {
+    noteStrict("Missing lib/services/module-factories.ts — run `0xstack baseline` for getBillingService/getStorageService/getSeoConfig.");
+  }
+
+  const coreRepoBases = new Set([
+    "orgs",
+    "org-members",
+    "user-profiles",
+    "billing",
+    "assets",
+    "api-keys",
+    "webhook-events",
+    "push-subscriptions",
+  ]);
+  const reposDir = path.join(input.projectRoot, "lib", "repos");
+  if (await exists(reposDir)) {
+    const repoFiles = await fs.readdir(reposDir);
+    for (const rf of repoFiles) {
+      if (!rf.endsWith(".repo.ts")) continue;
+      const base = rf.replace(/\.repo\.ts$/, "");
+      if (coreRepoBases.has(base)) continue;
+      const testDir = path.join(input.projectRoot, "tests", base);
+      for (const suffix of [`${base}.repo.test.ts`, `${base}.rules.test.ts`, `${base}.actions.test.ts`]) {
+        const tp = path.join(testDir, suffix);
+        if (!(await exists(tp))) {
+          noteStrict(`Domain "${base}" missing tests/${base}/${suffix} (PRD minimal tests)`);
+        }
+      }
+    }
+  }
+
+  if (!input.strict && strictOnly.length) {
+    for (const s of strictOnly) logger.warn(`doctor: ${s}`);
+  }
+
+  if (issues.length || (input.strict && strictOnly.length)) {
+    const combined = [...issues, ...(input.strict ? strictOnly : [])];
+    throw new Error(`doctor failed (${input.profile}):\n- ${combined.join("\n- ")}`);
   }
 
   logger.success(`doctor ok (${input.profile})`);

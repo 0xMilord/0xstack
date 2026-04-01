@@ -13,10 +13,25 @@ export const seoModule: Module = {
       await backupAndRemove(ctx.projectRoot, "app/opengraph-image.tsx");
       await backupAndRemove(ctx.projectRoot, "app/twitter-image.tsx");
       await backupAndRemove(ctx.projectRoot, "lib/seo/jsonld.ts");
+      await backupAndRemove(ctx.projectRoot, "lib/seo/runtime.ts");
       return;
     }
 
     await ensureDir(path.join(ctx.projectRoot, "lib", "seo"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "seo", "runtime.ts"),
+      `import { env } from "@/lib/env/server";
+
+export const SEO_MODULE_ENABLED = true as const;
+
+export function getSeoRuntimeConfig() {
+  return {
+    enabled: true as const,
+    siteUrl: env.NEXT_PUBLIC_APP_URL,
+  };
+}
+`
+    );
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "seo", "jsonld.ts"),
       `export function safeJsonLd<T>(data: T): string {

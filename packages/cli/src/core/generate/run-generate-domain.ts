@@ -46,7 +46,11 @@ import { ${plural} } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
 export async function get${pascal}ById(input: { id: string; orgId: string }) {
-  const rows = await db.select().from(${plural}).where(eq(${plural}.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(${plural})
+    .where(and(eq(${plural}.id, input.id), eq(${plural}.orgId, input.orgId)))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -166,7 +170,15 @@ import { requireAuth } from "@/lib/auth/server";
 import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
 import { orgsService_assertMember } from "@/lib/services/orgs.service";
 import { revalidate } from "@/lib/cache";
-import { ${camel}Service_create, ${camel}Service_delete, ${camel}Service_update } from "@/lib/services/${plural}.service";
+import { ${camel}Service_create, ${camel}Service_delete, ${camel}Service_list, ${camel}Service_update } from "@/lib/services/${plural}.service";
+
+export async function list${pascal}ForViewer() {
+  const session = await requireAuth();
+  const orgId = getActiveOrgIdFromCookies(await cookies());
+  if (!orgId) throw new Error("no_active_org");
+  await orgsService_assertMember({ userId: session.userId, orgId });
+  return await ${camel}Service_list({ orgId });
+}
 
 export async function create${pascal}(input: unknown) {
   const session = await requireAuth();
@@ -233,17 +245,10 @@ export async function delete${pascal}(input: unknown) {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ${camel}Keys } from "@/lib/query-keys/${plural}.keys";
 import { ${camel}Mutations } from "@/lib/mutation-keys/${plural}.mutations";
-import { create${pascal} } from "@/lib/actions/${plural}.actions";
-
-async function fetch${pascal}List() {
-  const res = await fetch("/api/v1/${plural}", { method: "GET" });
-  if (!res.ok) throw new Error("Failed to load ${plural}");
-  const json = (await res.json()) as any;
-  return (json?.data ?? []) as any[];
-}
+import { create${pascal}, list${pascal}ForViewer } from "@/lib/actions/${plural}.actions";
 
 export function use${pascal}List() {
-  return useQuery({ queryKey: ${camel}Keys.list(), queryFn: fetch${pascal}List });
+  return useQuery({ queryKey: ${camel}Keys.list(), queryFn: () => list${pascal}ForViewer() });
 }
 
 export function useCreate${pascal}() {
@@ -285,10 +290,9 @@ export default async function Page() {
         className="mt-6 flex flex-col gap-3 sm:flex-row"
         action={async (fd) => {
           "use server";
-          await create${pascal}({ id: String(fd.get("id") ?? ""), name: String(fd.get("name") ?? "") });
+          await create${pascal}({ name: String(fd.get("name") ?? "") });
         }}
       >
-        <Input name="id" placeholder="id" required />
         <Input name="name" placeholder="name" required />
         <Button type="submit">Create</Button>
       </form>
@@ -323,7 +327,15 @@ export async function GET(req: Request) {
   const requestId = crypto.randomUUID();
   try {
     await guardApiRequest(req);
-    const data = await ${camel}Service_list();
+    const url = new URL(req.url);
+    const orgId = url.searchParams.get("orgId") ?? "";
+    if (!orgId) {
+      return NextResponse.json(
+        { ok: false, code: "validation_error", message: "orgId query parameter required", requestId },
+        { status: 400, headers: { "x-request-id": requestId } }
+      );
+    }
+    const data = await ${camel}Service_list({ orgId });
     return NextResponse.json({ ok: true, requestId, data }, { headers: { "x-request-id": requestId } });
   } catch (err) {
     return toApiErrorResponse(err, requestId);
@@ -354,8 +366,8 @@ describe("${plural} repo", () => {
 import { create${pascal}Input } from "@/lib/rules/${plural}.rules";
 
 describe("${plural} rules", () => {
-  it("validates input", () => {
-    expect(() => create${pascal}Input.parse({ id: "x" })).not.toThrow();
+  it("validates create input", () => {
+    expect(create${pascal}Input.parse({ name: "Hello" })).toEqual({ name: "Hello" });
   });
 });
 `

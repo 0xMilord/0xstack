@@ -38,6 +38,154 @@ async function writeFileEnsured(p: string, content: string) {
   await fs.writeFile(p, content, "utf8");
 }
 
+async function patchEslintConfigForOxstack(root: string) {
+  const boundaryFile = "eslint.0xstack-boundaries.mjs";
+  const boundaryPath = path.join(root, boundaryFile);
+  if (!(await fileExists(boundaryPath))) return;
+
+  for (const name of ["eslint.config.mjs", "eslint.config.js"]) {
+    const p = path.join(root, name);
+    if (!(await fileExists(p))) continue;
+    let src = await fs.readFile(p, "utf8");
+    if (src.includes("eslint.0xstack-boundaries") || src.includes("oxstackBoundaries")) return;
+
+    const importLine =
+      name.endsWith(".mjs") || name.endsWith(".js")
+        ? `import oxstackBoundaries from "./eslint.0xstack-boundaries.mjs";\n`
+        : `import oxstackBoundaries from "./eslint.0xstack-boundaries.mjs";\n`;
+
+    const lines = src.split("\n");
+    let lastImport = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^\s*import\s/.test(lines[i]!)) lastImport = i;
+    }
+    lines.splice(lastImport + 1, 0, importLine.trimEnd());
+    src = lines.join("\n");
+
+    let patched = false;
+    if (/export\s+default\s+defineConfig\s*\(\s*\[/m.test(src)) {
+      src = src.replace(/export\s+default\s+defineConfig\s*\(\s*\[/, "export default defineConfig([...oxstackBoundaries, ");
+      patched = true;
+    } else if (/export\s+default\s+\[/m.test(src)) {
+      src = src.replace(/export\s+default\s+\[/, "export default [...oxstackBoundaries, ");
+      patched = true;
+    }
+
+    if (patched) {
+      await fs.writeFile(p, src, "utf8");
+      logger.info(`Patched ${name} with 0xstack ESLint architecture boundaries (PRD).`);
+    } else {
+      logger.warn(
+        `Could not auto-patch ${name} for ESLint boundaries. Merge "./eslint.0xstack-boundaries.mjs" into export default [...] manually.`
+      );
+    }
+    return;
+  }
+}
+
+async function ensurePrdArchitectureTooling(root: string) {
+  await ensureDir(path.join(root, "lib", "services"));
+  await writeFileEnsured(
+    path.join(root, "lib", "services", "module-factories.ts"),
+    `/**
+ * Progressive activation entry points (PRD).
+ * Use these instead of top-level imports from billing/storage/seo when modules may be disabled.
+ */
+export async function getBillingService() {
+  try {
+    await import("@/lib/billing/runtime");
+    return await import("@/lib/services/billing.service");
+  } catch {
+    throw new Error(
+      'Billing is not enabled. Set modules.billing to "dodo" or "stripe" in 0xstack.config.ts and run npx 0xstack baseline.'
+    );
+  }
+}
+
+export async function getStorageService() {
+  try {
+    await import("@/lib/storage/runtime");
+    return await import("@/lib/services/storage.service");
+  } catch {
+    throw new Error(
+      "Storage is not enabled. Set modules.storage in 0xstack.config.ts and run npx 0xstack baseline."
+    );
+  }
+}
+
+export async function getSeoConfig() {
+  try {
+    const m = await import("@/lib/seo/runtime");
+    return m.getSeoRuntimeConfig();
+  } catch {
+    throw new Error("SEO is not enabled. Set modules.seo to true in 0xstack.config.ts and run npx 0xstack baseline.");
+  }
+}
+`
+  );
+
+  await writeFileEnsured(
+    path.join(root, "eslint.0xstack-boundaries.mjs"),
+    `/** Auto-managed by 0xstack baseline — PRD architecture boundary (no-restricted-imports). */
+export default [
+  {
+    files: ["app/**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/repos", "@/lib/repos/*"],
+              message: "Use server actions or loaders — do not import repos from app/.",
+            },
+            {
+              group: ["@/lib/db", "@/lib/db/*"],
+              message: "Do not import Drizzle/db from app/; use repos via server layers.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+];
+`
+  );
+
+  await patchEslintConfigForOxstack(root);
+
+  const vitestConfigPath = path.join(root, "vitest.config.ts");
+  if (!(await fileExists(vitestConfigPath))) {
+    await writeFileEnsured(
+      vitestConfigPath,
+      `import path from "node:path";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "node",
+    include: ["tests/**/*.test.ts"],
+    passWithNoTests: true,
+  },
+  resolve: {
+    alias: { "@": path.resolve(__dirname, ".") },
+  },
+});
+`
+    );
+  }
+
+  try {
+    const pkgPath = path.join(root, "package.json");
+    const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { scripts?: Record<string, string> };
+    pkg.scripts = pkg.scripts ?? {};
+    if (!pkg.scripts.test) pkg.scripts.test = "vitest run";
+    await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
+  } catch {
+    // ignore
+  }
+}
+
 async function ensureOptionalEnvSchemaStubs(root: string) {
   await ensureDir(path.join(root, "lib", "env"));
   const stubs: Array<{ file: string; exportName: string }> = [
@@ -586,7 +734,7 @@ export async function runBaseline(input: BaselineInput) {
         deps.push("@tanstack/react-query", "zustand");
         deps.push("@upstash/redis", "@upstash/ratelimit");
         // Better Auth CLI is executed via npx/pnpm dlx (no install), but keep drizzle-kit in devDeps.
-        devDeps.push("drizzle-kit");
+        devDeps.push("drizzle-kit", "vitest", "vite");
 
         if (cfg.modules.blogMdx) {
           deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "rehype-slug", "rehype-autolink-headings");
@@ -629,6 +777,13 @@ export async function runBaseline(input: BaselineInput) {
 
         await install(Array.from(new Set(deps)), false);
         await install(Array.from(new Set(devDeps)), true);
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "PRD tooling (ESLint boundaries, module factories, vitest)",
+      run: async () => {
+        await ensurePrdArchitectureTooling(root);
         return { kind: "ok" };
       },
     },
