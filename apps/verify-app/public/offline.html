@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>You're Offline</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        background: #0a0a0a;
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        max-width: 520px;
+        padding: 24px;
+        border: 1px solid #262626;
+        border-radius: 14px;
+        background: #0f0f0f;
+      }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 0 0 16px; color: #a3a3a3; }
+      button {
+        background: #fff;
+        color: #000;
+        border: 0;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>You're offline</h1>
+      <p>Some features may be limited until you're back online.</p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </body>
+</html>

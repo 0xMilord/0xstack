@@ -39,6 +39,11 @@ async function ensureDirEmptyOrNew(dir: string) {
 function assertValidCreateNextAppDirName(folderName: string) {
   // create-next-app enforces npm package naming restrictions.
   // Keep this strict to avoid interactive failures later in the pipeline.
+  if (folderName.startsWith(".")) {
+    throw new Error(
+      `Invalid project directory name "${folderName}". It cannot start with a period (npm / create-next-app). Use e.g. "my-app".`
+    );
+  }
   if (folderName.startsWith("_")) {
     throw new Error(
       `Invalid project directory name "${folderName}". It cannot start with an underscore. Use e.g. "my-app".`
@@ -91,7 +96,8 @@ export async function runInit(input: InitInput) {
   const targetFolder = path.basename(targetDir);
   const cwd = process.cwd();
   const initIntoCurrentDir = path.resolve(targetDir) === path.resolve(cwd);
-  const tempFolderName = `.0xstack-tmp-${Date.now()}`;
+  // Must not start with "." — create-next-app uses the folder name like an npm package name.
+  const tempFolderName = `0xstack-tmp-${Date.now()}`;
   const tempDir = path.join(targetParent, tempFolderName);
   const createNextTargetFolder = initIntoCurrentDir ? tempFolderName : targetFolder;
   const effectiveDir = initIntoCurrentDir ? tempDir : targetDir;
@@ -349,7 +355,7 @@ pnpm dev
 \`\`\`bash
 npx 0xstack baseline --profile core
 npx 0xstack doctor --profile core
-npx 0xstack docs-sync
+npx 0xstack docs sync
 \`\`\`
 `
         );

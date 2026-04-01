@@ -27,10 +27,9 @@ export const storageCoreModule: Module = {
       await backupAndRemove(ctx.projectRoot, "lib/actions/assets.actions.ts");
       await backupAndRemove(ctx.projectRoot, "lib/query-keys/assets.keys.ts");
       await backupAndRemove(ctx.projectRoot, "lib/mutation-keys/assets.keys.ts");
-      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/assets/page.tsx");
-      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/assets/assets-client.tsx");
-      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/assets/[assetId]/page.tsx");
       await backupAndRemove(ctx.projectRoot, "app/app/assets/page.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/app/assets/assets-client.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/app/assets/[assetId]/page.tsx");
       return;
     }
 
@@ -46,10 +45,11 @@ export const storageCoreModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "storage", "sign-read"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "storage", "assets"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "storage", "assets", "[assetId]"));
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "assets"));
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "assets", "[assetId]"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "assets"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "assets", "[assetId]"));
 
-    await backupAndRemove(ctx.projectRoot, "app/app/assets/page.tsx");
+    // In older versions, the assets UI lived elsewhere; keep a defensive cleanup hook.
+    await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/assets/page.tsx");
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "storage", "runtime.ts"),
@@ -540,7 +540,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ assetId: str
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "assets", "assets-client.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "assets", "assets-client.tsx"),
       `"use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
@@ -683,7 +683,7 @@ export function AssetsClient({ assets }: { assets: Asset[] }) {
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "assets", "[assetId]", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "assets", "[assetId]", "page.tsx"),
       `import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -734,7 +734,7 @@ export default async function Page({ params }: { params: Promise<{ assetId: stri
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "assets", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "assets", "page.tsx"),
       `import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { loadAssetsForActiveOrg } from "@/lib/loaders/assets.loader";

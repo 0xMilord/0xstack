@@ -15,7 +15,7 @@ export const webhookLedgerModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "actions"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "rules"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "query-keys"));
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "webhooks"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "webhooks"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "webhooks", "ledger", "events"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "webhooks", "ledger", "events", "[provider]", "[eventId]", "replay"));
     await writeFileEnsured(
@@ -224,7 +224,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ provider: str
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "webhooks", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "webhooks", "page.tsx"),
       `import { loadWebhookLedger } from "@/lib/loaders/webhook-ledger.loader";
 import { replayWebhookEventAction } from "@/lib/actions/webhook-ledger.actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

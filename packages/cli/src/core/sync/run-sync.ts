@@ -85,7 +85,7 @@ export async function runSync(input: SyncInput) {
         "app/pricing/page.tsx",
         "app/billing/success/page.tsx",
         "app/billing/cancel/page.tsx",
-        "app/app/(workspace)/billing/page.tsx",
+        "app/app/billing/page.tsx",
       ]);
     }
     if (cfg.modules.storage === false) {
@@ -94,9 +94,9 @@ export async function runSync(input: SyncInput) {
         "app/api/v1/storage/sign-read/route.ts",
         "app/api/v1/storage/assets/route.ts",
         "app/api/v1/storage/assets/[assetId]/route.ts",
-        "app/app/(workspace)/assets/page.tsx",
-        "app/app/(workspace)/assets/assets-client.tsx",
-        "app/app/(workspace)/assets/[assetId]/page.tsx",
+        "app/app/assets/page.tsx",
+        "app/app/assets/assets-client.tsx",
+        "app/app/assets/[assetId]/page.tsx",
       ]);
     }
     if (!cfg.modules.blogMdx) addAll(["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts"]);

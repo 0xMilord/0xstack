@@ -37,7 +37,7 @@ export const billingCoreModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "app", "pricing"));
     await ensureDir(path.join(ctx.projectRoot, "app", "billing", "success"));
     await ensureDir(path.join(ctx.projectRoot, "app", "billing", "cancel"));
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "billing"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "billing"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "hooks", "client"));
 
     await writeFileEnsured(
@@ -417,7 +417,7 @@ export default function Page() {
         : "Org-scoped subscription read model (Dodo webhooks → DB).";
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "billing", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "billing", "page.tsx"),
       `import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";

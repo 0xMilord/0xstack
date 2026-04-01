@@ -199,9 +199,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 `
     );
 
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "settings"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "settings"));
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "settings", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "settings", "page.tsx"),
       `import Link from "next/link";
 import { loadViewer } from "@/lib/loaders/viewer.loader";
 import { buttonVariants } from "@/components/ui/button";

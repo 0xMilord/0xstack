@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  Generate a project once, then keep it correct over time with <code>baseline</code>, <code>doctor</code>, <code>sync</code>, and optional <code>upgrade</code>. Keywords people search for: <em>Next.js Drizzle starter</em>, <em>TanStack Query Next.js boilerplate</em>, <em>Supabase Drizzle starter kit</em>, <em>server actions architecture starter</em>, <em>modular billing and storage scaffolding</em>.
+  Generate a project once, then keep it correct over time with <code>baseline</code>, <code>doctor</code>, <code>sync</code>, and optional <code>upgrade</code>. <em>Next.js Drizzle starter</em>, <em>TanStack Query Next.js boilerplate</em>, <em>Supabase Drizzle starter kit</em>, <em>server actions architecture starter</em>, <em>modular billing and storage scaffolding</em>.
 </p>
 
 <div align="center">

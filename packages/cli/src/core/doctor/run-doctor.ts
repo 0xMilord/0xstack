@@ -100,8 +100,7 @@ export async function runDoctor(input: DoctorInput) {
     "app/layout.tsx",
     "app/providers.tsx",
     "app/app/layout.tsx",
-    "app/app/(workspace)/layout.tsx",
-    "app/app/(workspace)/settings/page.tsx",
+    "app/app/settings/page.tsx",
   ]);
   await checkFiles("foundation.orgs.active", ["lib/orgs/active-org.ts"]);
   await checkFiles("foundation.health", ["app/api/v1/health/route.ts"]);
@@ -130,10 +129,10 @@ export async function runDoctor(input: DoctorInput) {
     "lib/services/webhook-ledger.service.ts",
     "lib/loaders/webhook-ledger.loader.ts",
     "lib/actions/webhook-ledger.actions.ts",
-    "app/app/(workspace)/webhooks/page.tsx",
+    "app/app/webhooks/page.tsx",
     "app/api/v1/webhooks/ledger/events/route.ts",
   ]);
-  await checkFiles("foundation.api-keys.ux", ["app/app/(workspace)/api-keys/page.tsx", "lib/actions/api-keys.actions.ts", "lib/loaders/api-keys.loader.ts"]);
+  await checkFiles("foundation.api-keys.ux", ["app/app/api-keys/page.tsx", "lib/actions/api-keys.actions.ts", "lib/loaders/api-keys.loader.ts"]);
 
   const billingApis = [
     "app/api/v1/billing/checkout/route.ts",
@@ -144,7 +143,7 @@ export async function runDoctor(input: DoctorInput) {
     "app/pricing/page.tsx",
     "app/billing/success/page.tsx",
     "app/billing/cancel/page.tsx",
-    "app/app/(workspace)/billing/page.tsx",
+    "app/app/billing/page.tsx",
   ];
   const billingShared = [
     "lib/billing/runtime.ts",
@@ -198,11 +197,7 @@ export async function runDoctor(input: DoctorInput) {
     "app/api/v1/storage/assets/route.ts",
     "app/api/v1/storage/assets/[assetId]/route.ts",
   ];
-  const storageUi = [
-    "app/app/(workspace)/assets/page.tsx",
-    "app/app/(workspace)/assets/assets-client.tsx",
-    "app/app/(workspace)/assets/[assetId]/page.tsx",
-  ];
+  const storageUi = ["app/app/assets/page.tsx", "app/app/assets/assets-client.tsx", "app/app/assets/[assetId]/page.tsx"];
   const storageShared = [
     "lib/storage/runtime.ts",
     "lib/storage/provider.ts",
@@ -330,7 +325,7 @@ export async function runDoctor(input: DoctorInput) {
       "app/api/v1/pwa/push/unsubscribe/route.ts",
       "app/api/v1/pwa/push/send/route.ts",
     ]);
-    await checkFiles("pwa.ux", ["app/app/(workspace)/pwa/page.tsx", "app/app/(workspace)/pwa/pwa-client.tsx", "lib/loaders/pwa.loader.ts", "lib/actions/pwa.actions.ts"]);
+    await checkFiles("pwa.ux", ["app/app/pwa/page.tsx", "app/app/pwa/pwa-client.tsx", "lib/loaders/pwa.loader.ts", "lib/actions/pwa.actions.ts"]);
   }
   if (!modules.pwa) {
     await checkAbsent("pwa.disabled", [
@@ -346,8 +341,8 @@ export async function runDoctor(input: DoctorInput) {
       "app/api/v1/pwa/push/subscribe/route.ts",
       "app/api/v1/pwa/push/unsubscribe/route.ts",
       "app/api/v1/pwa/push/send/route.ts",
-      "app/app/(workspace)/pwa/page.tsx",
-      "app/app/(workspace)/pwa/pwa-client.tsx",
+      "app/app/pwa/page.tsx",
+      "app/app/pwa/pwa-client.tsx",
       "lib/loaders/pwa.loader.ts",
       "lib/actions/pwa.actions.ts",
     ]);

@@ -47,8 +47,8 @@ export const pwaModule: Module = {
       await backupAndRemove(ctx.projectRoot, "lib/env/pwa.ts");
       await backupAndRemove(ctx.projectRoot, "lib/loaders/pwa.loader.ts");
       await backupAndRemove(ctx.projectRoot, "lib/actions/pwa.actions.ts");
-      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/pwa/page.tsx");
-      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/pwa/pwa-client.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/app/pwa/page.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/app/pwa/pwa-client.tsx");
       return;
     }
 
@@ -58,7 +58,7 @@ export const pwaModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "services"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "loaders"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "actions"));
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "pwa"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "env"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "subscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe"));
@@ -143,7 +143,7 @@ export async function pwaUnsubscribeEndpointAction(input: { endpoint: string }) 
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa", "pwa-client.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "pwa", "pwa-client.tsx"),
       `"use client";
 
 import { useMemo, useState } from "react";
@@ -200,7 +200,7 @@ export function PwaClient({ vapidPublicKey }: { vapidPublicKey: string }) {
     );
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa", "page.tsx"),
+      path.join(ctx.projectRoot, "app", "app", "pwa", "page.tsx"),
       `import { loadPwaSettings } from "@/lib/loaders/pwa.loader";
 import { PwaClient } from "./pwa-client";
 import { pwaSendTestPushAction, pwaUnsubscribeEndpointAction } from "@/lib/actions/pwa.actions";
