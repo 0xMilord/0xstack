@@ -15,6 +15,10 @@ export type SyncInput = {
   apply: boolean;
   packageManager?: "pnpm" | "npm";
   lint?: boolean;
+  /** Run drizzle-kit generate after baseline + docs (PRD schema regen). */
+  drizzleGenerate?: boolean;
+  /** Run package.json `format` script if defined (e.g. Prettier). */
+  format?: boolean;
 };
 
 function pmCmd(pm: "pnpm" | "npm") {
@@ -38,8 +42,13 @@ export async function runSync(input: SyncInput) {
   logger.info(`- profile: ${state.appliedProfile}`);
   logger.info(`- modules: ${JSON.stringify(state.modules)}`);
   logger.info(`- detected routes: ${state.routes.length}`);
-  logger.info("- PRD reconcile hints: run `0xstack drizzle generate` after schema changes; use `--apply` for baseline + docs.");
+  logger.info("- PRD reconcile hints: use `--apply --drizzle-generate` to re-run drizzle-kit generate after baseline + docs.");
   logger.info("- Env: ensure `.env.local` satisfies `lib/env/schema.ts` for enabled modules (doctor checks file-level keys).");
+  if (input.apply) {
+    logger.info(
+      `- Hygiene flags: lint=${!!input.lint} format=${!!input.format} drizzle-generate=${!!input.drizzleGenerate}`
+    );
+  }
 
   // Dependency drift (best-effort)
   try {
@@ -126,7 +135,7 @@ export async function runSync(input: SyncInput) {
 
   if (!input.apply) {
     logger.info("No changes applied. Re-run with `--apply` to execute baseline + docs sync.");
-    logger.info("Optional: `--apply --lint` runs `pnpm|npm run lint` when a lint script exists.");
+    logger.info("With `--apply`: optional `--lint`, `--format`, `--drizzle-generate` run matching package scripts / drizzle-kit.");
     return;
   }
 
@@ -146,11 +155,42 @@ export async function runSync(input: SyncInput) {
     {
       name: "docs sync",
       run: async () => {
-        await runDocsSync({ projectRoot: input.projectRoot });
+        await runDocsSync({ projectRoot: input.projectRoot, profile: input.profile });
         return { kind: "ok" };
       },
     },
   ]);
+
+  if (input.drizzleGenerate) {
+    try {
+      const pm = input.packageManager ?? "pnpm";
+      logger.info("Running drizzle-kit generate (sync --drizzle-generate)…");
+      const cmd = pmCmd(pm);
+      const args =
+        pm === "npm" ? ["exec", "--", "drizzle-kit", "generate"] : ["exec", "drizzle-kit", "generate"];
+      await execCmd(cmd, args, { cwd: input.projectRoot });
+    } catch (e) {
+      logger.warn(`sync --drizzle-generate failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  if (input.format) {
+    try {
+      const pkgPath = path.join(input.projectRoot, "package.json");
+      const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { scripts?: Record<string, string> };
+      const pm = input.packageManager ?? "pnpm";
+      if (pkg.scripts?.format) {
+        logger.info("Running format script (sync --format)…");
+        const cmd = pmCmd(pm);
+        const args = pm === "npm" ? ["run", "format"] : ["run", "format"];
+        await execCmd(cmd, args, { cwd: input.projectRoot });
+      } else {
+        logger.warn("sync --format skipped: no `format` script in package.json");
+      }
+    } catch (e) {
+      logger.warn(`sync --format failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   if (input.lint) {
     try {

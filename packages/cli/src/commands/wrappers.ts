@@ -95,6 +95,10 @@ export function registerWrapperCommands(cli: CAC) {
     logger.info("  0xstack deps              — expected app deps from config");
     logger.info("  0xstack deps --cli        — this CLI's package.json deps");
     logger.info("  0xstack modules           — ids for `0xstack add`");
+    logger.info("  0xstack sync --apply [--lint|--format|--drizzle-generate]");
+    logger.info("  0xstack upgrade --apply   — refresh PRD hygiene without full codemods");
+    logger.info("  0xstack release           — changeset status when .changeset exists");
+    logger.info("  0xstack git commit        — prompted conventional commit");
   });
 }
 

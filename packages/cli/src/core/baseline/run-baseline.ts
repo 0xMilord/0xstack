@@ -83,7 +83,7 @@ async function patchEslintConfigForOxstack(root: string) {
   }
 }
 
-async function ensurePrdArchitectureTooling(root: string) {
+export async function ensurePrdArchitectureTooling(root: string) {
   await ensureDir(path.join(root, "lib", "services"));
   await writeFileEnsured(
     path.join(root, "lib", "services", "module-factories.ts"),
@@ -186,7 +186,7 @@ export default defineConfig({
   }
 }
 
-async function ensureOptionalEnvSchemaStubs(root: string) {
+export async function ensureOptionalEnvSchemaStubs(root: string) {
   await ensureDir(path.join(root, "lib", "env"));
   const stubs: Array<{ file: string; exportName: string }> = [
     { file: "billing-stripe.ts", exportName: "BillingStripeEnvSchema" },
@@ -216,7 +216,7 @@ async function ensureKeysIndex(root: string, dirRel: "lib/query-keys" | "lib/mut
   await writeFileEnsured(path.join(dir, "index.ts"), content);
 }
 
-async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
+export async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
   const p = path.join(projectRoot, "lib", "0xstack", "config.ts");
   const src = await fs.readFile(p, "utf8").catch(() => "");
   if (!src) return;
@@ -258,7 +258,7 @@ async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
   if (next !== src) await fs.writeFile(p, next, "utf8");
 }
 
-async function ensureConfigFileKeysUpToDate(projectRoot: string) {
+export async function ensureConfigFileKeysUpToDate(projectRoot: string) {
   const p = path.join(projectRoot, "0xstack.config.ts");
   const src = await fs.readFile(p, "utf8").catch(() => "");
   if (!src) return;

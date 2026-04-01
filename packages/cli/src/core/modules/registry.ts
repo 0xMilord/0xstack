@@ -18,6 +18,7 @@ import { emailResendModule } from "./email-resend.module";
 import { pwaModule } from "./pwa.module";
 import { cacheModule } from "./cache.module";
 import { authCoreModule } from "./auth-core.module";
+import { runConsolidatedModuleValidate } from "./module-consolidated-validate";
 
 export function getModules(): Module[] {
   return [
@@ -47,6 +48,9 @@ export async function runModulesLifecycle(ctx: ModuleContext) {
   for (const mod of getModules()) {
     await mod.install(ctx);
     await mod.activate(ctx);
+  }
+  await runConsolidatedModuleValidate(ctx);
+  for (const mod of getModules()) {
     await mod.validate(ctx);
     await mod.sync(ctx);
   }

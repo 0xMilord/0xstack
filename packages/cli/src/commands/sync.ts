@@ -9,6 +9,8 @@ export function registerSyncCommand(cli: CAC) {
     .option("--profile <profile>", "Profile preset to apply (default: core)")
     .option("--apply", "Apply changes (default: plan only)")
     .option("--lint", "With --apply, run package.json lint script if defined")
+    .option("--format", "With --apply, run package.json format script if defined")
+    .option("--drizzle-generate", "With --apply, run drizzle-kit generate after baseline + docs")
     .option("--pm <pm>", "Package manager when applying baseline: pnpm|npm (default: pnpm)")
     .action(async (options) => {
       const dir = path.resolve(process.cwd(), options.dir ?? ".");
@@ -20,6 +22,8 @@ export function registerSyncCommand(cli: CAC) {
         apply: !!options.apply,
         packageManager: pm,
         lint: !!options.lint,
+        format: !!options.format,
+        drizzleGenerate: !!options.drizzleGenerate,
       });
     });
 }
