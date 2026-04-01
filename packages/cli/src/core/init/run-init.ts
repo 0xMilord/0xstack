@@ -217,7 +217,7 @@ export async function runInit(input: InitInput) {
         const mkSimplePage = (title: string) =>
           `export default function Page() { return <main className="mx-auto max-w-3xl p-6"><h1 className="text-2xl font-semibold">${title}</h1></main>; }\n`;
         const mkPublicPage = (title: string, subtitle: string) => `import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -237,12 +237,8 @@ export default function Page() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <p className="max-w-2xl text-muted-foreground">{subtitle}</p>
         <div className="flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/get-started">Get started</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/pricing">Pricing</Link>
-          </Button>
+          <Link className={buttonVariants({ variant: "default" })} href="/get-started">Get started</Link>
+          <Link className={buttonVariants({ variant: "outline" })} href="/pricing">Pricing</Link>
         </div>
       </header>
 
@@ -287,9 +283,7 @@ export default function Page() {
             <p className="text-base font-semibold">Ready to ship?</p>
             <p className="text-sm text-muted-foreground">Run init → baseline → doctor and deploy.</p>
           </div>
-          <Button asChild>
-            <Link href="/get-started">Start now</Link>
-          </Button>
+          <Link className={buttonVariants({ variant: "default" })} href="/get-started">Start now</Link>
         </div>
       </section>
     </main>
@@ -522,7 +516,7 @@ export const { GET, POST } = toNextJsHandler(auth);
         await writeFileEnsured(
           path.join(projectRoot, "lib", "components", "layout", "app-shell.tsx"),
           `import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -533,9 +527,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             App
           </Link>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/app/settings">Settings</Link>
-            </Button>
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/app/settings">Settings</Link>
           </div>
         </div>
       </header>

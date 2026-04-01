@@ -88,6 +88,7 @@ export function getResend() {
 
 export async function sendResendEmail(input: { to: string; subject: string; html: string; text?: string }) {
   const resend = getResend();
+  if (!env.RESEND_FROM) throw new Error("Missing RESEND_FROM");
   const res = await resend.emails.send({
     from: env.RESEND_FROM,
     to: input.to,
@@ -328,10 +329,9 @@ export function ResetPasswordTemplate(props: { appName: string; userName: string
 import { sendResendEmail } from "@/lib/email/resend";
 import { VerifyEmailTemplate } from "@/lib/email/templates/verify-email";
 import { ResetPasswordTemplate } from "@/lib/email/templates/reset-password";
-import { getMilordConfig } from "@/lib/0xstack/config";
 
 function appName() {
-  return getMilordConfig().app.name ?? "App";
+  return process.env.NEXT_PUBLIC_APP_NAME ?? "App";
 }
 
 export async function sendVerifyEmail(input: { to: string; userName: string; verificationUrl: string }) {

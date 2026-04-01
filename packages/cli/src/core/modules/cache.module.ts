@@ -33,6 +33,11 @@ export const cacheTags = {
   user: (username: string) => \`user:\${username}\`,
   dashboardUser: (userId: string) => \`dashboard:\${userId}\`,
   viewerUser: (userId: string) => \`viewer:\${userId}\`,
+  orgsForUser: (userId: string) => \`orgs:user:\${userId}\`,
+  billingOrg: (orgId: string) => \`billing:org:\${orgId}\`,
+  assetsOrg: (orgId: string) => \`assets:org:\${orgId}\`,
+  pushSubsUser: (userId: string) => \`pwa:push:user:\${userId}\`,
+  webhookLedger: "webhooks:ledger",
 } as const;
 `
     );
@@ -48,7 +53,7 @@ type Key = string;
 
 const lru =
   (globalThis as any).__0xstack_lru ??
-  ((globalThis as any).__0xstack_lru = new LRUCache<Key, unknown>({
+  ((globalThis as any).__0xstack_lru = new LRUCache<Key, any>({
     max: LRU_MAX,
     ttl: LRU_TTL_MS,
   }));
@@ -109,22 +114,38 @@ export function withServerCache<A extends any[], T>(
 import { cacheTags } from "@/lib/cache/config";
 
 export const revalidate = {
-  tag: (tag: string) => revalidateTag(tag),
+  tag: (tag: string) => revalidateTag(tag, "page"),
   project: (slug: string) => {
-    revalidateTag(cacheTags.projects);
-    revalidateTag(cacheTags.project(slug));
+    revalidateTag(cacheTags.projects, "page");
+    revalidateTag(cacheTags.project(slug), "page");
   },
   company: (slug: string) => {
-    revalidateTag(cacheTags.companies);
-    revalidateTag(cacheTags.company(slug));
+    revalidateTag(cacheTags.companies, "page");
+    revalidateTag(cacheTags.company(slug), "page");
   },
   posts: () => {
-    revalidateTag(cacheTags.posts);
-    revalidateTag(cacheTags.trending);
+    revalidateTag(cacheTags.posts, "page");
+    revalidateTag(cacheTags.trending, "page");
   },
   dashboard: (userId: string) => {
-    revalidateTag(cacheTags.dashboard);
-    revalidateTag(cacheTags.dashboardUser(userId));
+    revalidateTag(cacheTags.dashboard, "page");
+    revalidateTag(cacheTags.dashboardUser(userId), "page");
+  },
+  orgs: (userId: string) => {
+    revalidateTag(cacheTags.orgsForUser(userId), "page");
+    revalidateTag(cacheTags.dashboard, "page");
+  },
+  billingForOrg: (orgId: string) => {
+    revalidateTag(cacheTags.billingOrg(orgId), "page");
+  },
+  assetsForOrg: (orgId: string) => {
+    revalidateTag(cacheTags.assetsOrg(orgId), "page");
+  },
+  pwaForUser: (userId: string) => {
+    revalidateTag(cacheTags.pushSubsUser(userId), "page");
+  },
+  webhookLedger: () => {
+    revalidateTag(cacheTags.webhookLedger, "page");
   },
 } as const;
 `

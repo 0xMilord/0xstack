@@ -1,6 +1,6 @@
 import type { CAC } from "cac";
 import path from "node:path";
-import { execCmd } from "../core/exec";
+import { diffSnapshots, execCmd, snapshotFiles } from "../core/exec";
 import { logger } from "../core/logger";
 import { detectPackageManager, pmDlx, pmExec } from "../core/pm";
 
@@ -12,12 +12,16 @@ function registerWrapper(cli: CAC, id: WrapperId) {
     .action(async (args: string[] = []) => {
       const cwd = process.cwd();
       const pm = await detectPackageManager(cwd);
+      const before = await snapshotFiles(cwd);
 
       if (id === "shadcn") {
         const { cmd, dlxArgs } = pmDlx(pm);
         const fullArgs = [...dlxArgs, "shadcn@latest", ...args];
         logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
         await execCmd(cmd, fullArgs, { cwd });
+        const after = await snapshotFiles(cwd);
+        const diff = diffSnapshots(before, after);
+        logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
         return;
       }
 
@@ -27,6 +31,9 @@ function registerWrapper(cli: CAC, id: WrapperId) {
         const fullArgs = [...dlxArgs, "auth@latest", ...args];
         logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
         await execCmd(cmd, fullArgs, { cwd });
+        const after = await snapshotFiles(cwd);
+        const diff = diffSnapshots(before, after);
+        logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
         return;
       }
 
@@ -35,6 +42,9 @@ function registerWrapper(cli: CAC, id: WrapperId) {
       const fullArgs = [...execArgs, "drizzle-kit", ...args];
       logger.info(`Running: ${cmd} ${fullArgs.join(" ")}`);
       await execCmd(cmd, fullArgs, { cwd });
+      const after = await snapshotFiles(cwd);
+      const diff = diffSnapshots(before, after);
+      logger.info(`Modified files: added=${diff.added.length} changed=${diff.changed.length} removed=${diff.removed.length}`);
     });
 }
 

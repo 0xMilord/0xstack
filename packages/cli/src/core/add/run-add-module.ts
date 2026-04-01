@@ -16,7 +16,7 @@ export async function runAddModule(input: AddInput) {
     const modulesBlockRe = /modules:\s*\{\s*([\s\S]*?)\n\s*\},/m;
     const m = inSrc.match(modulesBlockRe);
     if (!m) throw new Error("Cannot find modules: { ... } block in config");
-    const inner = m[1];
+    const inner = m[1] ?? "";
     const nextInner = `${inner.trimEnd()}\n    ${key}: ${value},`;
     return inSrc.replace(modulesBlockRe, (whole) => whole.replace(inner, nextInner));
   };

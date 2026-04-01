@@ -44,9 +44,10 @@ export const uiFoundationModule: Module = {
       path.join(ctx.projectRoot, "components", "layout", "site-header.tsx"),
       `import Link from "next/link";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { loadViewer } from "@/lib/loaders/viewer.loader";
 import { signOutAction } from "@/lib/actions/auth.actions";
+import { cn } from "@/lib/utils";
 
 export async function SiteHeader() {
   const viewer = await loadViewer();
@@ -57,40 +58,26 @@ export async function SiteHeader() {
           {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/pricing">Pricing</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/blog">Blog</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/about">About</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/contact">Contact</Link>
-          </Button>
+          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
+          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
+          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/about">About</Link>
+          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/contact">Contact</Link>
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {viewer ? (
             <>
-              <Button asChild variant="secondary" size="sm">
-                <Link href="/app/orgs">App</Link>
-              </Button>
+              <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href="/app/orgs">App</Link>
               <form action={signOutAction}>
-                <Button type="submit" variant="ghost" size="sm">
+                <button className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "cursor-pointer")} type="submit">
                   Sign out
-                </Button>
+                </button>
               </form>
             </>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/login">Sign in</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link href="/get-started">Get started</Link>
-              </Button>
+              <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/login">Sign in</Link>
+              <Link className={buttonVariants({ variant: "default", size: "sm" })} href="/get-started">Get started</Link>
             </>
           )}
         </div>
@@ -183,12 +170,41 @@ export function Providers({ children }: { children: React.ReactNode }) {
 `
     );
 
-    await ensureDir(path.join(ctx.projectRoot, "app", "app", "settings"));
+    // App shell (internal app chrome). Keep this separate from the marketing header/footer.
+    await ensureDir(path.join(ctx.projectRoot, "lib", "components", "layout"));
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "app", "app", "settings", "page.tsx"),
+      path.join(ctx.projectRoot, "lib", "components", "layout", "app-shell.tsx"),
+      `import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-dvh">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
+          <Link href="/app" className="font-semibold">
+            App
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/app/settings">
+              Settings
+            </Link>
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-5xl p-4">{children}</main>
+    </div>
+  );
+}
+`
+    );
+
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "settings"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "(workspace)", "settings", "page.tsx"),
       `import Link from "next/link";
 import { loadViewer } from "@/lib/loaders/viewer.loader";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOutAction } from "@/lib/actions/auth.actions";
 
@@ -209,13 +225,11 @@ export default async function Page() {
             <CardTitle className="text-base">Account</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <Button asChild variant="secondary">
-              <Link href="/app/orgs">Organizations</Link>
-            </Button>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/orgs">Organizations</Link>
             <form action={signOutAction}>
-              <Button type="submit" variant="outline" disabled={!viewer}>
+              <button className={buttonVariants({ variant: "outline" })} type="submit" disabled={!viewer}>
                 Sign out
-              </Button>
+              </button>
             </form>
           </CardContent>
         </Card>
@@ -225,15 +239,160 @@ export default async function Page() {
             <CardTitle className="text-base">Billing & storage</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <Button asChild variant="secondary">
-              <Link href="/pricing">Pricing</Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/app/assets">Assets</Link>
-            </Button>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/pricing">Pricing</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/billing">Billing</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/assets">Assets</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/api-keys">API keys</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/pwa">PWA</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/webhooks">Webhooks</Link>
           </CardContent>
         </Card>
       </div>
+    </main>
+  );
+}
+`
+    );
+
+    // Public marketing pages (home + about/contact + legal).
+    await ensureDir(path.join(ctx.projectRoot, "app", "about"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "contact"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "terms"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "privacy"));
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "page.tsx"),
+      `import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-6xl p-6">
+      <section className="grid gap-8 md:grid-cols-2 md:items-center">
+        <div className="space-y-4">
+          <h1 className="text-4xl font-semibold tracking-tight">Ship a production app in days.</h1>
+          <p className="text-base text-muted-foreground">
+            0xstack gives you auth, orgs, billing, storage, jobs, and enterprise guardrails with a strict CQRS contract.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link className={buttonVariants({ variant: "default" })} href="/get-started">Get started</Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/pricing">View pricing</Link>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">What’s included</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Better Auth + Drizzle (Postgres)</li>
+              <li>Org-scoped workspace with hardened boundaries</li>
+              <li>Storage (GCS) signed URLs + asset index</li>
+              <li>Billing (Dodo) webhook ledger + subscription read model</li>
+            </ul>
+            <div className="pt-2">
+              <Link className={buttonVariants({ variant: "outline", size: "sm" })} href="/app/orgs">Open app</Link>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "about", "page.tsx"),
+      `import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-4xl p-6 space-y-8">
+      <header className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">About</h1>
+        <p className="text-sm text-muted-foreground">A pragmatic stack for real SaaS constraints: multi-tenant, secure, observable.</p>
+      </header>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">CQRS by default</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Reads use loaders + server cache; writes use server actions; external APIs call services only.
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Enterprise guardrails</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            ` + "`doctor`" + ` enforces boundaries and required surfaces so teams don’t accidentally break architecture.
+          </CardContent>
+        </Card>
+      </div>
+      <div className="flex gap-2">
+        <Link className={buttonVariants({ variant: "default" })} href="/contact">Contact</Link>
+        <Link className={buttonVariants({ variant: "secondary" })} href="/terms">Terms</Link>
+      </div>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "contact", "page.tsx"),
+      `import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-4xl p-6 space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Contact</h1>
+        <p className="text-sm text-muted-foreground">Drop your support email, Discord, or a contact form here.</p>
+      </header>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Support</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Update this page in your app with the channels your team actually uses (email, ticketing, chat).
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "terms", "page.tsx"),
+      `export default function Page() {
+  return (
+    <main className="mx-auto max-w-4xl p-6 space-y-4">
+      <h1 className="text-3xl font-semibold tracking-tight">Terms</h1>
+      <p className="text-sm text-muted-foreground">
+        Replace this with your legal terms. Keep it versioned and linked from the footer.
+      </p>
+    </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "privacy", "page.tsx"),
+      `export default function Page() {
+  return (
+    <main className="mx-auto max-w-4xl p-6 space-y-4">
+      <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>
+      <p className="text-sm text-muted-foreground">
+        Replace this with your privacy policy. Keep it versioned and linked from the footer.
+      </p>
     </main>
   );
 }

@@ -100,7 +100,8 @@ export async function signOutAction() {
   const h = await headers();
   await authService_signOut(h as any);
   revalidate.tag("viewer");
-  return { ok: true as const };
+  // Server Action form handlers are best as void-return for broad compatibility.
+  return;
 }
 `
     );

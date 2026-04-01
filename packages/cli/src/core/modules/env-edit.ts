@@ -20,20 +20,39 @@ export async function ensureEnvSchemaModuleWiring(projectRoot: string) {
   src = ensureImport(src, `import { PwaEnvSchema } from "./pwa";`);
   src = ensureImport(src, `import { ObservabilityEnvSchema } from "./observability";`);
 
-  // Ensure EnvSchema composes optional module schemas.
-  if (!src.includes(".and(BillingEnvSchema.partial())")) {
-    src = src.replace(
-      /export const EnvSchema = z\.object\(\{([\s\S]*?)\}\);\s*/m,
-      (m) =>
-        m.replace(
-          /\}\);\s*$/m,
-          `}).and(BillingEnvSchema.partial())
+  // Ensure EnvSchema composes optional module schemas (idempotent).
+  const needsCompose =
+    !src.includes(".and(BillingEnvSchema.partial())") ||
+    !src.includes(".and(StorageEnvSchema.partial())") ||
+    !src.includes(".and(EmailEnvSchema.partial())") ||
+    !src.includes(".and(PwaEnvSchema.partial())") ||
+    !src.includes(".and(ObservabilityEnvSchema.partial())");
+  if (needsCompose) {
+    src = src
+      // normalize any existing one-line chain
+      .replace(
+        /\}\)\.and\(BillingEnvSchema\.partial\(\)\)(?:\.and\(StorageEnvSchema\.partial\(\)\))?(?:\.and\(EmailEnvSchema\.partial\(\)\))?(?:\.and\(PwaEnvSchema\.partial\(\)\))?(?:\.and\(ObservabilityEnvSchema\.partial\(\)\))?;\s*$/m,
+        `})
+  .and(BillingEnvSchema.partial())
+  .and(StorageEnvSchema.partial())
+  .and(EmailEnvSchema.partial())
+  .and(PwaEnvSchema.partial())
+  .and(ObservabilityEnvSchema.partial());`
+      )
+      // if there was no chain at all yet, add it
+      .replace(
+        /export const EnvSchema = z\.object\(\{([\s\S]*?)\}\);\s*/m,
+        (m) =>
+          m.replace(
+            /\}\);\s*$/m,
+            `})
+  .and(BillingEnvSchema.partial())
   .and(StorageEnvSchema.partial())
   .and(EmailEnvSchema.partial())
   .and(PwaEnvSchema.partial())
   .and(ObservabilityEnvSchema.partial());\n`
-        )
-    );
+          )
+      );
   }
 
   await fs.writeFile(p, src, "utf8");

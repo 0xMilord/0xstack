@@ -68,13 +68,14 @@ export async function runDocsSync(input: DocsSyncInput) {
     const createRe = /create table\s+"?([a-zA-Z0-9_]+)"?\s*\(([\s\S]*?)\);\s*/gi;
     let m: RegExpExecArray | null;
     while ((m = createRe.exec(sql))) {
-      const name = m[1];
-      const body = m[2];
+      const name = m[1] ?? "";
+      const body = m[2] ?? "";
       const cols = body
         .split(/\r?\n/)
         .map((l) => l.trim())
         .filter((l) => !!l && !l.toLowerCase().startsWith("constraint"))
         .map((l) => l.replace(/,$/, ""));
+      if (!name) continue;
       tables[name] = tables[name] ?? { cols: [], fks: [] };
       tables[name].cols = cols;
     }
@@ -83,10 +84,11 @@ export async function runDocsSync(input: DocsSyncInput) {
     const fkRe =
       /alter table\s+"?([a-zA-Z0-9_]+)"?\s+add constraint\s+"?([a-zA-Z0-9_]+)"?\s+foreign key\s*\("?([a-zA-Z0-9_]+)"?\)\s+references\s+"?([a-zA-Z0-9_]+)"?\s*\("?([a-zA-Z0-9_]+)"?\)/gi;
     while ((m = fkRe.exec(sql))) {
-      const fromT = m[1];
-      const fromC = m[3];
-      const toT = m[4];
-      const toC = m[5];
+      const fromT = m[1] ?? "";
+      const fromC = m[3] ?? "";
+      const toT = m[4] ?? "";
+      const toC = m[5] ?? "";
+      if (!fromT || !fromC || !toT || !toC) continue;
       tables[fromT] = tables[fromT] ?? { cols: [], fks: [] };
       tables[fromT].fks.push(`${fromT}.${fromC} -> ${toT}.${toC}`);
     }
@@ -100,17 +102,19 @@ export async function runDocsSync(input: DocsSyncInput) {
       return lines.join("\n");
     }
     for (const t of names) {
+      const node = tables[t];
+      if (!node) continue;
       lines.push(`### \`${t}\``);
       lines.push("");
-      const cols = tables[t].cols.length ? tables[t].cols : ["(columns not detected)"];
+      const cols = node.cols.length ? node.cols : ["(columns not detected)"];
       lines.push("**Columns**");
       lines.push("");
       lines.push(...cols.map((c) => `- \`${c}\``));
-      if (tables[t].fks.length) {
+      if (node.fks.length) {
         lines.push("");
         lines.push("**Relations (FKs)**");
         lines.push("");
-        lines.push(...tables[t].fks.map((x) => `- \`${x}\``));
+        lines.push(...node.fks.map((x) => `- \`${x}\``));
       }
       lines.push("");
     }
@@ -170,9 +174,25 @@ export async function runDocsSync(input: DocsSyncInput) {
     "pnpm dlx 0xstack docs-sync",
     "```",
     "",
-    "## Environment variables",
-    "- Copy `.env.example` → `.env.local` and fill required keys.",
-    "- Core validation lives in `lib/env/schema.ts` (plus module env schemas in `lib/env/*`).",
+    "## Environment variables (runbook)",
+    "- Create `.env.local` (or set real env vars in prod). Validation lives in `lib/env/schema.ts`.",
+    "",
+    "### Core (required)",
+    "- `NEXT_PUBLIC_APP_URL`: public base URL (ex: `http://localhost:3000`)",
+    "- `DATABASE_URL`: Postgres connection string",
+    "- `BETTER_AUTH_SECRET`: 32+ chars secret",
+    "- `BETTER_AUTH_URL`: base URL for Better Auth callbacks (usually same as `NEXT_PUBLIC_APP_URL`)",
+    "",
+    "### Core (optional but recommended)",
+    "- `API_KEY`: server-to-server key for `/api/v1/*` (when not using session auth)",
+    "- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`: durable rate limiting + caching support",
+    "",
+    "### Module env (when enabled)",
+    "- Billing (Dodo): `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_ENVIRONMENT`, `DODO_PAYMENTS_RETURN_URL`, `DODO_PAYMENTS_STARTER_PRICE_ID` (optional `DODO_PAYMENTS_PLANS_JSON`)",
+    "- Storage (GCS): `GCS_BUCKET`, `GCS_PROJECT_ID`",
+    "- PWA push: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`",
+    "- Email (Resend): `RESEND_API_KEY`, `RESEND_FROM`",
+    "- Observability: `SENTRY_DSN` (optional)",
     "",
     "## Architecture (quick map)",
     "- `lib/db/*`: Drizzle schema + DB client",
@@ -208,6 +228,7 @@ export async function runDocsSync(input: DocsSyncInput) {
     "seo",
     "services",
     "storage",
+    "pwa",
     "stores",
     "security",
   ];
@@ -218,25 +239,144 @@ export async function runDocsSync(input: DocsSyncInput) {
     const entrypoints = files.length
       ? ["## Entry points (detected)", "", ...files.map((f) => `- \`${f}\``), ""].join("\n")
       : "## Entry points (detected)\n\n- (none detected)\n";
-    const body = [
+    const genericBody = [
       `# \`lib/${sub}\``,
       "",
       "## Purpose",
-      "- (auto) Describe what this subsystem owns.",
+      "- This folder owns a single architecture layer or subsystem in the CQRS stack.",
       "",
       "## Allowed imports",
-      "- (auto) Define allowed layers and forbidden dependencies.",
+      "- Prefer importing *down* the stack (UI → loaders/actions → services → repos).",
+      "- `app/api/v1/*` must call `lib/services/*` (never repos directly).",
       "",
       entrypoints.trimEnd(),
       "",
       "## Conventions",
-      "- (auto) Naming + patterns.",
-      "",
-      "## Examples",
-      "- Prefer `services/*` from routes; avoid importing repos from `app/`.",
-      "- Keep rules in `lib/rules/*` and validate inputs at boundaries.",
+      "- Keep input validation in `lib/rules/*` and parse at boundaries (actions/routes).",
+      "- Prefer tag-based revalidation for read models (`lib/cache`).",
       "",
     ].join("\n");
+
+    const envBody =
+      sub === "env"
+        ? [
+            "# `lib/env`",
+            "",
+            "## Production runbook",
+            "- All validation is centralized in `lib/env/schema.ts` (composed from `lib/env/*`).",
+            "- If `EnvSchema.parse(process.env)` throws, the app should fail fast (misconfigured deployment).",
+            "",
+            "## Required core variables",
+            "- `NEXT_PUBLIC_APP_URL`",
+            "- `DATABASE_URL`",
+            "- `BETTER_AUTH_SECRET`",
+            "- `BETTER_AUTH_URL`",
+            "",
+            "## Optional core variables",
+            "- `API_KEY` (server-to-server auth for `/api/v1/*` routes when no session is present)",
+            "- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (durable rate limiting for external routes)",
+            "",
+            "## Module variables (only when that module is enabled)",
+            "- Billing (Dodo): `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_ENVIRONMENT`, `DODO_PAYMENTS_RETURN_URL`, `DODO_PAYMENTS_STARTER_PRICE_ID` (optional `DODO_PAYMENTS_PLANS_JSON`)",
+            "- Storage (GCS): `GCS_BUCKET`, `GCS_PROJECT_ID`",
+            "- PWA push: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`",
+            "- Email (Resend): `RESEND_API_KEY`, `RESEND_FROM`",
+            "- Observability: `SENTRY_DSN`",
+            "",
+            entrypoints.trimEnd(),
+            "",
+          ].join("\n")
+        : null;
+
+    const storageBody =
+      sub === "storage"
+        ? [
+            "# `lib/storage`",
+            "",
+            "## GCS runbook (production)",
+            "- `GCS_PROJECT_ID`: your GCP project id",
+            "- `GCS_BUCKET`: bucket name for object storage",
+            "",
+            "### Auth model",
+            "- Browser clients use session auth + org membership checks, then request signed URLs.",
+            "- Server-to-server calls can use `API_KEY`/stored API keys via `guardApiRequest`.",
+            "",
+            "### Recommended IAM",
+            "- Prefer Workload Identity / service account attached to the runtime (no JSON keys).",
+            "- Grant the runtime identity permissions to sign URLs and read/write objects in the bucket.",
+            "",
+            entrypoints.trimEnd(),
+            "",
+          ].join("\n")
+        : null;
+
+    const billingBody =
+      sub === "billing"
+        ? [
+            "# `lib/billing`",
+            "",
+            "## Dodo runbook (production)",
+            "- Set `DODO_PAYMENTS_*` vars in your environment.",
+            "- `DODO_PAYMENTS_WEBHOOK_KEY` must match your Dodo webhook signing key.",
+            "",
+            "## Plan registry",
+            "- Default plan uses `DODO_PAYMENTS_STARTER_PRICE_ID`.",
+            "- For multiple plans set `DODO_PAYMENTS_PLANS_JSON` (validated at runtime).",
+            "",
+            "## Org scoping",
+            "- Checkout URLs include `org_id` so webhook reconciliation can map subscriptions to orgs.",
+            "- Subscription status is a durable read model in `billing_subscriptions` and is cached/tagged by org.",
+            "",
+            entrypoints.trimEnd(),
+            "",
+          ].join("\n")
+        : null;
+
+    const securityBody =
+      sub === "security"
+        ? [
+            "# `lib/security`",
+            "",
+            "## API key + rate limiting runbook",
+            "- External routes under `/api/v1/*` should use `guardApiRequest(req)` when session auth is not applicable.",
+            "- If `UPSTASH_REDIS_*` is configured, rate limiting is durable; otherwise a safe in-memory fallback is used.",
+            "",
+            "## API keys lifecycle",
+            "- Keys are org-scoped and managed via `/app/api-keys`.",
+            "- Secrets are only shown once on creation; revoke to rotate.",
+            "",
+            entrypoints.trimEnd(),
+            "",
+          ].join("\n")
+        : null;
+
+    const pwaBody =
+      sub === "pwa"
+        ? [
+            "# `lib/pwa`",
+            "",
+            "## Push + service worker runbook",
+            "- Generate VAPID keys and set:",
+            "  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`",
+            "  - `VAPID_PRIVATE_KEY`",
+            "  - `VAPID_SUBJECT` (mailto: or URL)",
+            "",
+            "## Service worker update strategy",
+            "- Increment `SW_VERSION` in `public/sw.js` when changing caching rules.",
+            "- Clients activate new SW on refresh (current implementation uses `skipWaiting` + `clients.claim`).",
+            "",
+            entrypoints.trimEnd(),
+            "",
+          ].join("\n")
+        : null;
+
+    const body =
+      envBody ??
+      storageBody ??
+      billingBody ??
+      securityBody ??
+      pwaBody ??
+      genericBody;
     const prev = await readOrEmpty(p);
     await writeEnsured(p, replaceAutoSection(prev || "", body));
   }

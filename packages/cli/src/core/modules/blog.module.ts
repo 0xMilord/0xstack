@@ -9,6 +9,8 @@ export const blogMdxModule: Module = {
     if (!ctx.modules.blogMdx) {
       await backupAndRemove(ctx.projectRoot, "app/blog/page.tsx");
       await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/page.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.ts");
+      await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.tsx");
       await backupAndRemove(ctx.projectRoot, "app/rss.xml/route.ts");
       await backupAndRemove(ctx.projectRoot, "lib/loaders/blog.loader.ts");
       await backupAndRemove(ctx.projectRoot, "content/blog/hello-world.mdx");
@@ -29,6 +31,8 @@ export const blogMdxModule: Module = {
 import path from "node:path";
 import matter from "gray-matter";
 import { cache } from "react";
+import { z } from "zod";
+import { withServerCache, CACHE_TTL, cacheTags } from "@/lib/cache";
 
 export type BlogPost = {
   slug: string;
@@ -36,47 +40,95 @@ export type BlogPost = {
   description: string;
   date: string;
   published: boolean;
+  canonicalPath?: string;
+  ogImage?: string;
+  tags?: string[];
   content: string;
 };
 
 const BLOG_DIR = path.join(process.cwd(), "content", "blog");
 
-export const listPosts = cache(async (): Promise<BlogPost[]> => {
-  const entries = await fs.readdir(BLOG_DIR);
-  const posts: BlogPost[] = [];
-  for (const file of entries) {
-    if (!file.endsWith(".mdx")) continue;
-    const slug = file.replace(/\\.mdx$/, "");
-    const raw = await fs.readFile(path.join(BLOG_DIR, file), "utf8");
-    const parsed = matter(raw);
-    posts.push({
-      slug,
-      title: String(parsed.data.title ?? slug),
-      description: String(parsed.data.description ?? ""),
-      date: String(parsed.data.date ?? ""),
-      published: parsed.data.published !== false,
-      content: parsed.content,
-    });
-  }
-  return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
+const FrontmatterSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  date: z.string().min(1),
+  published: z.boolean().optional().default(true),
+  canonicalPath: z.string().min(1).optional(),
+  ogImage: z.string().min(1).optional(),
+  tags: z.array(z.string().min(1)).optional(),
 });
 
-export const getPost = cache(async (slug: string) => {
-  const raw = await fs.readFile(path.join(BLOG_DIR, \`\${slug}.mdx\`), "utf8");
+function parsePost(slug: string, raw: string): BlogPost {
   const parsed = matter(raw);
+  const fm = FrontmatterSchema.safeParse(parsed.data ?? {});
+  if (!fm.success) {
+    const msg = fm.error.issues.map((i) => i.path.join(".") + ": " + i.message).join("; ");
+    throw new Error(\`invalid_frontmatter:\${slug}: \${msg}\`);
+  }
+  const d = new Date(fm.data.date);
+  if (Number.isNaN(d.getTime())) throw new Error(\`invalid_date:\${slug}\`);
   return {
     slug,
-    title: String(parsed.data.title ?? slug),
-    description: String(parsed.data.description ?? ""),
-    date: String(parsed.data.date ?? ""),
-    published: parsed.data.published !== false,
+    title: fm.data.title,
+    description: fm.data.description,
+    date: fm.data.date,
+    published: fm.data.published !== false,
+    canonicalPath: fm.data.canonicalPath,
+    ogImage: fm.data.ogImage,
+    tags: fm.data.tags,
     content: parsed.content,
-  } satisfies BlogPost;
+  };
+}
+
+const listPostsCached = withServerCache(
+  async () => {
+    const entries = await fs.readdir(BLOG_DIR);
+    const posts: BlogPost[] = [];
+    for (const file of entries) {
+      if (!file.endsWith(".mdx")) continue;
+      const slug = file.replace(/\\.mdx$/, "");
+      const raw = await fs.readFile(path.join(BLOG_DIR, file), "utf8");
+      posts.push(parsePost(slug, raw));
+    }
+    return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
+  },
+  {
+    key: () => ["blog", "posts"],
+    tags: () => [cacheTags.posts],
+    revalidate: CACHE_TTL.LISTING,
+  }
+);
+
+export const listPosts = cache(async (): Promise<BlogPost[]> => {
+  return await listPostsCached();
 });
+
+const getPostCached = withServerCache(
+  async (slug: string) => {
+    const raw = await fs.readFile(path.join(BLOG_DIR, \`\${slug}.mdx\`), "utf8");
+    return parsePost(slug, raw);
+  },
+  {
+    key: (slug: string) => ["blog", "post", slug],
+    tags: () => [cacheTags.posts],
+    revalidate: CACHE_TTL.ENTITY_PAGE,
+  }
+);
+
+export const getPost = cache(async (slug: string) => {
+  return await getPostCached(slug);
+});
+
+export function getPostCanonicalUrl(input: { baseUrl: string; slug: string; canonicalPath?: string }) {
+  const p = input.canonicalPath?.startsWith("/") ? input.canonicalPath : \`/blog/\${input.slug}\`;
+  return new URL(p, input.baseUrl).toString();
+}
 `
     );
 
     await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]", "opengraph-image"));
+    await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.ts");
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "blog", "page.tsx"),
       `import Link from "next/link";
@@ -108,13 +160,40 @@ export default async function Page() {
       `import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
-import { getPost } from "@/lib/loaders/blog.loader";
+import { env } from "@/lib/env/server";
+import { getPost, getPostCanonicalUrl } from "@/lib/loaders/blog.loader";
 import { safeJsonLd } from "@/lib/seo/jsonld";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await getPost(slug).catch(() => null);
+  if (!post || !post.published) return {};
+  const baseUrl = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const canonical = getPostCanonicalUrl({ baseUrl, slug: post.slug, canonicalPath: post.canonicalPath });
+  return {
+    title: post.title,
+    description: post.description,
+    alternates: { canonical },
+    openGraph: {
+      type: "article",
+      url: canonical,
+      title: post.title,
+      description: post.description,
+      images: [{ url: \`/blog/\${post.slug}/opengraph-image\` }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
+      images: [\`/blog/\${post.slug}/opengraph-image\`],
+    },
+  };
+}
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPost(slug).catch(() => null);
-  if (!post) return notFound();
+  if (!post || !post.published) return notFound();
   return (
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="text-2xl font-semibold">{post.title}</h1>
@@ -136,6 +215,31 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         }}
       />
     </main>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "blog", "[slug]", "opengraph-image", "route.tsx"),
+      `import type { NextRequest } from "next/server";
+import { ImageResponse } from "next/og";
+import { getPost } from "@/lib/loaders/blog.loader";
+
+export const runtime = "edge";
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  const { slug } = await ctx.params;
+  const post = await getPost(slug);
+  return new ImageResponse(
+    (
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: 64, background: "#0a0a0a", color: "#ffffff" }}>
+        <div style={{ fontSize: 28, color: "#d4d4d4" }}>{process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}</div>
+        <div style={{ marginTop: 16, fontSize: 56, fontWeight: 800, lineHeight: 1.05 }}>{post.title}</div>
+        <div style={{ marginTop: 16, fontSize: 24, color: "#a3a3a3" }}>{post.description}</div>
+      </div>
+    ),
+    { width: 1200, height: 630 }
   );
 }
 `

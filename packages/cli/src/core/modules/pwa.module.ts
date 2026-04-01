@@ -45,6 +45,10 @@ export const pwaModule: Module = {
       await backupAndRemove(ctx.projectRoot, "app/api/v1/pwa/push/unsubscribe/route.ts");
       await backupAndRemove(ctx.projectRoot, "app/api/v1/pwa/push/send/route.ts");
       await backupAndRemove(ctx.projectRoot, "lib/env/pwa.ts");
+      await backupAndRemove(ctx.projectRoot, "lib/loaders/pwa.loader.ts");
+      await backupAndRemove(ctx.projectRoot, "lib/actions/pwa.actions.ts");
+      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/pwa/page.tsx");
+      await backupAndRemove(ctx.projectRoot, "app/app/(workspace)/pwa/pwa-client.tsx");
       return;
     }
 
@@ -52,12 +56,21 @@ export const pwaModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "pwa"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "repos"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "services"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "loaders"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "actions"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "env"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "subscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "send"));
 
     await ensurePushTables(ctx.projectRoot);
+
+    // TypeScript: `web-push` has no bundled typings; keep builds strict without requiring @types packages.
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "types", "web-push.d.ts"),
+      `declare module "web-push";\n`
+    );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "env", "pwa.ts"),
@@ -70,6 +83,189 @@ export const pwaModule: Module = {
 `
     );
     await ensureEnvSchemaModuleWiring(ctx.projectRoot);
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "loaders", "pwa.loader.ts"),
+      `import { cache } from "react";
+import { requireAuth } from "@/lib/auth/server";
+import { env } from "@/lib/env/server";
+import { withServerCache, CACHE_TTL, cacheTags } from "@/lib/cache";
+import { pushSubscriptionsService_list } from "@/lib/services/push-subscriptions.service";
+
+const loadPushSubsCached = withServerCache(
+  async (userId: string) => await pushSubscriptionsService_list(userId),
+  {
+    key: (userId: string) => ["pwa", "push-subs", userId],
+    tags: (userId: string) => [cacheTags.pushSubsUser(userId)],
+    revalidate: CACHE_TTL.DASHBOARD,
+  }
+);
+
+export const loadPwaSettings = cache(async () => {
+  const viewer = await requireAuth();
+  const subs = await loadPushSubsCached(viewer.userId);
+  if (!env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) throw new Error("missing_NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+  return {
+    viewer,
+    vapidPublicKey: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    subscriptions: subs,
+  };
+});
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "actions", "pwa.actions.ts"),
+      `"use server";
+
+import { requireAuth } from "@/lib/auth/server";
+import { revalidate } from "@/lib/cache";
+import { pushService_sendToUser } from "@/lib/services/push.service";
+import { pushSubscriptionsService_unsubscribe } from "@/lib/services/push-subscriptions.service";
+
+export async function pwaSendTestPushAction(input?: { title?: string; body?: string }) {
+  const viewer = await requireAuth();
+  const res = await pushService_sendToUser({
+    userId: viewer.userId,
+    payload: { title: input?.title ?? "Test push", body: input?.body, url: "/app/pwa", tag: "test-push" },
+  });
+  revalidate.pwaForUser(viewer.userId);
+  return { ok: true as const, ...res };
+}
+
+export async function pwaUnsubscribeEndpointAction(input: { endpoint: string }) {
+  const viewer = await requireAuth();
+  await pushSubscriptionsService_unsubscribe(viewer.userId, input.endpoint);
+  revalidate.pwaForUser(viewer.userId);
+  return { ok: true as const };
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa", "pwa-client.tsx"),
+      `"use client";
+
+import { useMemo, useState } from "react";
+import { registerServiceWorker } from "@/lib/pwa/register-sw.client";
+import { buttonVariants } from "@/components/ui/button";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+export function PwaClient({ vapidPublicKey }: { vapidPublicKey: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+  const key = useMemo(() => urlBase64ToUint8Array(vapidPublicKey), [vapidPublicKey]);
+
+  return (
+    <div className="space-y-2">
+      <button
+        className={buttonVariants({ variant: "secondary" })}
+        type="button"
+        onClick={async () => {
+          setStatus(null);
+          await registerServiceWorker();
+          const perm = await Notification.requestPermission();
+          if (perm !== "granted") {
+            setStatus("Notifications permission not granted.");
+            return;
+          }
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+          const res = await fetch("/api/v1/pwa/push/subscribe", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(sub),
+          });
+          if (!res.ok) {
+            setStatus("Subscribe failed.");
+            return;
+          }
+          setStatus("Subscribed. Reload the page to see status.");
+        }}
+      >
+        Enable notifications
+      </button>
+      {status ? <p className="text-xs text-muted-foreground">{status}</p> : null}
+    </div>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "(workspace)", "pwa", "page.tsx"),
+      `import { loadPwaSettings } from "@/lib/loaders/pwa.loader";
+import { PwaClient } from "./pwa-client";
+import { pwaSendTestPushAction, pwaUnsubscribeEndpointAction } from "@/lib/actions/pwa.actions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+
+export default async function Page() {
+  const { vapidPublicKey, subscriptions } = await loadPwaSettings();
+  return (
+    <main className="mx-auto max-w-5xl space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">PWA</h1>
+        <p className="text-sm text-muted-foreground">Manage push notifications for your account.</p>
+      </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <PwaClient vapidPublicKey={vapidPublicKey} />
+          <form
+            action={async () => {
+              "use server";
+              await pwaSendTestPushAction({ title: "Hello from 0xstack", body: "This is a test push." });
+            }}
+          >
+            <button className={buttonVariants({ variant: "outline" })} type="submit">
+              Send test push
+            </button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Current subscriptions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {subscriptions.length ? (
+            subscriptions.map((s: any) => (
+              <div key={s.endpoint} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <p className="font-mono text-xs truncate">{s.endpoint}</p>
+                <form
+                  action={async () => {
+                    "use server";
+                    await pwaUnsubscribeEndpointAction({ endpoint: String(s.endpoint) });
+                  }}
+                >
+                  <button className={buttonVariants({ variant: "outline" })} type="submit">
+                    Remove
+                  </button>
+                </form>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground">No active subscriptions yet.</p>
+          )}
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "public", "manifest.webmanifest"),

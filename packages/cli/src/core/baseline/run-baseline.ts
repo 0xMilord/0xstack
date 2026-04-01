@@ -128,7 +128,7 @@ async function ensureConfigFileKeysUpToDate(projectRoot: string) {
 
 function mkPublicPage(title: string, subtitle: string) {
   return `import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -148,12 +148,8 @@ export default function Page() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">${title}</h1>
         <p className="max-w-2xl text-muted-foreground">${subtitle}</p>
         <div className="flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/get-started">Get started</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/pricing">Pricing</Link>
-          </Button>
+          <Link className={buttonVariants({ variant: "default" })} href="/get-started">Get started</Link>
+          <Link className={buttonVariants({ variant: "outline" })} href="/pricing">Pricing</Link>
         </div>
       </header>
 
@@ -198,9 +194,7 @@ export default function Page() {
             <p className="text-base font-semibold">Ready to ship?</p>
             <p className="text-sm text-muted-foreground">Run init -> baseline -> doctor and deploy.</p>
           </div>
-          <Button asChild>
-            <Link href="/get-started">Start now</Link>
-          </Button>
+          <Link className={buttonVariants({ variant: "default" })} href="/get-started">Start now</Link>
         </div>
       </section>
     </main>
@@ -217,9 +211,13 @@ async function maybeUpgradeShellPage(filePath: string, nextSrc: string) {
     prev.includes("<h1") &&
     prev.length < 220;
   const hasBrokenTemplatePlaceholders = prev.includes("{title}") || prev.includes("{subtitle}");
+  const hasOldAsChild = prev.includes("asChild");
+  const hasButtonVariantsUsage = prev.includes("buttonVariants(");
+  const hasButtonVariantsImport = prev.includes("buttonVariants }") || prev.includes("buttonVariants,");
+  const hasBrokenButtonVariantsImport = hasButtonVariantsUsage && !hasButtonVariantsImport;
   if (!prev || isShell) {
     await writeFileEnsured(filePath, nextSrc);
-  } else if (hasBrokenTemplatePlaceholders) {
+  } else if (hasBrokenTemplatePlaceholders || hasOldAsChild || hasBrokenButtonVariantsImport) {
     await writeFileEnsured(filePath, nextSrc);
   }
 }
@@ -253,7 +251,7 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth/auth-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function Page() {
   const router = useRouter();
@@ -316,9 +314,9 @@ export default function Page() {
             <Button type="submit" disabled={pending}>
               {pending ? "Working…" : "${submitLabel}"}
             </Button>
-            <Button asChild variant="ghost" type="button">
-              <Link href={\`${otherHref}?redirect=\${encodeURIComponent(redirect)}\`}>${otherText}</Link>
-            </Button>
+            <Link className={buttonVariants({ variant: "ghost" })} href={\`${otherHref}?redirect=\${encodeURIComponent(redirect)}\`}>
+              ${otherText}
+            </Link>
           </form>
         </CardContent>
       </Card>
@@ -337,7 +335,7 @@ import { useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth/auth-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function Page() {
   const sp = useSearchParams();
@@ -386,9 +384,9 @@ export default function Page() {
             <Button type="submit" disabled={pending || done}>
               {done ? "Email sent (if account exists)" : pending ? "Working…" : "Send reset link"}
             </Button>
-            <Button asChild variant="ghost" type="button">
-              <Link href={"/login?redirect=" + encodeURIComponent(redirect)}>Back to sign in</Link>
-            </Button>
+            <Link className={buttonVariants({ variant: "ghost" })} href={"/login?redirect=" + encodeURIComponent(redirect)}>
+              Back to sign in
+            </Link>
           </form>
         </CardContent>
       </Card>
@@ -407,7 +405,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth/auth-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function Page() {
   const router = useRouter();
@@ -429,9 +427,9 @@ export default function Page() {
           {!token ? (
             <div className="grid gap-3">
               <p className="text-sm text-muted-foreground">Missing reset token. Use the link from your email.</p>
-              <Button asChild variant="outline">
-                <Link href={"/forgot-password?redirect=" + encodeURIComponent(redirect)}>Request a new link</Link>
-              </Button>
+              <Link className={buttonVariants({ variant: "outline" })} href={"/forgot-password?redirect=" + encodeURIComponent(redirect)}>
+                Request a new link
+              </Link>
             </div>
           ) : (
             <form

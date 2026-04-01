@@ -16,10 +16,10 @@ import { authCoreModule } from "./auth-core.module";
 
 export function getModules(): Module[] {
   return [
-    uiFoundationModule,
-    authCoreModule,
     cacheModule,
+    authCoreModule,
     coreDbStateModule,
+    uiFoundationModule,
     securityApiModule,
     webhookLedgerModule,
     observabilityModule,

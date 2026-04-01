@@ -43,15 +43,15 @@ export async function runGenerateDomain(input: GenerateDomainInput) {
     path.join(input.projectRoot, "lib", "repos", `${plural}.repo.ts`),
     `import { db } from "@/lib/db";
 import { ${plural} } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-export async function get${pascal}ById(id: string) {
+export async function get${pascal}ById(input: { id: string; orgId: string }) {
   const rows = await db.select().from(${plural}).where(eq(${plural}.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
-export async function list${pascal}() {
-  return await db.select().from(${plural}).limit(100);
+export async function list${pascal}(input: { orgId: string }) {
+  return await db.select().from(${plural}).where(eq(${plural}.orgId, input.orgId)).limit(200);
 }
 
 export async function insert${pascal}(input: typeof ${plural}.$inferInsert) {
@@ -59,13 +59,17 @@ export async function insert${pascal}(input: typeof ${plural}.$inferInsert) {
   return rows[0] ?? null;
 }
 
-export async function update${pascal}(id: string, patch: Partial<typeof ${plural}.$inferInsert>) {
-  const rows = await db.update(${plural}).set({ ...patch, updatedAt: new Date() }).where(eq(${plural}.id, id)).returning();
+export async function update${pascal}(input: { id: string; orgId: string; patch: Partial<typeof ${plural}.$inferInsert> }) {
+  const rows = await db
+    .update(${plural})
+    .set({ ...input.patch, updatedAt: new Date() })
+    .where(and(eq(${plural}.id, input.id), eq(${plural}.orgId, input.orgId)))
+    .returning();
   return rows[0] ?? null;
 }
 
-export async function delete${pascal}(id: string) {
-  const rows = await db.delete(${plural}).where(eq(${plural}.id, id)).returning();
+export async function delete${pascal}(input: { id: string; orgId: string }) {
+  const rows = await db.delete(${plural}).where(and(eq(${plural}.id, input.id), eq(${plural}.orgId, input.orgId))).returning();
   return rows[0] ?? null;
 }
 `
@@ -73,32 +77,33 @@ export async function delete${pascal}(id: string) {
 
   await writeFileEnsured(
     path.join(input.projectRoot, "lib", "services", `${plural}.service.ts`),
-    `import { delete${pascal}, get${pascal}ById, insert${pascal}, list${pascal}, update${pascal} } from "@/lib/repos/${plural}.repo";
+    `import crypto from "node:crypto";
+import { delete${pascal}, get${pascal}ById, insert${pascal}, list${pascal}, update${pascal} } from "@/lib/repos/${plural}.repo";
 
-export async function ${camel}Service_list() {
-  return await list${pascal}();
+export async function ${camel}Service_list(input: { orgId: string }) {
+  return await list${pascal}({ orgId: input.orgId });
 }
 
-export async function ${camel}Service_getById(id: string) {
-  return await get${pascal}ById(id);
+export async function ${camel}Service_getById(input: { id: string; orgId: string }) {
+  return await get${pascal}ById({ id: input.id, orgId: input.orgId });
 }
 
-export async function ${camel}Service_create(input: { id: string; name: string; orgId?: string | null; createdByUserId?: string | null }) {
+export async function ${camel}Service_create(input: { orgId: string; name: string; createdByUserId: string }) {
   return await insert${pascal}({
-    id: input.id,
+    id: crypto.randomUUID(),
     name: input.name,
-    orgId: input.orgId ?? null,
-    createdByUserId: input.createdByUserId ?? null,
+    orgId: input.orgId,
+    createdByUserId: input.createdByUserId,
     updatedAt: new Date(),
   });
 }
 
-export async function ${camel}Service_update(id: string, patch: { name?: string }) {
-  return await update${pascal}(id, patch);
+export async function ${camel}Service_update(input: { id: string; orgId: string; patch: { name?: string } }) {
+  return await update${pascal}({ id: input.id, orgId: input.orgId, patch: input.patch });
 }
 
-export async function ${camel}Service_delete(id: string) {
-  return await delete${pascal}(id);
+export async function ${camel}Service_delete(input: { id: string; orgId: string }) {
+  return await delete${pascal}({ id: input.id, orgId: input.orgId });
 }
 `
   );
@@ -106,10 +111,28 @@ export async function ${camel}Service_delete(id: string) {
   await writeFileEnsured(
     path.join(input.projectRoot, "lib", "loaders", `${plural}.loader.ts`),
     `import { cache } from "react";
+import { cookies } from "next/headers";
+import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_assertMember } from "@/lib/services/orgs.service";
+import { withServerCache, CACHE_TTL, cacheTags } from "@/lib/cache";
 import { ${camel}Service_list } from "@/lib/services/${plural}.service";
 
+const load${pascal}ListCached = withServerCache(
+  async (orgId: string) => await ${camel}Service_list({ orgId }),
+  {
+    key: (orgId: string) => ["${plural}", "org", orgId],
+    tags: (orgId: string) => [cacheTags.billingOrg(orgId)],
+    revalidate: CACHE_TTL.DASHBOARD,
+  }
+);
+
 export const load${pascal}List = cache(async () => {
-  return await ${camel}Service_list();
+  const viewer = await requireAuth();
+  const orgId = getActiveOrgIdFromCookies(await cookies());
+  if (!orgId) return [];
+  await orgsService_assertMember({ userId: viewer.userId, orgId });
+  return await load${pascal}ListCached(orgId);
 });
 `
   );
@@ -119,9 +142,7 @@ export const load${pascal}List = cache(async () => {
     `import { z } from "zod";
 
 export const create${pascal}Input = z.object({
-  id: z.string().min(1),
   name: z.string().min(1).max(200),
-  orgId: z.string().min(1).optional(),
 });
 
 export const update${pascal}Input = z.object({
@@ -139,37 +160,48 @@ export const delete${pascal}Input = z.object({
     path.join(input.projectRoot, "lib", "actions", `${plural}.actions.ts`),
     `"use server";
 
-import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { create${pascal}Input, delete${pascal}Input, update${pascal}Input } from "@/lib/rules/${plural}.rules";
 import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_assertMember } from "@/lib/services/orgs.service";
+import { revalidate } from "@/lib/cache";
 import { ${camel}Service_create, ${camel}Service_delete, ${camel}Service_update } from "@/lib/services/${plural}.service";
 
 export async function create${pascal}(input: unknown) {
   const session = await requireAuth();
+  const orgId = getActiveOrgIdFromCookies(await cookies());
+  if (!orgId) throw new Error("no_active_org");
+  await orgsService_assertMember({ userId: session.userId, orgId });
   const data = create${pascal}Input.parse(input);
   const created = await ${camel}Service_create({
-    id: data.id,
     name: data.name,
-    orgId: data.orgId ?? null,
-    createdByUserId: (session as any)?.user?.id ?? null,
+    orgId,
+    createdByUserId: session.userId,
   });
-  revalidatePath("/app");
+  revalidate.orgs(session.userId);
   return { ok: true, data: created };
 }
 
 export async function update${pascal}(input: unknown) {
-  await requireAuth();
+  const session = await requireAuth();
+  const orgId = getActiveOrgIdFromCookies(await cookies());
+  if (!orgId) throw new Error("no_active_org");
+  await orgsService_assertMember({ userId: session.userId, orgId });
   const data = update${pascal}Input.parse(input);
-  const updated = await ${camel}Service_update(data.id, { name: data.name });
-  revalidatePath("/app");
+  const updated = await ${camel}Service_update({ id: data.id, orgId, patch: { name: data.name } });
+  revalidate.orgs(session.userId);
   return { ok: true, data: updated };
 }
 
 export async function delete${pascal}(input: unknown) {
-  await requireAuth();
+  const session = await requireAuth();
+  const orgId = getActiveOrgIdFromCookies(await cookies());
+  if (!orgId) throw new Error("no_active_org");
+  await orgsService_assertMember({ userId: session.userId, orgId });
   const data = delete${pascal}Input.parse(input);
-  const deleted = await ${camel}Service_delete(data.id);
-  revalidatePath("/app");
+  const deleted = await ${camel}Service_delete({ id: data.id, orgId });
+  revalidate.orgs(session.userId);
   return { ok: true, data: deleted };
 }
 `

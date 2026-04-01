@@ -161,6 +161,9 @@ export const logger = {
 `
     );
 
+    // TypeScript: keep @sentry/nextjs optional without breaking builds.
+    await writeFileEnsured(path.join(ctx.projectRoot, "types", "sentry__nextjs.d.ts"), `declare module "@sentry/nextjs";\n`);
+
     // Sentry SDK init files (only when enabled in config).
     if (ctx.modules.observability?.sentry) {
       await writeFileEnsured(

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { ensureDir, writeFileEnsured } from "./fs-utils";
+import { backupAndRemove, ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
 import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgsTables } from "../generate/schema-edit";
 
@@ -11,6 +11,74 @@ export const coreDbStateModule: Module = {
     await ensureApiKeysTable(ctx.projectRoot);
     await ensureAssetsTable(ctx.projectRoot);
     await ensureBillingTables(ctx.projectRoot);
+
+    await backupAndRemove(ctx.projectRoot, "app/app/page.tsx");
+    await backupAndRemove(ctx.projectRoot, "app/app/settings/page.tsx");
+
+    await ensureDir(path.join(ctx.projectRoot, "lib", "orgs"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "orgs", "active-org.ts"),
+      `/** HttpOnly cookie set when the user selects an org (see orgs.actions). */
+export const ACTIVE_ORG_COOKIE = "ox_org";
+
+export function getActiveOrgIdFromCookies(cookieStore: { get: (name: string) => { value: string } | undefined }): string | null {
+  const v = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim();
+  return v && v.length > 0 ? v : null;
+}
+`
+    );
+
+    await ensureDir(path.join(ctx.projectRoot, "app", "app", "(workspace)"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "(workspace)", "layout.tsx"),
+      `import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_resolveActiveOrg } from "@/lib/services/orgs.service";
+
+export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+  const viewer = await requireAuth();
+  const cookieOrg = getActiveOrgIdFromCookies(await cookies());
+  const gate = await orgsService_resolveActiveOrg({ userId: viewer.userId, cookieOrgId: cookieOrg });
+  if (!gate.ok) redirect("/app/orgs");
+  return <>{children}</>;
+}
+`
+    );
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "app", "(workspace)", "page.tsx"),
+      `import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function Page() {
+  return (
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Workspace</h1>
+        <p className="text-sm text-muted-foreground">You have an active organization. Open settings, billing, or assets from here.</p>
+      </header>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Quick links</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/settings">
+              Settings
+            </Link>
+            <Link className={buttonVariants({ variant: "secondary" })} href="/app/orgs">
+              Switch organization
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+`
+    );
 
     await ensureDir(path.join(ctx.projectRoot, "lib", "repos"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "services"));
@@ -42,6 +110,11 @@ export async function listAssetsForOrg(orgId: string) {
   return await db.select().from(assets).where(eq(assets.orgId, orgId)).orderBy(assets.createdAt).limit(200);
 }
 
+export async function getAssetById(assetId: string) {
+  const rows = await db.select().from(assets).where(eq(assets.id, assetId)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function deleteAssetById(assetId: string) {
   const rows = await db.delete(assets).where(eq(assets.id, assetId)).returning();
   return rows[0] ?? null;
@@ -52,7 +125,7 @@ export async function deleteAssetById(assetId: string) {
       path.join(ctx.projectRoot, "lib", "repos", "billing.repo.ts"),
       `import { db } from "@/lib/db";
 import { billingCustomers, billingSubscriptions } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 export async function upsertBillingCustomer(input: { userId: string; dodoCustomerId: string }) {
   await db.execute(sql\`
@@ -72,12 +145,22 @@ export async function upsertBillingSubscription(input: {
   await db.execute(sql\`
     insert into billing_subscriptions (provider, provider_subscription_id, status, plan_id, org_id, updated_at)
     values (\${input.provider}, \${input.providerSubscriptionId}, \${input.status}, \${input.planId ?? null}, \${input.orgId ?? null}, now())
-    on conflict (provider_subscription_id) do update set
+      on conflict (provider_subscription_id) do update set
       status = excluded.status,
       plan_id = excluded.plan_id,
       org_id = excluded.org_id,
       updated_at = now()
   \`);
+}
+
+export async function getLatestBillingSubscriptionForOrg(orgId: string) {
+  const rows = await db
+    .select()
+    .from(billingSubscriptions)
+    .where(eq(billingSubscriptions.orgId, orgId))
+    .orderBy(desc(billingSubscriptions.updatedAt))
+    .limit(1);
+  return rows[0] ?? null;
 }
 `
     );
@@ -151,13 +234,17 @@ export async function listOrgsForUser(userId: string) {
   return rows;
 }
 
-export async function isMember(orgId: string, userId: string) {
+export async function getMembership(input: { orgId: string; userId: string }) {
   const rows = await db
     .select()
     .from(orgMembers)
-    .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+    .where(and(eq(orgMembers.orgId, input.orgId), eq(orgMembers.userId, input.userId)))
     .limit(1);
-  return !!rows[0];
+  return rows[0] ?? null;
+}
+
+export async function isMember(orgId: string, userId: string) {
+  return !!(await getMembership({ orgId, userId }));
 }
 `
     );
@@ -166,7 +253,17 @@ export async function isMember(orgId: string, userId: string) {
       path.join(ctx.projectRoot, "lib", "services", "orgs.service.ts"),
       `import crypto from "node:crypto";
 import { insertOrg } from "@/lib/repos/orgs.repo";
-import { addMember, listOrgsForUser } from "@/lib/repos/org-members.repo";
+import { addMember, getMembership, isMember, listOrgsForUser } from "@/lib/repos/org-members.repo";
+
+export const ORG_ROLES = ["member", "admin", "owner"] as const;
+export type OrgRole = (typeof ORG_ROLES)[number];
+
+function roleRank(role: string | null | undefined) {
+  if (role === "owner") return 3;
+  if (role === "admin") return 2;
+  if (role === "member") return 1;
+  return 0;
+}
 
 export async function orgsService_listForUser(userId: string) {
   return await listOrgsForUser(userId);
@@ -177,6 +274,28 @@ export async function orgsService_createForUser(input: { userId: string; name: s
   const org = await insertOrg({ id: orgId, name: input.name });
   await addMember({ orgId, userId: input.userId, role: "owner" });
   return org;
+}
+
+export async function orgsService_assertMember(input: { userId: string; orgId: string }) {
+  const ok = await isMember(input.orgId, input.userId);
+  if (!ok) throw new Error("not_org_member");
+}
+
+export async function orgsService_assertRoleAtLeast(input: { userId: string; orgId: string; atLeast: OrgRole }) {
+  const m = await getMembership({ orgId: input.orgId, userId: input.userId });
+  if (!m) throw new Error("not_org_member");
+  if (roleRank((m as any).role) < roleRank(input.atLeast)) throw new Error("insufficient_role");
+  return m;
+}
+
+export async function orgsService_resolveActiveOrg(input: { userId: string; cookieOrgId: string | null }) {
+  const rows = await listOrgsForUser(input.userId);
+  if (!rows.length) return { ok: false as const, reason: "no_orgs" as const };
+  const id = input.cookieOrgId;
+  if (!id) return { ok: false as const, reason: "no_cookie" as const };
+  const member = rows.some((r) => r.org.id === id);
+  if (!member) return { ok: false as const, reason: "not_member" as const };
+  return { ok: true as const, orgId: id };
 }
 `
     );
@@ -209,20 +328,20 @@ import { viewerService_getViewer } from "@/lib/services/viewer.service";
 import { orgsService_listForUser } from "@/lib/services/orgs.service";
 
 const loadMyOrgsCached = withServerCache(
-  async () => {
-    const h = await headers();
-    const viewer = await viewerService_getViewer(h as any);
-    if (!viewer?.userId) return [];
-    return await orgsService_listForUser(viewer.userId);
-  },
+  async (userId: string) => await orgsService_listForUser(userId),
   {
-    key: () => ["orgs", "mine"],
-    tags: () => [cacheTags.dashboard],
+    key: (userId: string) => ["orgs", "mine", userId],
+    tags: (userId: string) => [cacheTags.orgsForUser(userId)],
     revalidate: CACHE_TTL.DASHBOARD,
   }
 );
 
-export const loadMyOrgs = cache(loadMyOrgsCached);
+export const loadMyOrgs = cache(async () => {
+  const h = await headers();
+  const viewer = await viewerService_getViewer(h as any);
+  if (!viewer?.userId) return [];
+  return await loadMyOrgsCached(viewer.userId);
+});
 `
     );
 
@@ -242,23 +361,32 @@ export const createOrgInput = z.object({
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { ACTIVE_ORG_COOKIE } from "@/lib/orgs/active-org";
 import { requireAuth } from "@/lib/auth/server";
+import { revalidate } from "@/lib/cache";
 import { createOrgInput } from "@/lib/rules/orgs.rules";
-import { orgsService_createForUser } from "@/lib/services/orgs.service";
+import { orgsService_assertMember, orgsService_createForUser } from "@/lib/services/orgs.service";
 
 export async function createOrg(input: unknown) {
   const viewer = await requireAuth();
   const data = createOrgInput.parse(input);
   const org = await orgsService_createForUser({ userId: viewer.userId, name: data.name });
-  cookies().set("ox_org", String(org?.id ?? ""), { httpOnly: true, sameSite: "lax", path: "/" });
+  const c = await cookies();
+  c.set(ACTIVE_ORG_COOKIE, String(org?.id ?? ""), { httpOnly: true, sameSite: "lax", path: "/" });
+  revalidate.orgs(viewer.userId);
   revalidatePath("/app/orgs");
+  revalidatePath("/app");
   return { ok: true, org };
 }
 
 export async function setActiveOrg(input: { orgId: string }) {
   const viewer = await requireAuth();
-  // basic guard: cookie is only set after auth; membership check happens in services when used.
-  cookies().set("ox_org", String(input.orgId), { httpOnly: true, sameSite: "lax", path: "/" });
+  await orgsService_assertMember({ userId: viewer.userId, orgId: input.orgId });
+  const c = await cookies();
+  c.set(ACTIVE_ORG_COOKIE, String(input.orgId), { httpOnly: true, sameSite: "lax", path: "/" });
+  revalidate.orgs(viewer.userId);
+  revalidate.billingForOrg(input.orgId);
+  revalidate.assetsForOrg(input.orgId);
   revalidatePath("/app");
   return { ok: true, userId: viewer.userId };
 }
@@ -316,6 +444,23 @@ export default async function Page() {
       </div>
     </main>
   );
+}
+`
+    );
+
+    await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "health"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "api", "v1", "health", "route.ts"),
+      `import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    t: new Date().toISOString(),
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+    hasBetterAuthSecret: Boolean(process.env.BETTER_AUTH_SECRET),
+    hasPublicAppUrl: Boolean(process.env.NEXT_PUBLIC_APP_URL),
+  });
 }
 `
     );
