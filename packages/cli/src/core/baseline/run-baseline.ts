@@ -91,35 +91,38 @@ export async function ensurePrdArchitectureTooling(root: string) {
  * Progressive activation entry points (PRD).
  * Use these instead of top-level imports from billing/storage/seo when modules may be disabled.
  */
+import { getConfig } from "@/lib/0xstack/config";
+
+function assertEnabled(ok: boolean, message: string) {
+  if (!ok) throw new Error(message);
+}
+
 export async function getBillingService() {
-  try {
-    await import("@/lib/billing/runtime");
-    return await import("@/lib/services/billing.service");
-  } catch {
-    throw new Error(
-      'Billing is not enabled. Set modules.billing to "dodo" or "stripe" in 0xstack.config.ts and run npx 0xstack baseline.'
-    );
-  }
+  const cfg = await getConfig();
+  assertEnabled(
+    cfg.modules.billing === "dodo" || cfg.modules.billing === "stripe",
+    'Billing is not enabled. Set modules.billing to "dodo" or "stripe" in 0xstack.config.ts and run npx 0xstack baseline.'
+  );
+  return await import("@/lib/services/billing.service");
 }
 
 export async function getStorageService() {
-  try {
-    await import("@/lib/storage/runtime");
-    return await import("@/lib/services/storage.service");
-  } catch {
-    throw new Error(
-      "Storage is not enabled. Set modules.storage in 0xstack.config.ts and run npx 0xstack baseline."
-    );
-  }
+  const cfg = await getConfig();
+  assertEnabled(
+    cfg.modules.storage === "gcs" || cfg.modules.storage === "s3" || cfg.modules.storage === "supabase",
+    "Storage is not enabled. Set modules.storage in 0xstack.config.ts and run npx 0xstack baseline."
+  );
+  return await import("@/lib/services/storage.service");
 }
 
 export async function getSeoConfig() {
-  try {
-    const m = await import("@/lib/seo/runtime");
-    return m.getSeoRuntimeConfig();
-  } catch {
-    throw new Error("SEO is not enabled. Set modules.seo to true in 0xstack.config.ts and run npx 0xstack baseline.");
-  }
+  const cfg = await getConfig();
+  assertEnabled(
+    cfg.modules.seo === true,
+    "SEO is not enabled. Set modules.seo to true in 0xstack.config.ts and run npx 0xstack baseline."
+  );
+  const m = await import("@/lib/seo/runtime");
+  return m.getSeoRuntimeConfig();
 }
 `
   );

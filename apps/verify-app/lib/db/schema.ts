@@ -34,6 +34,7 @@ export * from "../auth/auth-schema";
 
 
 
+
 export const orgs = pgTable("orgs", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -115,5 +116,14 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 }, (t) => ({
   uniq: uniqueIndex("push_subscriptions_user_endpoint").on(t.userId, t.endpoint),
 }));
+
+export const testdomains = pgTable("testdomains", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id"),
+  name: text("name").notNull(),
+  createdByUserId: text("created_by_user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 // 0xstack:SCHEMA-AUTO-END

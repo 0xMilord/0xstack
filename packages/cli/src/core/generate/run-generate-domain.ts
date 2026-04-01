@@ -2,6 +2,7 @@ import path from "node:path";
 import { writeFileEnsured, ensureDir } from "../modules/fs-utils";
 import { pluralize, toCamel, toKebab, toPascal } from "./names";
 import { upsertDomainTable } from "./schema-edit";
+import { runPipeline, type Step } from "../pipeline";
 
 export type GenerateDomainInput = {
   projectRoot: string;
@@ -15,11 +16,14 @@ export async function runGenerateDomain(input: GenerateDomainInput) {
   const camel = toCamel(domain);
   const pascal = toPascal(domain);
 
-  // DB: add a basic table (text IDs; aligns with Better Auth text strategy)
-  await upsertDomainTable(
-    input.projectRoot,
-    plural,
-    `export const ${plural} = pgTable("${plural}", {
+  const steps: Step[] = [
+    {
+      name: `schema: upsert ${plural} table`,
+      run: async () => {
+        await upsertDomainTable(
+          input.projectRoot,
+          plural,
+          `export const ${plural} = pgTable("${plural}", {
   id: text("id").primaryKey(),
   orgId: text("org_id"),
   name: text("name").notNull(),
@@ -27,17 +31,27 @@ export async function runGenerateDomain(input: GenerateDomainInput) {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });`
-  );
+        );
+        return { kind: "ok" as const };
+      },
+    },
+    {
+      name: "ensure directories",
+      run: async () => {
+        await ensureDir(path.join(input.projectRoot, "lib", "repos"));
+        await ensureDir(path.join(input.projectRoot, "lib", "loaders"));
+        await ensureDir(path.join(input.projectRoot, "lib", "rules"));
+        await ensureDir(path.join(input.projectRoot, "lib", "actions"));
+        await ensureDir(path.join(input.projectRoot, "lib", "services"));
+        await ensureDir(path.join(input.projectRoot, "lib", "query-keys"));
+        await ensureDir(path.join(input.projectRoot, "lib", "mutation-keys"));
+        await ensureDir(path.join(input.projectRoot, "lib", "hooks", "client"));
+        return { kind: "ok" as const };
+      },
+    },
+  ];
 
-  // Repo / Loader / Rules / Actions
-  await ensureDir(path.join(input.projectRoot, "lib", "repos"));
-  await ensureDir(path.join(input.projectRoot, "lib", "loaders"));
-  await ensureDir(path.join(input.projectRoot, "lib", "rules"));
-  await ensureDir(path.join(input.projectRoot, "lib", "actions"));
-  await ensureDir(path.join(input.projectRoot, "lib", "services"));
-  await ensureDir(path.join(input.projectRoot, "lib", "query-keys"));
-  await ensureDir(path.join(input.projectRoot, "lib", "mutation-keys"));
-  await ensureDir(path.join(input.projectRoot, "lib", "hooks", "client"));
+  await runPipeline(steps);
 
   await writeFileEnsured(
     path.join(input.projectRoot, "lib", "repos", `${plural}.repo.ts`),
