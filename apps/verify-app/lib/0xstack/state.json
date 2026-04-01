@@ -1,0 +1,22 @@
+{
+  "appliedProfile": "full",
+  "modules": {
+    "auth": "better-auth",
+    "orgs": true,
+    "billing": "dodo",
+    "storage": "gcs",
+    "email": "resend",
+    "cache": true,
+    "pwa": true,
+    "seo": true,
+    "blogMdx": true,
+    "observability": {
+      "sentry": false,
+      "otel": false
+    },
+    "jobs": {
+      "enabled": true,
+      "driver": "cron-only"
+    }
+  }
+}
