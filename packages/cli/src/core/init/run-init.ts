@@ -153,7 +153,8 @@ export async function runInit(input: InitInput) {
     {
       name: "normalize repo layout (flat lib/ and required pages)",
       run: async () => {
-        const projectRoot = effectiveDir;
+        // After the move step, files live in targetDir (not the temp dir).
+        const projectRoot = initIntoCurrentDir ? targetDir : effectiveDir;
         // Ensure core dirs exist
         await fs.mkdir(path.join(projectRoot, "lib"), { recursive: true });
         await fs.mkdir(path.join(projectRoot, "content", "blog"), { recursive: true });
