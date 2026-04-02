@@ -63,6 +63,7 @@ export const pwaModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "subscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "send"));
+    await ensureDir(path.join(ctx.projectRoot, "components", "pwa"));
 
     await ensurePushTables(ctx.projectRoot);
 
@@ -624,6 +625,67 @@ import { env } from "@/lib/env/server";
 
 export function configureWebPush() {
   webpush.setVapidDetails(env.VAPID_SUBJECT, env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "pwa", "pwa-update-banner.tsx"),
+      `"use client";
+\nimport { useEffect, useState } from "react";
+import { usePwaStatus } from "@/lib/pwa/register-sw.client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { RefreshCw } from "lucide-react";
+\n/**
+ * Floating toast that appears when a new service worker version is detected.
+ */
+export function PwaUpdateBanner() {
+  const { updateAvailable, refreshForUpdate } = usePwaStatus();
+  const [show, setShow] = useState(false);
+\n  useEffect(() => {
+    if (updateAvailable) setShow(true);
+  }, [updateAvailable]);
+\n  if (!show) return null;
+\n  return (
+    <div className="fixed bottom-4 left-4 right-4 z-[100] sm:left-auto sm:right-4 sm:w-96">
+      <Card className="shadow-2xl border-primary/50 bg-background/95 backdrop-blur">
+        <CardContent className="flex items-center justify-between p-4 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-primary/10 p-2 text-primary">
+              <RefreshCw className="h-4 w-4 animate-spin-slow" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Update available</p>
+              <p className="text-xs text-muted-foreground">A new version is ready.</p>
+            </div>
+          </div>
+          <Button size="sm" onClick={refreshForUpdate}>
+            Refresh
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "pwa", "pwa-install-button.tsx"),
+      `"use client";
+\nimport { usePwaStatus } from "@/lib/pwa/register-sw.client";
+import { Button, type ButtonProps } from "@/components/ui/button";
+import { Download } from "lucide-react";
+\nexport function PwaInstallButton({ children, ...props }: ButtonProps) {
+  const { canInstall, install } = usePwaStatus();
+\n  if (!canInstall) return null;
+\n  return (
+    <Button variant="outline" size="sm" onClick={install} {...props}>
+      <Download className="mr-2 h-4 w-4" />
+      {children || "Install App"}
+    </Button>
+  );
 }
 `
     );

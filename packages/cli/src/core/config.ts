@@ -102,6 +102,7 @@ export function applyProfile(config: MilordConfig, profile: string): MilordConfi
 export async function writeDefaultConfig(
   targetDir: string,
   appName: string,
+  appDescription: string,
   modules?: {
     seo: boolean;
     blogMdx: boolean;
@@ -139,7 +140,7 @@ export async function writeDefaultConfig(
   const content = `import { defineConfig } from "./lib/0xstack/config";
 
 export default defineConfig({
-  app: { name: ${JSON.stringify(appName)}, baseUrl: "http://localhost:3000" },
+  app: { name: ${JSON.stringify(appName)}, description: ${JSON.stringify(appDescription)}, baseUrl: "http://localhost:3000" },
   modules: {
     auth: "better-auth",
     // init enables core (auth fixed) + your selected modules.

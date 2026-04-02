@@ -70,3 +70,34 @@ export async function ensureEnvSchemaModuleWiring(projectRoot: string) {
   await fs.writeFile(p, src, "utf8");
 }
 
+export async function writeBrandingEnv(projectRoot: string, name: string, description: string) {
+  const p = path.join(projectRoot, ".env");
+  const pExample = path.join(projectRoot, ".env.example");
+
+  const branding = `NEXT_PUBLIC_APP_NAME="${name}"\nNEXT_PUBLIC_APP_DESCRIPTION="${description}"\n`;
+
+  // Write to .env (creating it if needed)
+  let envSrc = "";
+  try {
+    envSrc = await fs.readFile(p, "utf8");
+  } catch {
+    // doesn't exist yet, we'll create it
+  }
+
+  if (!envSrc.includes("NEXT_PUBLIC_APP_NAME")) {
+    await fs.writeFile(p, branding + envSrc, "utf8");
+  }
+
+  // Also ensure .env.example has them (idempotent)
+  let exampleSrc = "";
+  try {
+    exampleSrc = await fs.readFile(pExample, "utf8");
+  } catch {
+    return;
+  }
+
+  if (!exampleSrc.includes("NEXT_PUBLIC_APP_NAME")) {
+    await fs.writeFile(pExample, branding + exampleSrc, "utf8");
+  }
+}
+

@@ -1,10 +1,11 @@
 import path from "node:path";
 import { ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
+import { ensureAuthTables } from "../generate/schema-edit";
 
 export const authCoreModule: Module = {
   id: "auth-core",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     // Always-on auth domain surfaces (Better Auth is always enabled).
     await ensureDir(path.join(ctx.projectRoot, "lib", "query-keys"));
@@ -15,6 +16,92 @@ export const authCoreModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "hooks", "client"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "auth", "viewer"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "auth", "signout"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "login"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "get-started"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "forgot-password"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "reset-password"));
+    await ensureDir(path.join(ctx.projectRoot, "lib", "auth"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "api", "auth", "[...all]"));
+
+    // Ensure Drizzle tables for auth exist.
+    await ensureAuthTables(ctx.projectRoot);
+
+    // Auth schema file for Drizzle access if needed (required by doctor)
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "auth", "auth-schema.ts"),
+      `import { user, session, account, verification } from "@/lib/db/schema";
+
+export const authSchema = {
+  user,
+  session,
+  account,
+  verification,
+};
+`
+    );
+
+    // Better Auth server instance (base config, email patched by email module if enabled)
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "auth", "auth.ts"),
+      `import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { db } from "@/lib/db";
+import { env } from "@/lib/env/server";
+
+export const auth = betterAuth({
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  database: drizzleAdapter(db, { provider: "pg" }),
+  emailAndPassword: {
+    enabled: true,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          // This will be patched or used by the welcome email logic
+          // @ts-ignore - dynamic hook for welcome email
+          if (global.sendWelcomeEmail) {
+            // @ts-ignore
+            await global.sendWelcomeEmail(user.email, user.name);
+          }
+        }
+      }
+    }
+  }
+});
+`
+    );
+
+    // Better Auth client for browser usage
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "auth", "auth-client.ts"),
+      `import { createAuthClient } from "better-auth/react";
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+});
+`
+    );
+
+    // Better Auth API route handler
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "api", "auth", "[...all]", "route.ts"),
+      `import { auth } from "@/lib/auth/auth";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  return await auth.handler(request);
+}
+
+export async function POST(request: NextRequest) {
+  return await auth.handler(request);
+}
+`
+    );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "query-keys", "auth.keys.ts"),
@@ -167,8 +254,338 @@ export async function POST(req: Request) {
 }
 `
     );
+
+    // Login page
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "login", "page.tsx"),
+      `"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { authClient } from "@/lib/auth/auth-client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+export default function Page() {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const redirect = useMemo(() => sp.get("redirect") ?? "/app/orgs", [sp]);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <main className="mx-auto flex max-w-md flex-1 flex-col justify-center px-6 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Welcome back</CardTitle>
+          <CardDescription>Sign in to continue to your dashboard.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPending(true);
+              setError(null);
+              try {
+                const res = await authClient.signIn.email({ email, password, rememberMe: true, callbackURL: redirect });
+                if ((res as any)?.error) throw new Error((res as any).error.message ?? "Authentication failed");
+                router.push(redirect);
+                router.refresh();
+              } catch (err: any) {
+                setError(err?.message ?? "Something went wrong");
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="Email"
+              autoComplete="email"
+              required
+            />
+            <Input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Password"
+              autoComplete="current-password"
+              required
+              minLength={8}
+            />
+            <div className="flex items-center justify-between">
+              <Link className="text-sm text-muted-foreground hover:underline" href="/forgot-password">
+                Forgot password?
+              </Link>
+            </div>
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button type="submit" disabled={pending}>
+              {pending ? "Working…" : "Sign in"}
+            </Button>
+            <Link className={buttonVariants({ variant: "ghost" })} href={\`/get-started?redirect=\${encodeURIComponent(redirect)}\`}>
+              Need an account? Get started
+            </Link>
+          </form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
+
+    // Get started (signup) page
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "get-started", "page.tsx"),
+      `"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { authClient } from "@/lib/auth/auth-client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+export default function Page() {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const redirect = useMemo(() => sp.get("redirect") ?? "/app/orgs", [sp]);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <main className="mx-auto flex max-w-md flex-1 flex-col justify-center px-6 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Create your account</CardTitle>
+          <CardDescription>Start with email + password. You'll land in Organizations after signup.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPending(true);
+              setError(null);
+              try {
+                const res = await authClient.signUp.email({ 
+                  name: name || email, 
+                  email, 
+                  password,
+                  callbackURL: redirect,
+                });
+                if ((res as any)?.error) throw new Error((res as any).error.message ?? "Authentication failed");
+                // After signup, user is redirected to orgs or shown verification message
+                router.push(redirect);
+                router.refresh();
+              } catch (err: any) {
+                setError(err?.message ?? "Something went wrong");
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoComplete="name" />
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="Email"
+              autoComplete="email"
+              required
+            />
+            <Input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button type="submit" disabled={pending}>
+              {pending ? "Creating account…" : "Create account"}
+            </Button>
+            <Link className={buttonVariants({ variant: "ghost" })} href={\`/login?redirect=\${encodeURIComponent(redirect)}\`}>
+              Already have an account? Sign in
+            </Link>
+          </form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
+
+    // Forgot password page
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "forgot-password", "page.tsx"),
+      `"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { authClient } from "@/lib/auth/auth-client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+export default function Page() {
+  const sp = useSearchParams();
+  const redirect = useMemo(() => sp.get("redirect") ?? "/app/orgs", [sp]);
+  const [email, setEmail] = useState("");
+  const [pending, setPending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <main className="mx-auto flex max-w-md flex-1 flex-col justify-center px-6 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Reset your password</CardTitle>
+          <CardDescription>We'll email you a reset link if the account exists.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPending(true);
+              setError(null);
+              try {
+                const origin = typeof window !== "undefined" ? window.location.origin : "";
+                const redirectTo = \`\${origin}/reset-password?redirect=\${encodeURIComponent(redirect)}\`;
+                const res = await authClient.requestPasswordReset({ email, redirectTo });
+                if ((res as any)?.error) throw new Error((res as any).error.message ?? "Request failed");
+                setDone(true);
+              } catch (err: any) {
+                setError(err?.message ?? "Something went wrong");
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="Email"
+              autoComplete="email"
+              required
+            />
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {done ? (
+              <p className="text-sm text-green-600">Check your email for a reset link.</p>
+            ) : (
+              <Button type="submit" disabled={pending}>
+                {pending ? "Working…" : "Send reset link"}
+              </Button>
+            )}
+            <Link className={buttonVariants({ variant: "ghost" })} href={"/login?redirect=" + encodeURIComponent(redirect)}>
+              Back to sign in
+            </Link>
+          </form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
+
+    // Reset password page
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "reset-password", "page.tsx"),
+      `"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { authClient } from "@/lib/auth/auth-client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+export default function Page() {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const token = sp.get("token") ?? "";
+  const redirect = useMemo(() => sp.get("redirect") ?? "/app/orgs", [sp]);
+  const [newPassword, setNewPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <main className="mx-auto flex max-w-md flex-1 flex-col justify-center px-6 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Choose a new password</CardTitle>
+          <CardDescription>Set a new password to regain access.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!token ? (
+            <div className="grid gap-3">
+              <p className="text-sm text-muted-foreground">Missing reset token. Use the link from your email.</p>
+              <Link className={buttonVariants({ variant: "outline" })} href={"/forgot-password?redirect=" + encodeURIComponent(redirect)}>
+                Request a new link
+              </Link>
+            </div>
+          ) : (
+            <form
+              className="grid gap-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setPending(true);
+                setError(null);
+                try {
+                  const res = await authClient.resetPassword({ newPassword, token });
+                  if ((res as any)?.error) throw new Error((res as any).error.message ?? "Reset failed");
+                  router.push("/login?redirect=" + encodeURIComponent(redirect));
+                  router.refresh();
+                } catch (err: any) {
+                  setError(err?.message ?? "Something went wrong");
+                } finally {
+                  setPending(false);
+                }
+              }}
+            >
+              <Input
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                type="password"
+                placeholder="New password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+              />
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              <Button type="submit" disabled={pending}>
+                {pending ? "Working…" : "Reset password"}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+`
+    );
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 

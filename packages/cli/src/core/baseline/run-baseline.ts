@@ -228,8 +228,8 @@ export async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
   // Ensure email module exists in runtime schema
   if (!next.includes('email: z.union([z.literal(false), z.literal("resend")])')) {
     next = next.replace(
-    /storage:\s*z\.union\(\[z\.literal\(false\),\s*z\.literal\("gcs"\)\]\),\s*\n/m,
-    (m) => `${m}    email: z.union([z.literal(false), z.literal("resend")]),\n`
+      /storage:\s*z\.union\(\[z\.literal\(false\),\s*z\.literal\("gcs"\)\]\),\s*\n/m,
+      (m) => `${m}    email: z.union([z.literal(false), z.literal("resend")]),\n`
     );
   }
 
@@ -461,8 +461,8 @@ export default function Page() {
               try {
                 const res =
                   ${kind === "login"
-                    ? `await authClient.signIn.email({ email, password, rememberMe: true });`
-                    : `await authClient.signUp.email({ name: name || email, email, password });`}
+      ? `await authClient.signIn.email({ email, password, rememberMe: true });`
+      : `await authClient.signUp.email({ name: name || email, email, password });`}
                 if ((res as any)?.error) throw new Error((res as any).error.message ?? "Authentication failed");
                 router.push(redirect);
                 router.refresh();
@@ -693,7 +693,7 @@ export async function runBaseline(input: BaselineInput) {
     {
       name: "ensure config exists",
       run: async () => {
-        await writeDefaultConfig(root, path.basename(root));
+        await writeDefaultConfig(root, path.basename(root), "Production-ready Next.js app");
         await ensureConfigFileKeysUpToDate(root);
         return { kind: "ok" };
       },

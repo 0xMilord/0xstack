@@ -6,6 +6,7 @@ import { execCmd } from "../exec";
 import { logger } from "../logger";
 import { runPipeline } from "../pipeline";
 import { writeDefaultConfig } from "../config";
+import { writeBrandingEnv } from "../modules/env-edit";
 
 type PackageManager = "pnpm" | "npm";
 
@@ -488,12 +489,14 @@ export default async function Layout({ children }: { children: React.ReactNode }
         await writeFileEnsured(path.join(projectRoot, "app", "app", "settings", "page.tsx"), mkSimplePage("Settings"));
 
         // Seed config + minimal config runtime helper path.
-        await writeDefaultConfig(projectRoot, input.name, input.features);
+        await writeDefaultConfig(projectRoot, input.name, input.description, input.features);
+        await writeBrandingEnv(projectRoot, input.name, input.description);
+
         await writeFileEnsured(
           path.join(projectRoot, "lib", "0xstack", "config.ts"),
           `import { z } from "zod";
 \nconst ConfigSchema = z.object({
-  app: z.object({ name: z.string(), baseUrl: z.string().url() }),
+  app: z.object({ name: z.string(), description: z.string().optional(), baseUrl: z.string().url() }),
   modules: z.object({
     auth: z.literal("better-auth").optional(),
     orgs: z.boolean(),
@@ -522,6 +525,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
 \nimport { BillingEnvSchema } from "./billing";
 \nimport { StorageEnvSchema } from "./storage";
 \nexport const EnvSchema = z.object({
+  NEXT_PUBLIC_APP_NAME: z.string().min(1),
+  NEXT_PUBLIC_APP_DESCRIPTION: z.string().min(1),
   NEXT_PUBLIC_APP_URL: z.string().url(),
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),

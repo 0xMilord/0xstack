@@ -48,7 +48,7 @@ export const auth = betterAuth({
 
 export const emailResendModule: Module = {
   id: "email-resend",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     const enabled = ctx.modules.email === "resend";
     const filesToRemove = [
@@ -118,14 +118,14 @@ import {
 } from "@react-email/components";
 
 const base = {
-  bg: "#0a0a0a",
-  panel: "#0f0f0f",
-  border: "#262626",
-  text: "#fafafa",
-  muted: "#a3a3a3",
-  subtle: "#737373",
-  brand: "#ffffff",
-  brandText: "#000000",
+  bg: "#ffffff",
+  panel: "#f9fafb",
+  border: "#e5e7eb",
+  text: "#111827",
+  muted: "#6b7280",
+  subtle: "#9ca3af",
+  brand: "#000000",
+  brandText: "#ffffff",
 };
 
 function Shell(props: { appName: string; preview: string; children: React.ReactNode }) {
@@ -145,7 +145,7 @@ function Shell(props: { appName: string; preview: string; children: React.ReactN
           </Section>
           <Section style={{ padding: "14px 2px 0" }}>
             <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
-              Sent by {props.appName}. If you didn’t request this, you can ignore it.
+              Sent by {props.appName}. If you didn't request this, you can ignore it.
             </Text>
           </Section>
         </Container>
@@ -171,7 +171,7 @@ export function VerifyEmailTemplate(props: { appName: string; userName: string; 
           Verify your email
         </Text>
         <Text style={{ margin: "0 0 14px", fontSize: "14px", color: base.muted }}>
-          Hi {userName}, confirm this email to finish setting up your account.
+          Hi {userName}, welcome to {appName}! Confirm your email to get started.
         </Text>
 
         <Section style={{ margin: "16px 0 10px" }}>
@@ -193,17 +193,17 @@ export function VerifyEmailTemplate(props: { appName: string; userName: string; 
         </Section>
 
         <Text style={{ margin: "14px 0 0", fontSize: "12px", color: base.subtle }}>
-          If the button doesn’t work, open this link:
+          If the button doesn't work, open this link:
         </Text>
         {monoLink(verificationUrl)}
 
         <Hr style={{ borderColor: base.border, margin: "18px 0" }} />
 
         <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
-          For security, this link may expire. If it does, sign in and request a new verification email.
+          For security, this link expires in 24 hours. If you didn't create an account, you can safely ignore this email.
         </Text>
         <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.subtle }}>
-          Need help? Contact support.
+          Need help? Contact our support team.
         </Text>
       </Section>
     </Shell>
@@ -229,14 +229,14 @@ import {
 } from "@react-email/components";
 
 const base = {
-  bg: "#0a0a0a",
-  panel: "#0f0f0f",
-  border: "#262626",
-  text: "#fafafa",
-  muted: "#a3a3a3",
-  subtle: "#737373",
-  brand: "#ffffff",
-  brandText: "#000000",
+  bg: "#ffffff",
+  panel: "#f9fafb",
+  border: "#e5e7eb",
+  text: "#111827",
+  muted: "#6b7280",
+  subtle: "#9ca3af",
+  brand: "#000000",
+  brandText: "#ffffff",
 };
 
 function Shell(props: { appName: string; preview: string; children: React.ReactNode }) {
@@ -256,7 +256,7 @@ function Shell(props: { appName: string; preview: string; children: React.ReactN
           </Section>
           <Section style={{ padding: "14px 2px 0" }}>
             <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
-              Sent by {props.appName}. If you didn’t request this, you can ignore it.
+              Sent by {props.appName}. If you didn't request this, you can ignore it.
             </Text>
           </Section>
         </Container>
@@ -304,17 +304,17 @@ export function ResetPasswordTemplate(props: { appName: string; userName: string
         </Section>
 
         <Text style={{ margin: "14px 0 0", fontSize: "12px", color: base.subtle }}>
-          If the button doesn’t work, open this link:
+          If the button doesn't work, open this link:
         </Text>
         {monoLink(resetLink)}
 
         <Hr style={{ borderColor: base.border, margin: "18px 0" }} />
 
         <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
-          If you suspect someone else requested this email, secure your account after you sign in.
+          This link expires in 24 hours for your security. If you didn't request this password reset, you can safely ignore this email.
         </Text>
         <Text style={{ margin: "10px 0 0", fontSize: "12px", color: base.subtle }}>
-          Need help? Contact support.
+          Need help? Contact our support team.
         </Text>
       </Section>
     </Shell>
@@ -382,7 +382,7 @@ export async function sendResetPasswordEmail(input: { to: string; userName: stri
 
     await patchAuthForEmail(ctx.projectRoot);
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 
