@@ -8,7 +8,7 @@ function billingOn(ctx: { modules: { billing: false | "dodo" | "stripe" } }) {
 
 export const billingCoreModule: Module = {
   id: "billing-core",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     const on = billingOn(ctx);
     const provider = ctx.modules.billing;
@@ -39,6 +39,7 @@ export const billingCoreModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "app", "billing", "cancel"));
     await ensureDir(path.join(ctx.projectRoot, "app", "app", "billing"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "hooks", "client"));
+    await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "billing", "status"));
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "billing", "runtime.ts"),
@@ -301,15 +302,70 @@ export async function openPortalAction() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "hooks", "client", "use-billing.client.ts"),
-      `import { useQueryClient } from "@tanstack/react-query";
+      `import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { billingKeys } from "@/lib/query-keys/billing.keys";
 
 export { billingKeys };
+
+export type BillingStatus = {
+  hasSubscription: boolean;
+  isActive: boolean;
+  planId: string | null;
+  provider: "dodo" | "stripe" | null;
+  status: string | null;
+};
+
+async function fetchBillingStatus(orgId: string): Promise<BillingStatus> {
+  const res = await fetch(\`/api/v1/billing/status?orgId=\${encodeURIComponent(orgId)}\`);
+  if (!res.ok) throw new Error("Failed to fetch billing status");
+  return res.json();
+}
+
+/** Query billing status for an org. Returns loading + error states. */
+export function useBillingStatus(orgId: string | null) {
+  return useQuery({
+    queryKey: billingKeys.org(orgId!),
+    queryFn: () => fetchBillingStatus(orgId!),
+    enabled: !!orgId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
 
 /** Invalidate billing queries after client-side flows; prefer RSC loaders for reads. */
 export function useInvalidateBilling() {
   const qc = useQueryClient();
   return (orgId: string) => qc.invalidateQueries({ queryKey: billingKeys.org(orgId) });
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "api", "v1", "billing", "status", "route.ts"),
+      `import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { guardApiRequest } from "@/lib/security/api";
+import { billingService_getLatestForOrg } from "@/lib/services/billing.service";
+import { getBillingPlans } from "@/lib/billing/plans";
+import { ACTIVE_BILLING_PROVIDER } from "@/lib/billing/runtime";
+
+export async function GET(req: NextRequest) {
+  await guardApiRequest(req);
+  const url = new URL(req.url);
+  const orgId = url.searchParams.get("orgId");
+  if (!orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
+
+  const sub = await billingService_getLatestForOrg(orgId);
+  const plan = sub?.planId ? getBillingPlans().find((p) => p.priceId === sub.planId || p.id === sub.planId) : null;
+
+  return NextResponse.json({
+    hasSubscription: !!sub,
+    isActive: sub?.status === "active",
+    planId: sub?.planId ?? null,
+    provider: ACTIVE_BILLING_PROVIDER,
+    status: sub?.status ?? null,
+    planName: plan?.name ?? null,
+  });
 }
 `
     );
@@ -509,6 +565,6 @@ export default async function Page() {
 `
     );
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };

@@ -73,6 +73,7 @@ export async function runSync(input: SyncInput) {
   }
 
   // File-level impact (best-effort): surface obvious removals when modules are disabled.
+  const filesToRemove: string[] = [];
   try {
     const cfg = applyProfile(await loadConfig(input.projectRoot), input.profile);
     const absentIfDisabled: string[] = [];
@@ -128,6 +129,7 @@ export async function runSync(input: SyncInput) {
       logger.info(`- removals (if apply): ${present.length} disabled-module files currently present`);
       for (const f of present.slice(0, 25)) logger.info(`  - would remove: ${f}`);
       if (present.length > 25) logger.info("  - ...");
+      filesToRemove.push(...present);
     }
   } catch {
     // ignore
@@ -137,6 +139,24 @@ export async function runSync(input: SyncInput) {
     logger.info("No changes applied. Re-run with `--apply` to execute baseline + docs sync.");
     logger.info("With `--apply`: optional `--lint`, `--format`, `--drizzle-generate` run matching package scripts / drizzle-kit.");
     return;
+  }
+
+  // Remove disabled-module files BEFORE running baseline
+  if (filesToRemove.length > 0) {
+    logger.info(`Removing ${filesToRemove.length} disabled-module files...`);
+    for (const rel of filesToRemove) {
+      const p = path.join(input.projectRoot, ...rel.split("/"));
+      try {
+        await fs.unlink(p);
+        logger.info(`  - removed: ${rel}`);
+      } catch (err: any) {
+        if (err?.code === "ENOENT") {
+          // already gone, ok
+        } else {
+          logger.warn(`  - failed to remove ${rel}: ${err?.message ?? String(err)}`);
+        }
+      }
+    }
   }
 
   const before = await snapshotFiles(input.projectRoot);

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { computeProjectState } from "../project/project-state";
 import { replaceAutoSection } from "./markers";
+import { loadConfig } from "../config";
 
 export type DocsSyncInput = { projectRoot: string; profile?: string };
 
@@ -260,114 +261,114 @@ export async function runDocsSync(input: DocsSyncInput) {
     const envBody =
       sub === "env"
         ? [
-            "# `lib/env`",
-            "",
-            "## Production runbook",
-            "- All validation is centralized in `lib/env/schema.ts` (composed from `lib/env/*`).",
-            "- If `EnvSchema.parse(process.env)` throws, the app should fail fast (misconfigured deployment).",
-            "",
-            "## Required core variables",
-            "- `NEXT_PUBLIC_APP_URL`",
-            "- `DATABASE_URL`",
-            "- `BETTER_AUTH_SECRET`",
-            "- `BETTER_AUTH_URL`",
-            "",
-            "## Optional core variables",
-            "- `API_KEY` (server-to-server auth for `/api/v1/*` routes when no session is present)",
-            "- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (durable rate limiting for external routes)",
-            "",
-            "## Module variables (only when that module is enabled)",
-            "- Billing (Dodo): `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_ENVIRONMENT`, `DODO_PAYMENTS_RETURN_URL`, `DODO_PAYMENTS_STARTER_PRICE_ID` (optional `DODO_PAYMENTS_PLANS_JSON`)",
-            "- Storage (GCS): `GCS_BUCKET`, `GCS_PROJECT_ID`",
-            "- PWA push: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`",
-            "- Email (Resend): `RESEND_API_KEY`, `RESEND_FROM`",
-            "- Observability: `SENTRY_DSN`",
-            "",
-            entrypoints.trimEnd(),
-            "",
-          ].join("\n")
+          "# `lib/env`",
+          "",
+          "## Production runbook",
+          "- All validation is centralized in `lib/env/schema.ts` (composed from `lib/env/*`).",
+          "- If `EnvSchema.parse(process.env)` throws, the app should fail fast (misconfigured deployment).",
+          "",
+          "## Required core variables",
+          "- `NEXT_PUBLIC_APP_URL`",
+          "- `DATABASE_URL`",
+          "- `BETTER_AUTH_SECRET`",
+          "- `BETTER_AUTH_URL`",
+          "",
+          "## Optional core variables",
+          "- `API_KEY` (server-to-server auth for `/api/v1/*` routes when no session is present)",
+          "- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (durable rate limiting for external routes)",
+          "",
+          "## Module variables (only when that module is enabled)",
+          "- Billing (Dodo): `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_ENVIRONMENT`, `DODO_PAYMENTS_RETURN_URL`, `DODO_PAYMENTS_STARTER_PRICE_ID` (optional `DODO_PAYMENTS_PLANS_JSON`)",
+          "- Storage (GCS): `GCS_BUCKET`, `GCS_PROJECT_ID`",
+          "- PWA push: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`",
+          "- Email (Resend): `RESEND_API_KEY`, `RESEND_FROM`",
+          "- Observability: `SENTRY_DSN`",
+          "",
+          entrypoints.trimEnd(),
+          "",
+        ].join("\n")
         : null;
 
     const storageBody =
       sub === "storage"
         ? [
-            "# `lib/storage`",
-            "",
-            "## GCS runbook (production)",
-            "- `GCS_PROJECT_ID`: your GCP project id",
-            "- `GCS_BUCKET`: bucket name for object storage",
-            "",
-            "### Auth model",
-            "- Browser clients use session auth + org membership checks, then request signed URLs.",
-            "- Server-to-server calls can use `API_KEY`/stored API keys via `guardApiRequest`.",
-            "",
-            "### Recommended IAM",
-            "- Prefer Workload Identity / service account attached to the runtime (no JSON keys).",
-            "- Grant the runtime identity permissions to sign URLs and read/write objects in the bucket.",
-            "",
-            entrypoints.trimEnd(),
-            "",
-          ].join("\n")
+          "# `lib/storage`",
+          "",
+          "## GCS runbook (production)",
+          "- `GCS_PROJECT_ID`: your GCP project id",
+          "- `GCS_BUCKET`: bucket name for object storage",
+          "",
+          "### Auth model",
+          "- Browser clients use session auth + org membership checks, then request signed URLs.",
+          "- Server-to-server calls can use `API_KEY`/stored API keys via `guardApiRequest`.",
+          "",
+          "### Recommended IAM",
+          "- Prefer Workload Identity / service account attached to the runtime (no JSON keys).",
+          "- Grant the runtime identity permissions to sign URLs and read/write objects in the bucket.",
+          "",
+          entrypoints.trimEnd(),
+          "",
+        ].join("\n")
         : null;
 
     const billingBody =
       sub === "billing"
         ? [
-            "# `lib/billing`",
-            "",
-            "## Dodo runbook (production)",
-            "- Set `DODO_PAYMENTS_*` vars in your environment.",
-            "- `DODO_PAYMENTS_WEBHOOK_KEY` must match your Dodo webhook signing key.",
-            "",
-            "## Plan registry",
-            "- Default plan uses `DODO_PAYMENTS_STARTER_PRICE_ID`.",
-            "- For multiple plans set `DODO_PAYMENTS_PLANS_JSON` (validated at runtime).",
-            "",
-            "## Org scoping",
-            "- Checkout URLs include `org_id` so webhook reconciliation can map subscriptions to orgs.",
-            "- Subscription status is a durable read model in `billing_subscriptions` and is cached/tagged by org.",
-            "",
-            entrypoints.trimEnd(),
-            "",
-          ].join("\n")
+          "# `lib/billing`",
+          "",
+          "## Dodo runbook (production)",
+          "- Set `DODO_PAYMENTS_*` vars in your environment.",
+          "- `DODO_PAYMENTS_WEBHOOK_KEY` must match your Dodo webhook signing key.",
+          "",
+          "## Plan registry",
+          "- Default plan uses `DODO_PAYMENTS_STARTER_PRICE_ID`.",
+          "- For multiple plans set `DODO_PAYMENTS_PLANS_JSON` (validated at runtime).",
+          "",
+          "## Org scoping",
+          "- Checkout URLs include `org_id` so webhook reconciliation can map subscriptions to orgs.",
+          "- Subscription status is a durable read model in `billing_subscriptions` and is cached/tagged by org.",
+          "",
+          entrypoints.trimEnd(),
+          "",
+        ].join("\n")
         : null;
 
     const securityBody =
       sub === "security"
         ? [
-            "# `lib/security`",
-            "",
-            "## API key + rate limiting runbook",
-            "- External routes under `/api/v1/*` should use `guardApiRequest(req)` when session auth is not applicable.",
-            "- If `UPSTASH_REDIS_*` is configured, rate limiting is durable; otherwise a safe in-memory fallback is used.",
-            "",
-            "## API keys lifecycle",
-            "- Keys are org-scoped and managed via `/app/api-keys`.",
-            "- Secrets are only shown once on creation; revoke to rotate.",
-            "",
-            entrypoints.trimEnd(),
-            "",
-          ].join("\n")
+          "# `lib/security`",
+          "",
+          "## API key + rate limiting runbook",
+          "- External routes under `/api/v1/*` should use `guardApiRequest(req)` when session auth is not applicable.",
+          "- If `UPSTASH_REDIS_*` is configured, rate limiting is durable; otherwise a safe in-memory fallback is used.",
+          "",
+          "## API keys lifecycle",
+          "- Keys are org-scoped and managed via `/app/api-keys`.",
+          "- Secrets are only shown once on creation; revoke to rotate.",
+          "",
+          entrypoints.trimEnd(),
+          "",
+        ].join("\n")
         : null;
 
     const pwaBody =
       sub === "pwa"
         ? [
-            "# `lib/pwa`",
-            "",
-            "## Push + service worker runbook",
-            "- Generate VAPID keys and set:",
-            "  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`",
-            "  - `VAPID_PRIVATE_KEY`",
-            "  - `VAPID_SUBJECT` (mailto: or URL)",
-            "",
-            "## Service worker update strategy",
-            "- Increment `SW_VERSION` in `public/sw.js` when changing caching rules.",
-            "- Clients activate new SW on refresh (current implementation uses `skipWaiting` + `clients.claim`).",
-            "",
-            entrypoints.trimEnd(),
-            "",
-          ].join("\n")
+          "# `lib/pwa`",
+          "",
+          "## Push + service worker runbook",
+          "- Generate VAPID keys and set:",
+          "  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`",
+          "  - `VAPID_PRIVATE_KEY`",
+          "  - `VAPID_SUBJECT` (mailto: or URL)",
+          "",
+          "## Service worker update strategy",
+          "- Increment `SW_VERSION` in `public/sw.js` when changing caching rules.",
+          "- Clients activate new SW on refresh (current implementation uses `skipWaiting` + `clients.claim`).",
+          "",
+          entrypoints.trimEnd(),
+          "",
+        ].join("\n")
         : null;
 
     const body =
@@ -380,5 +381,191 @@ export async function runDocsSync(input: DocsSyncInput) {
     const prev = await readOrEmpty(p);
     await writeEnsured(p, replaceAutoSection(prev || "", body));
   }
+
+  // Generate RUNBOOKS.md with operational guides for enabled modules
+  const cfg = await loadConfig(input.projectRoot);
+  const modules = cfg.modules;
+  const runbookLines: string[] = [
+    "# Operational Runbooks",
+    "",
+    "This document contains operational runbooks for enabled modules. Each section includes required env vars, testing steps, and failure modes.",
+    "",
+  ];
+
+  // Auth runbook
+  runbookLines.push(
+    "## Auth (Better Auth)",
+    "",
+    "### Required environment",
+    "- `DATABASE_URL` — Postgres connection string",
+    "- `BETTER_AUTH_SECRET` — 32+ char random string for session signing",
+    "- `BETTER_AUTH_URL` — Base URL (e.g. `http://localhost:3000`)",
+    "- `NEXT_PUBLIC_APP_URL` — Public URL for redirects",
+    "",
+    "### Testing locally",
+    "1. Run `npx 0xstack baseline` to generate auth schema and migrations",
+    "2. Run `pnpm db:migrate` (or let baseline run migrations)",
+    "3. Visit `/get-started` and create an account",
+    "4. Check `user_profiles` table for profile row",
+    "",
+    "### Failure modes",
+    "- **Invalid session**: Check `BETTER_AUTH_SECRET` matches across restarts",
+    "- **Redirect loop**: Ensure `BETTER_AUTH_URL` matches your dev server URL",
+    "- **Missing profile**: `viewer.service.ts` ensures profile on first read; check logs for errors",
+    "",
+  );
+
+  // Email runbook
+  if (modules.email === "resend") {
+    runbookLines.push(
+      "## Email (Resend)",
+      "",
+      "### Required environment",
+      "- `RESEND_API_KEY` — Resend API key",
+      "- `RESEND_FROM` — Verified sender (e.g. `Acme <noreply@acme.com>`)",
+      "",
+      "### Testing locally",
+      "1. Use `RESEND_API_KEY=re_test_...` for test mode (emails logged, not sent)",
+      "2. Trigger password reset at `/forgot-password`",
+      "3. Check console for email preview or Resend dashboard for delivery",
+      "",
+      "### Production setup",
+      "1. Add and verify domain in Resend dashboard",
+      "2. Update `RESEND_FROM` with verified domain",
+      "3. Configure DMARC/DKIM/SPF for your domain",
+      "",
+      "### Failure modes",
+      "- **Emails not sending**: Check domain verification status in Resend",
+      "- **Deliverability issues**: Verify DMARC policy and DNS records",
+      "",
+    );
+  }
+
+  // Billing runbook
+  if (modules.billing === "dodo" || modules.billing === "stripe") {
+    const provider = modules.billing === "dodo" ? "Dodo" : "Stripe";
+    const providerLower = provider.toLowerCase();
+    runbookLines.push(
+      `## Billing (${provider})`,
+      "",
+      "### Required environment",
+      provider === "Dodo"
+        ? [
+          "- `DODO_PAYMENTS_API_KEY` — Dodo API key",
+          "- `DODO_PAYMENTS_WEBHOOK_KEY` — Webhook signing key",
+          "- `DODO_PAYMENTS_ENVIRONMENT` — `test_mode` or `live_mode`",
+          "- `DODO_PAYMENTS_RETURN_URL` — Checkout redirect (e.g. `/billing/success`)",
+          "- `DODO_PAYMENTS_STARTER_PRICE_ID` — Default plan price ID",
+        ].join("\n")
+        : [
+          "- `STRIPE_SECRET_KEY` — Stripe secret key",
+          "- `STRIPE_WEBHOOK_SECRET` — Webhook signing secret",
+          "- `STRIPE_RETURN_URL` — Checkout redirect",
+          "- `STRIPE_STARTER_PRICE_ID` — Default plan price ID",
+        ].join("\n"),
+      "",
+      "### Testing locally",
+      `1. Use ${providerLower} test keys (do not use live keys)`,
+      `2. Configure webhook endpoint: \`https://your-domain.ngrok.io/api/v1/billing/webhook\``,
+      "3. Start checkout at `/pricing`",
+      "4. Use test card: `4242 4242 4242 4242` (Stripe) or provider test flow",
+      "5. Verify webhook delivered and `billing_subscriptions` updated",
+      "",
+      "### Org scoping",
+      "- Checkout URLs include `org_id` query param",
+      "- Webhook reconciliation maps subscriptions to orgs via metadata",
+      "- Subscription status cached per-org with tag revalidation",
+      "",
+      "### Failure modes",
+      "- **Webhook 400**: Check webhook signing key matches",
+      "- **Subscription not activating**: Verify org_id in checkout metadata",
+      "- **Missing plan**: Check `DODO_PAYMENTS_STARTER_PRICE_ID` or plan registry",
+      "",
+    );
+  }
+
+  // Storage runbook
+  if (modules.storage === "gcs" || modules.storage === "s3" || modules.storage === "supabase") {
+    runbookLines.push(
+      "## Storage",
+      "",
+      modules.storage === "gcs"
+        ? [
+          "### Required environment (GCS)",
+          "- `GCS_BUCKET` — Bucket name",
+          "- `GCS_PROJECT_ID` — GCP project ID",
+          "",
+          "### IAM setup",
+          "1. Create service account with `Storage Object Admin` role",
+          "2. Download JSON key or use Workload Identity",
+          "3. Grant bucket-level permissions for least privilege",
+          "",
+          "### Testing locally",
+          "- Use `gcloud auth application-default login` for local dev",
+          "- Upload test file via `/app/assets` UI",
+          "- Verify signed URLs work with expiration",
+          "",
+        ].join("\n")
+        : modules.storage === "s3"
+          ? [
+            "### Required environment (S3)",
+            "- `S3_REGION` — AWS region",
+            "- `S3_BUCKET` — Bucket name",
+            "- `AWS_ACCESS_KEY_ID` — IAM access key",
+            "- `AWS_SECRET_ACCESS_KEY` — IAM secret",
+            "",
+            "### IAM setup",
+            "1. Create IAM user with `AmazonS3FullAccess` (or bucket-scoped policy)",
+            "2. Generate access keys",
+            "3. Enable CORS for browser uploads if needed",
+            "",
+          ].join("\n")
+          : [
+            "### Required environment (Supabase Storage)",
+            "- `SUPABASE_URL` — Supabase project URL",
+            "- `SUPABASE_SERVICE_ROLE_KEY` — Service role key",
+            "- `SUPABASE_STORAGE_BUCKET` — Bucket name",
+            "",
+            "### Bucket setup",
+            "1. Create bucket in Supabase dashboard",
+            "2. Set RLS policies for org-scoped access",
+            "3. Configure public/private visibility as needed",
+            "",
+          ].join("\n"),
+      "### Upload flow",
+      "1. Client requests signed URL via server action",
+      "2. Client PUTs file directly to storage (no server proxy)",
+      "3. Server records asset in `assets` table",
+      "",
+      "### Failure modes",
+      "- **Upload 403**: Check IAM permissions or bucket policies",
+      "- **Signed URL expired**: URLs expire after 15 minutes; retry to get fresh URL",
+      "- **Org scoping missing**: Ensure active org cookie is set before upload",
+      "",
+    );
+  }
+
+  // Webhook ledger runbook
+  runbookLines.push(
+    "## Webhook Ledger",
+    "",
+    "### Idempotency model",
+    "- All webhooks recorded in `webhook_events` table",
+    "- Duplicate events rejected based on `provider_event_id`",
+    "- Replay supported via `/app/webhooks` UI",
+    "",
+    "### Testing webhooks locally",
+    "1. Use ngrok/cloudflared to expose webhook endpoint",
+    "2. Configure webhook URL in provider dashboard",
+    "3. Trigger test event from provider",
+    "4. Verify event recorded in `webhook_events` with status",
+    "",
+    "### Failure modes",
+    "- **Duplicate event**: Check `provider_event_id` uniqueness constraint",
+    "- **Reconciliation failed**: Check event payload schema matches expected format",
+    "",
+  );
+
+  await writeEnsured(path.join(input.projectRoot, "RUNBOOKS.md"), runbookLines.join("\n"));
 }
 

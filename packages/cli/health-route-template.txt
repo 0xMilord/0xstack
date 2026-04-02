@@ -1,0 +1,38 @@
+import { NextResponse } from "next/server";
+import { env } from "@/lib/env/server";
+
+/**
+ * Health endpoint for load balancers and uptime monitoring.
+ * Returns 200 OK with module status based on enabled config.
+ */
+export async function GET() {
+  const checks: Record<string, { ok: boolean; error?: string }> = {
+    env: { ok: !!(env.DATABASE_URL && env.BETTER_AUTH_SECRET && env.BETTER_AUTH_URL) },
+  };
+
+  // Optional module checks (best-effort, non-fatal)
+  try {
+    const { ACTIVE_BILLING_PROVIDER } = await import("@/lib/billing/runtime").catch(() => ({ ACTIVE_BILLING_PROVIDER: null }));
+    if (ACTIVE_BILLING_PROVIDER) {
+      checks.billing = { ok: true, provider: ACTIVE_BILLING_PROVIDER };
+    }
+  } catch {
+    // billing not enabled, ok
+  }
+
+  try {
+    const { StorageEnvSchema } = await import("@/lib/env/storage").catch(() => ({ StorageEnvSchema: null }));
+    if (StorageEnvSchema) {
+      checks.storage = { ok: true };
+    }
+  } catch {
+    // storage not enabled, ok
+  }
+
+  const allOk = Object.values(checks).every((c) => c.ok);
+  return NextResponse.json({
+    status: allOk ? "ok" : "degraded",
+    timestamp: new Date().toISOString(),
+    checks,
+  }, { status: allOk ? 200 : 503 });
+}

@@ -114,7 +114,6 @@ export async function runInit(input: InitInput) {
     {
       name: "scaffold Next.js app (create-next-app)",
       run: async () => {
-        spinner.start("Running create-next-app…");
         const args = [
           "dlx",
           "create-next-app@latest",
@@ -131,7 +130,6 @@ export async function runInit(input: InitInput) {
         ];
         // create-next-app runs in parent folder; it will create <targetFolder>.
         await execCmd(pmCmd(input.packageManager), args, { cwd: targetParent });
-        spinner.succeed("Next.js app created");
         return { kind: "ok" };
       },
     },
@@ -180,9 +178,13 @@ export async function runInit(input: InitInput) {
           await ensurePnpmOnlyBuiltDependencies(projectRoot);
           await execCmd("pnpm", ["install"], { cwd: projectRoot });
         }
-
-        // Install core deps required by PRD
-        spinner.start("Installing baseline dependencies…");
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "install baseline dependencies",
+      run: async () => {
+        const projectRoot = initIntoCurrentDir ? targetDir : effectiveDir;
         await addDeps(projectRoot, input.packageManager, [
           "zod",
           "drizzle-orm",
@@ -193,10 +195,13 @@ export async function runInit(input: InitInput) {
           "zustand",
         ]);
         await addDeps(projectRoot, input.packageManager, ["drizzle-kit"], true);
-        spinner.succeed("Dependencies installed");
-
-        // shadcn init + required components (non-interactive)
-        spinner.start("Initializing shadcn/ui…");
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "initialize shadcn/ui",
+      run: async () => {
+        const projectRoot = initIntoCurrentDir ? targetDir : effectiveDir;
         const dlxCmd = input.packageManager === "npm" ? "npx" : "pnpm";
         const dlxArgs = input.packageManager === "npm" ? [] : ["dlx"];
         await execCmd(
@@ -206,22 +211,18 @@ export async function runInit(input: InitInput) {
         );
         await execCmd(
           dlxCmd,
-          [
-            ...dlxArgs,
-            "shadcn@latest",
-            "add",
-            "--yes",
-            "--all",
-            "--cwd",
-            projectRoot,
-          ],
+          [...dlxArgs, "shadcn@latest", "add", "--yes", "--all", "--cwd", projectRoot],
           { cwd: projectRoot }
         );
-        spinner.succeed("shadcn/ui ready");
-
         // Re-apply globals.css theme after shadcn modifies it.
         await writeFileEnsured(path.join(projectRoot, "app", "globals.css"), getGlobalsCss(input.theme ?? "default"));
-
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "generate public pages",
+      run: async () => {
+        const projectRoot = initIntoCurrentDir ? targetDir : effectiveDir;
         // Public pages: real sections (hero/features/FAQ/CTA), not stubs.
         const mkSimplePage = (title: string) =>
           `export default function Page() { return <main className="mx-auto max-w-3xl p-6"><h1 className="text-2xl font-semibold">${title}</h1></main>; }\n`;
@@ -229,10 +230,10 @@ export async function runInit(input: InitInput) {
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title: s, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="py-10">
-      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight">{s}</h2>
       <div className="mt-4 text-sm text-muted-foreground">{children}</div>
     </section>
   );
@@ -243,8 +244,8 @@ export default function Page() {
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="space-y-4">
         <p className="text-sm text-muted-foreground">Production-ready Next.js + Postgres starter</p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-        <p className="max-w-2xl text-muted-foreground">{subtitle}</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">${title}</h1>
+        <p className="max-w-2xl text-muted-foreground">${subtitle}</p>
         <div className="flex flex-wrap gap-3">
           <Link className={buttonVariants({ variant: "default" })} href="/get-started">Get started</Link>
           <Link className={buttonVariants({ variant: "outline" })} href="/pricing">Pricing</Link>
@@ -300,13 +301,113 @@ export default function Page() {
 }
 `;
 
-        await writeFileEnsured(
-          path.join(projectRoot, "app", "page.tsx"),
-          mkPublicPage(
-            "Ship SaaS faster",
-            "A starter that enforces clean boundaries, real auth, and production DB workflows from day one."
-          )
-        );
+        // Sophisticated 0xstack homepage
+        const homepage = `import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+const features = [
+  { name: "Read/Write Separation", description: "Two highways: fast reads (loaders) + safe writes (actions → rules → repos).", icon: "📐" },
+  { name: "Enterprise Modules", description: "Billing, Storage, Email, SEO—activated only when enabled.", icon: "🧩" },
+  { name: "Self-Healing CLI", description: "baseline, doctor, sync keep your repo correct over time.", icon: "🔧" },
+  { name: "Auth Ready", description: "Better Auth with email templates, sessions, and org membership.", icon: "🔐" },
+  { name: "Multi-Tenant", description: "Orgs, members, active-org cookie backbone for SaaS.", icon: "🏢" },
+  { name: "Production DB", description: "Drizzle ORM + Postgres with migrations and type-safe queries.", icon: "🗄️" },
+];
+
+export default function Page() {
+  return (
+    <main className="min-h-screen">
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-background to-muted/20">
+        <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32">
+          <div className="text-center">
+            <Badge variant="secondary" className="mb-4">Production Architecture System</Badge>
+            <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
+              Ship SaaS faster with <span className="text-primary">0xstack</span>
+            </h1>
+            <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
+              A self-healing architecture engine for Next.js. Clean boundaries, real auth, production DB workflows, and a CLI that keeps your repo correct.
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link className={buttonVariants({ size: "lg" })} href="/get-started">Get started</Link>
+              <Link className={buttonVariants({ variant: "outline", size: "lg" })} href="/about">Learn more</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything you need</h2>
+            <p className="mt-4 text-lg text-muted-foreground">Production-ready architecture with sane defaults.</p>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((f) => (
+              <Card key={f.name}>
+                <CardHeader>
+                  <div className="text-4xl mb-2">{f.icon}</div>
+                  <CardTitle>{f.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-base">{f.description}</CardDescription>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Architecture */}
+      <section className="py-24 bg-muted/30">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Clean architecture</h2>
+            <p className="mt-4 text-lg text-muted-foreground">Enforced boundaries prevent drift.</p>
+          </div>
+          <div className="grid gap-8 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Read Highway (Fast)</CardTitle>
+                <CardDescription>RSC → Loader → Repo → DB</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Loaders use React.cache() with tag revalidation. Page-ready DTOs only.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Write Highway (Safe)</CardTitle>
+                <CardDescription>UI → Action → Rules → Service → Repo → DB</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Actions validate with Zod, rules enforce authz, services orchestrate.
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-24 bg-primary text-primary-foreground">
+        <div className="mx-auto max-w-7xl px-6 text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to ship?</h2>
+          <p className="mt-4 text-lg opacity-90">Start solid. Scale with confidence.</p>
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link className={buttonVariants({ variant: "secondary", size: "lg" })} href="/get-started">Get started</Link>
+            <Link className={buttonVariants({ variant: "outline", size: "lg", className: "bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10" })} href="/pricing">Pricing</Link>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+`;
+
+        await writeFileEnsured(path.join(projectRoot, "app", "page.tsx"), homepage);
         await writeFileEnsured(
           path.join(projectRoot, "app", "about", "page.tsx"),
           mkPublicPage("About", "A pragmatic, enterprise-minded starter for teams that want sane defaults and strong boundaries.")

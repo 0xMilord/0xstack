@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ModuleContext } from "./types";
+import { logger } from "../logger";
 
 async function fileExists(p: string) {
   try {
@@ -27,6 +28,9 @@ export async function runConsolidatedModuleValidate(ctx: ModuleContext) {
   const root = ctx.projectRoot;
   const m = ctx.modules;
   const errors: string[] = [];
+  const warnings: string[] = [];
+
+  logger.info("Validating enabled modules...");
 
   if (m.seo) {
     await requireFiles(
@@ -109,7 +113,37 @@ export async function runConsolidatedModuleValidate(ctx: ModuleContext) {
     );
   }
 
-  if (errors.length) {
+  // Categorize errors by module
+  const errorsByModule = new Map<string, string[]>();
+  for (const err of errors) {
+    const match = err.match(/^\[([^\]]+)\]/);
+    const module = match ? match[1]! : "unknown";
+    const existing = errorsByModule.get(module) ?? [];
+    existing.push(err);
+    errorsByModule.set(module, existing);
+  }
+
+  if (errors.length > 0) {
+    logger.error(`\n❌ Module validation failed: ${errors.length} issue(s) across ${errorsByModule.size} module(s)\n`);
+    for (const [module, moduleErrors] of errorsByModule.entries()) {
+      logger.error(`  ${module}: ${moduleErrors.length} issue(s)`);
+      for (const err of moduleErrors.slice(0, 5)) {
+        logger.error(`    - ${err}`);
+      }
+      if (moduleErrors.length > 5) {
+        logger.error(`    ... and ${moduleErrors.length - 5} more`);
+      }
+    }
+    logger.error("\n💡 Run `npx 0xstack baseline --profile " + ctx.profile + "` to regenerate missing files.\n");
     throw new Error(`Module validate failed (${errors.length} issue(s)):\n- ${errors.join("\n- ")}`);
   }
+
+  if (warnings.length > 0) {
+    logger.warn(`\n⚠️  Module validation warnings: ${warnings.length} issue(s)\n`);
+    for (const w of warnings) {
+      logger.warn(`  - ${w}`);
+    }
+  }
+
+  logger.success("✓ All enabled modules validated successfully.\n");
 }

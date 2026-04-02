@@ -5,7 +5,7 @@ import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgsT
 
 export const coreDbStateModule: Module = {
   id: "core-db-state",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     await ensureOrgsTables(ctx.projectRoot);
     await ensureApiKeysTable(ctx.projectRoot);
@@ -18,12 +18,66 @@ export const coreDbStateModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "orgs"));
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "orgs", "active-org.ts"),
-      `/** HttpOnly cookie set when the user selects an org (see orgs.actions). */
+      `/**
+ * Active org backbone — cookie-based org selection for multi-tenant apps.
+ * 
+ * Usage:
+ *   - Server Components: use getActiveOrgIdFromCookies(cookies()) + requireActiveOrg()
+ *   - Server Actions: use setActiveOrgCookie(response, orgId) after selection
+ *   - API Routes: use getActiveOrgIdFromCookies(new RequestCookies(request.headers))
+ */
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { orgsService_resolveActiveOrg } from "@/lib/services/orgs.service";
+import { requireAuth } from "@/lib/auth/server";
+
+/** HttpOnly cookie name set when the user selects an org. */
 export const ACTIVE_ORG_COOKIE = "ox_org";
 
+/**
+ * Extract active org ID from cookie store (Next.js cookies() or RequestCookies).
+ * Returns null if not present or empty.
+ */
 export function getActiveOrgIdFromCookies(cookieStore: { get: (name: string) => { value: string } | undefined }): string | null {
   const v = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim();
   return v && v.length > 0 ? v : null;
+}
+
+/**
+ * Set active org cookie on response. Use in server actions after org selection.
+ */
+export function setActiveOrgCookie(response: Response, orgId: string) {
+  response.headers.set("Set-Cookie", \`\${ACTIVE_ORG_COOKIE}=\${orgId}; HttpOnly; SameSite=Lax; Path=/\`);
+}
+
+/**
+ * Require an active org for the current user. Throws redirect to /app/orgs if no org is active.
+ * Use this in server components that require org context.
+ */
+export async function requireActiveOrg() {
+  const viewer = await requireAuth();
+  const cookieStore = await cookies();
+  const cookieOrgId = getActiveOrgIdFromCookies(cookieStore);
+  const gate = await orgsService_resolveActiveOrg({ userId: viewer.userId, cookieOrgId: cookieOrgId });
+  if (!gate.ok || !gate.org) {
+    redirect("/app/orgs");
+  }
+  return { viewer, org: gate.org };
+}
+
+/**
+ * Get active org ID for the current user (no redirect). Returns null if no org is active.
+ */
+export async function getActiveOrgId(): Promise<string | null> {
+  try {
+    const viewer = await requireAuth();
+    const cookieStore = await cookies();
+    const cookieOrgId = getActiveOrgIdFromCookies(cookieStore);
+    const gate = await orgsService_resolveActiveOrg({ userId: viewer.userId, cookieOrgId: cookieOrgId });
+    return gate.org?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 `
     );
@@ -474,7 +528,7 @@ export async function GET() {
 `
     );
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 

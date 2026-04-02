@@ -95,6 +95,21 @@ export async function runDoctor(input: DoctorInput) {
   // Query/mutation keys conventions
   await checkFiles("keys.indices", ["lib/query-keys/index.ts", "lib/mutation-keys/index.ts"]);
 
+  // Query key completeness (each domain should have keys)
+  const queryKeysDir = path.join(input.projectRoot, "lib", "query-keys");
+  if (await exists(queryKeysDir)) {
+    const queryKeyFiles = await fs.readdir(queryKeysDir);
+    const expectedDomains = ["auth", "orgs"];
+    if (modules.billing) expectedDomains.push("billing");
+    if (modules.storage) expectedDomains.push("assets");
+    if (modules.blogMdx) expectedDomains.push("blog");
+    for (const domain of expectedDomains) {
+      if (!queryKeyFiles.some((f) => f.startsWith(domain))) {
+        note(`Query keys: missing ${domain}.keys.ts (domain has no cache keys)`);
+      }
+    }
+  }
+
   // Always-on foundations (per-layer sanity)
   await checkFiles("foundation.ui", [
     "app/layout.tsx",
@@ -475,6 +490,21 @@ export async function runDoctor(input: DoctorInput) {
   }
   if (!(await exists(path.join(input.projectRoot, "lib", "services", "module-factories.ts")))) {
     noteStrict("Missing lib/services/module-factories.ts — run `0xstack baseline` for getBillingService/getStorageService/getSeoConfig.");
+  }
+
+  // Module factories completeness (when modules are enabled)
+  const moduleFactoriesPath = path.join(input.projectRoot, "lib", "services", "module-factories.ts");
+  if (await exists(moduleFactoriesPath)) {
+    const src = await fs.readFile(moduleFactoriesPath, "utf8");
+    if (modules.billing && !src.includes("getBillingService")) {
+      note("Module factories: billing enabled but getBillingService() missing");
+    }
+    if (modules.storage && !src.includes("getStorageService")) {
+      note("Module factories: storage enabled but getStorageService() missing");
+    }
+    if (modules.seo && !src.includes("getSeoConfig")) {
+      note("Module factories: SEO enabled but getSeoConfig() missing");
+    }
   }
 
   const coreRepoBases = new Set([

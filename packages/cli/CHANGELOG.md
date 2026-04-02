@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.5
+
+### Minor Changes
+
+- **Enterprise hardening**: Production architecture system with self-healing capabilities
+  - **Locked dependency versions** — CLI deps pinned for reproducible installs (no floating `^` versions)
+  - **Sync file removal** — `sync --apply` now removes disabled module files (billing, storage, SEO, blog, email, PWA, jobs)
+  - **Consolidated validation** — Module validation with categorized error reporting by module
+  - **Active-org backbone** — `lib/orgs/active-org.ts` with `requireActiveOrg()`, cookie helpers, org-scoping utilities
+  - **Billing status read model** — `/api/v1/billing/status` endpoint + `useBillingStatus()` hook for client-side subscription status
+  - **Enhanced doctor checks** — Query key completeness, module factories validation, stricter boundary enforcement
+  - **Operational runbooks** — Auto-generated `RUNBOOKS.md` with env vars, testing steps, failure modes for auth, billing, storage, webhooks
+
+- **README restructure** — Value proposition in 5 seconds with architecture diagrams, layer definitions, quick-start commands
+
+- **Storage upload UX** — Complete client-side upload flow with signed URLs (GCS/S3/Supabase)
+
+### Patch Changes
+
+- Fixed TypeScript errors in module validation
+- Improved error messages with remediation hints
+- Added module factory completeness checks
+
 ## 0.1.4
 
 ### Patch Changes

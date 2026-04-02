@@ -7,12 +7,54 @@
 </h1>
 
 <p align="center">
-  <strong>0xstack</strong> (npm: <code>0xstack</code>) — a production-minded <strong>Next.js starter</strong> and <strong>CLI factory</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>. Not the same as <strong>T3 Stack</strong> — see <a href="#comparison-t3-stack-tanstack-starters-and-0xstack">comparison</a> below.
+  <strong>Production architecture system for Next.js</strong>
 </p>
 
 <p align="center">
-  Generate a project once, then keep it correct over time with <code>baseline</code>, <code>doctor</code>, <code>sync</code>, and optional <code>upgrade</code>. <em>Next.js Drizzle starter</em>, <em>TanStack Query Next.js boilerplate</em>, <em>Supabase Drizzle starter kit</em>, <em>server actions architecture starter</em>, <em>modular billing and storage scaffolding</em>.
+  <strong>0xstack</strong> (npm: <code>0xstack</code>) is a <strong>self-healing architecture engine</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>.
 </p>
+
+<p align="center">
+  <a href="#what-is-0xstack"><strong>What it is</strong></a> ·
+  <a href="#architecture"><strong>Architecture</strong></a> ·
+  <a href="#getting-started"><strong>Get Started</strong></a> ·
+  <a href="#comparison-t3-stack-tanstack-starters-and-0xstack"><strong>vs T3</strong></a>
+</p>
+
+---
+
+## 🚀 What is 0xstack?
+
+**0xstack = Production architecture system for Next.js**
+
+- **📐 Read/Write separation** — Two highways: fast reads (loaders) + safe writes (actions → rules → repos)
+- **🛡️ Enforced boundaries** — ESLint + `doctor` prevent architecture drift
+- **🔧 CLI that keeps your repo correct** — `baseline`, `sync`, `upgrade` auto-heal your codebase over time
+
+```bash
+# Start a new project in 2 minutes
+npx 0xstack@latest init
+
+# Install full production baseline (idempotent)
+npx 0xstack baseline --profile full
+
+# Validate architecture, deps, and env
+npx 0xstack doctor
+
+# Reconcile repo with config (plan or apply)
+npx 0xstack sync --apply
+```
+
+> [!IMPORTANT]
+> **Do NOT install this package with `npm i 0xstack`.**
+> 0xstack is a project initializer and CLI factory. Installing it as a dependency will only give you a `node_modules` folder.
+>
+> To start a new project, use:
+> ```bash
+> npx 0xstack@latest init
+> ```
+
+---
 
 <div align="center">
 
@@ -22,12 +64,12 @@
 
 ## Table of contents
 
+- [What is 0xstack?](#-what-is-0xstack)
+- [Architecture](#architecture)
 - [Naming: 0xstack vs oxstack](#naming-0xstack-vs-oxstack)
 - [Who is this for?](#who-is-this-for)
 - [Comparison: T3 Stack, TanStack starters, and 0xstack](#comparison-t3-stack-tanstack-starters-and-0xstack)
 - [Frequently asked questions](#frequently-asked-questions)
-- [What is 0xstack?](#what-is-0xstack)
-- [Generated app architecture](#generated-app-architecture)
 - [What you need vs optional](#what-you-need-vs-optional)
 - [Modules (capabilities)](#modules-capabilities)
 - [CLI commands](#cli-commands)
@@ -35,6 +77,67 @@
 - [Getting started](#getting-started)
 - [Release process](#release-process)
 - [Contributing](#contributing)
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph Read["Read highway (fast reads)"]
+    RSC["RSC pages"]
+    L["Loaders (React.cache + tags)"]
+    RepoR["Repos"]
+    DB[(Postgres / Drizzle)]
+    RSC --> L --> RepoR --> DB
+  end
+
+  subgraph Write["Write highway (mutations)"]
+    CC["Client components"]
+    SA["Server actions"]
+    RU["Rules (Zod + authz)"]
+    SV["Services (orchestration)"]
+    RepoW["Repos"]
+    CC --> SA --> RU --> SV --> RepoW --> DB
+  end
+
+  subgraph External["External HTTP"]
+    API["app/api/v1/*"]
+    WH["Webhooks"]
+    API --> SV
+    WH --> SV
+  end
+
+  CFG[["0xstack.config.ts"]]
+  CFG -.->|gates routes + imports| RSC
+  CFG -.->|gates routes + imports| API
+```
+
+**CLI and repo hygiene loop:**
+
+```mermaid
+flowchart LR
+  INIT[init] --> CFG[0xstack.config.ts]
+  CFG --> BASE[baseline]
+  BASE --> DOC[docs-sync]
+  DOC --> DEV[develop]
+  DEV --> DOC2[doctor]
+  DEV --> SYN[sync]
+  SYN -->|optional| UP[upgrade --apply]
+  DOC2 --> DEV
+```
+
+### Layer definitions
+
+| Layer | Purpose | Rules |
+|-------|---------|-------|
+| **Repos** | Data access only | No business logic, no imports from UI |
+| **Loaders** | Read-only facades | Use `React.cache()`, shape output for viewer/public |
+| **Rules** | Business rules for writes | Authz + invariants + validation glue |
+| **Services** | Orchestration only | Multi-step flows, transactions, integrations |
+| **Server actions** | Internal API for the app | Call `requireAuth()`, validate with Zod, trigger revalidation |
+| **API routes** | External only | Call same rules/services as actions |
+| **Client hooks** | Transport + cache | TanStack Query only, no business logic |
+
+---
 
 ## Naming: 0xstack vs oxstack
 
