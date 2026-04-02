@@ -7,6 +7,8 @@ import { logger } from "../logger";
 import { runPipeline } from "../pipeline";
 import { writeDefaultConfig } from "../config";
 import { writeBrandingEnv } from "../modules/env-edit";
+import { ensureDir } from "../modules/fs-utils";
+import { generateAppIcon, generateFaviconDataUrl } from "../utils/icon-generator";
 
 type PackageManager = "pnpm" | "npm";
 
@@ -218,6 +220,30 @@ export async function runInit(input: InitInput) {
         );
         // Re-apply globals.css theme after shadcn modifies it.
         await writeFileEnsured(path.join(projectRoot, "app", "globals.css"), getGlobalsCss(input.theme ?? "default"));
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "generate app icons (favicon, PWA)",
+      run: async () => {
+        const projectRoot = initIntoCurrentDir ? targetDir : effectiveDir;
+        const theme = input.theme ?? "default";
+
+        // Generate SVG icon for PWA
+        const svgIcon = generateAppIcon(input.name, theme);
+        await ensureDir(path.join(projectRoot, "public", "icons"));
+        await writeFileEnsured(path.join(projectRoot, "public", "icons", "icon-512x512.png"), svgIcon.replace('<?xml', '<?xml'));
+        await writeFileEnsured(path.join(projectRoot, "public", "icons", "icon-192x192.png"), svgIcon.replace('<?xml', '<?xml'));
+        await writeFileEnsured(path.join(projectRoot, "public", "icons", "maskable-icon-512x512.png"), svgIcon.replace('<?xml', '<?xml'));
+
+        // Generate app icon.svg
+        await writeFileEnsured(path.join(projectRoot, "app", "icon.svg"), svgIcon);
+
+        // Generate favicon
+        const faviconData = generateFaviconDataUrl(input.name, theme);
+        const { Buffer } = await import("node:buffer");
+        await writeFileEnsured(path.join(projectRoot, "app", "favicon.ico"), Buffer.from(faviconData.split(',')[1] as string, 'base64').toString("binary"));
+
         return { kind: "ok" };
       },
     },

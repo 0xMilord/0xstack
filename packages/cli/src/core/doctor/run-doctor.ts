@@ -4,6 +4,7 @@ import { computeProjectState } from "../project/project-state";
 import { logger } from "../logger";
 import { applyProfile, loadConfig } from "../config";
 import { expectedDepsForConfig } from "../deps";
+import chalk from "chalk";
 
 async function exists(p: string) {
   try {
@@ -34,27 +35,42 @@ async function listFilesRecursive(dir: string, exts: string[]) {
 
 export type DoctorInput = { projectRoot: string; profile: string; strict?: boolean };
 
+type IssueSeverity = "critical" | "warning" | "info";
+
+type Issue = {
+  message: string;
+  severity: IssueSeverity;
+  category: string;
+  fix?: string | undefined;
+};
+
 export async function runDoctor(input: DoctorInput) {
   const state = await computeProjectState(input.projectRoot, input.profile);
   const modules = state.modules as any;
 
-  const issues: string[] = [];
-  const strictOnly: string[] = [];
-  const note = (msg: string) => issues.push(msg);
-  const noteStrict = (msg: string) => strictOnly.push(msg);
+  const issues: Issue[] = [];
+  const strictOnly: Issue[] = [];
+
+  const addIssue = (message: string, severity: "critical" | "warning" | "info" = "critical", category: string = "General", fix?: string) => {
+    issues.push({ message, severity, category, fix: fix ?? undefined });
+  };
+
+  const addStrict = (message: string, severity: "critical" | "warning" | "info" = "warning", category: string = "Hygiene", fix?: string) => {
+    strictOnly.push({ message, severity, category, fix: fix ?? undefined });
+  };
 
   const checkAbsent = async (label: string, files: string[]) => {
     const present: string[] = [];
     for (const f of files) {
       if (await exists(path.join(input.projectRoot, f))) present.push(f);
     }
-    if (present.length) note(`${label}: should be removed when disabled: ${present.join(", ")}`);
+    if (present.length) addIssue(`${label}: should be removed when disabled: ${present.join(", ")}`, "warning", "Module Cleanup", "Run `0xstack sync --apply` to remove disabled module files");
   };
 
   const requiredFiles = ["proxy.ts", "lib/env/schema.ts", "lib/env/server.ts", "lib/db/index.ts", "lib/db/schema.ts"];
   for (const f of requiredFiles) {
     const p = path.join(input.projectRoot, f);
-    if (!(await exists(p))) note(`Missing required file: ${f}`);
+    if (!(await exists(p))) addIssue(`Missing required file: ${f}`, "critical", "Core Files");
   }
 
   // Dependency parity (missing deps are errors; extra deps are allowed)
@@ -67,33 +83,34 @@ export async function runDoctor(input: DoctorInput) {
     const devDeps = new Set<string>(Object.keys(pkg?.devDependencies ?? {}));
     const missingDeps = expected.deps.filter((d) => !deps.has(d));
     const missingDevDeps = expected.devDeps.filter((d) => !devDeps.has(d));
-    if (missingDeps.length) note(`Missing dependencies for enabled modules: ${missingDeps.join(", ")}`);
-    if (missingDevDeps.length) note(`Missing devDependencies for enabled modules: ${missingDevDeps.join(", ")}`);
+    if (missingDeps.length) addIssue(`Missing dependencies: ${missingDeps.join(", ")}`, "critical", "Dependencies", "Run `pnpm install` or `0xstack baseline`");
+    if (missingDevDeps.length) addIssue(`Missing devDependencies: ${missingDevDeps.join(", ")}`, "warning", "Dependencies", "Run `pnpm install` or `0xstack baseline`");
   } catch {
-    note("Unable to validate dependency parity (package.json/config unreadable)");
+    addIssue("Unable to validate dependency parity (package.json/config unreadable)", "warning", "Dependencies");
   }
 
-  const checkFiles = async (label: string, files: string[]) => {
+  const checkFiles = async (label: string, files: string[], category: string = "Files") => {
     const missing: string[] = [];
     for (const f of files) {
       if (!(await exists(path.join(input.projectRoot, f)))) missing.push(f);
     }
-    if (missing.length) note(`${label}: missing ${missing.join(", ")}`);
+    if (missing.length) addIssue(`${label}: missing ${missing.join(", ")}`, "critical", category, "Run `0xstack baseline` to generate missing files");
   };
 
   // Env invariants (file-level, plus module-specific required keys in schema)
   const envSchemaPath = path.join(input.projectRoot, "lib/env/schema.ts");
   const envSchema = (await exists(envSchemaPath)) ? await fs.readFile(envSchemaPath, "utf8") : "";
   const requireEnvKey = (key: string) => {
-    if (!envSchema.includes(key)) note(`Env schema missing required key: ${key}`);
+    if (!envSchema.includes(key)) addIssue(`Env schema missing required key: ${key}`, "critical", "Environment");
   };
   requireEnvKey("DATABASE_URL");
   requireEnvKey("BETTER_AUTH_SECRET");
   requireEnvKey("BETTER_AUTH_URL");
   requireEnvKey("NEXT_PUBLIC_APP_URL");
+  requireEnvKey("NEXT_PUBLIC_APP_NAME");
 
   // Query/mutation keys conventions
-  await checkFiles("keys.indices", ["lib/query-keys/index.ts", "lib/mutation-keys/index.ts"]);
+  await checkFiles("keys.indices", ["lib/query-keys/index.ts", "lib/mutation-keys/index.ts"], "Query Keys");
 
   // Query key completeness (each domain should have keys)
   const queryKeysDir = path.join(input.projectRoot, "lib", "query-keys");
@@ -105,7 +122,7 @@ export async function runDoctor(input: DoctorInput) {
     if (modules.blogMdx) expectedDomains.push("blog");
     for (const domain of expectedDomains) {
       if (!queryKeyFiles.some((f) => f.startsWith(domain))) {
-        note(`Query keys: missing ${domain}.keys.ts (domain has no cache keys)`);
+        addIssue(`Query keys: missing ${domain}.keys.ts`, "warning", "Query Keys");
       }
     }
   }
@@ -127,6 +144,10 @@ export async function runDoctor(input: DoctorInput) {
     "lib/loaders/viewer.loader.ts",
     "lib/actions/auth.actions.ts",
     "lib/hooks/client/use-viewer.ts",
+    "app/login/page.tsx",
+    "app/get-started/page.tsx",
+    "app/forgot-password/page.tsx",
+    "app/reset-password/page.tsx",
   ]);
   await checkFiles("foundation.orgs", [
     "lib/repos/orgs.repo.ts",
@@ -172,20 +193,20 @@ export async function runDoctor(input: DoctorInput) {
 
   if (modules.billing === "dodo") {
     const billingEnvPath = path.join(input.projectRoot, "lib/env/billing.ts");
-    if (!(await exists(billingEnvPath))) note("Billing (Dodo) enabled but missing lib/env/billing.ts");
+    if (!(await exists(billingEnvPath))) addIssue("Billing (Dodo) enabled but missing lib/env/billing.ts");
     const billingEnv = (await exists(billingEnvPath)) ? await fs.readFile(billingEnvPath, "utf8") : "";
     for (const key of ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY", "DODO_PAYMENTS_ENVIRONMENT", "DODO_PAYMENTS_RETURN_URL"]) {
-      if (!billingEnv.includes(key)) note(`Billing env schema missing key: ${key}`);
+      if (!billingEnv.includes(key)) addIssue(`Billing env schema missing key: ${key}`);
     }
     await checkFiles("billing.dodo.vendor", ["lib/billing/dodo.webhooks.ts"]);
   }
 
   if (modules.billing === "stripe") {
     const stripeEnvPath = path.join(input.projectRoot, "lib/env/billing-stripe.ts");
-    if (!(await exists(stripeEnvPath))) note("Billing (Stripe) enabled but missing lib/env/billing-stripe.ts");
+    if (!(await exists(stripeEnvPath))) addIssue("Billing (Stripe) enabled but missing lib/env/billing-stripe.ts");
     const stripeEnv = (await exists(stripeEnvPath)) ? await fs.readFile(stripeEnvPath, "utf8") : "";
     for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_RETURN_URL", "STRIPE_STARTER_PRICE_ID"]) {
-      if (!stripeEnv.includes(key)) note(`Stripe billing env schema missing key: ${key}`);
+      if (!stripeEnv.includes(key)) addIssue(`Stripe billing env schema missing key: ${key}`);
     }
     await checkFiles("billing.stripe.vendor", ["lib/billing/stripe.ts"]);
   }
@@ -225,30 +246,30 @@ export async function runDoctor(input: DoctorInput) {
 
   if (modules.storage === "gcs") {
     const storageEnvPath = path.join(input.projectRoot, "lib/env/storage.ts");
-    if (!(await exists(storageEnvPath))) note("Storage (GCS) enabled but missing lib/env/storage.ts");
+    if (!(await exists(storageEnvPath))) addIssue("Storage (GCS) enabled but missing lib/env/storage.ts");
     const storageEnv = (await exists(storageEnvPath)) ? await fs.readFile(storageEnvPath, "utf8") : "";
     for (const key of ["GCS_BUCKET", "GCS_PROJECT_ID"]) {
-      if (!storageEnv.includes(key)) note(`GCS storage env schema missing key: ${key}`);
+      if (!storageEnv.includes(key)) addIssue(`GCS storage env schema missing key: ${key}`);
     }
     await checkFiles("storage.gcs.provider", ["lib/storage/providers/gcs.ts"]);
   }
 
   if (modules.storage === "s3") {
     const s3EnvPath = path.join(input.projectRoot, "lib/env/storage-s3.ts");
-    if (!(await exists(s3EnvPath))) note("Storage (S3) enabled but missing lib/env/storage-s3.ts");
+    if (!(await exists(s3EnvPath))) addIssue("Storage (S3) enabled but missing lib/env/storage-s3.ts");
     const s3Env = (await exists(s3EnvPath)) ? await fs.readFile(s3EnvPath, "utf8") : "";
     for (const key of ["S3_REGION", "S3_BUCKET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) {
-      if (!s3Env.includes(key)) note(`S3 storage env schema missing key: ${key}`);
+      if (!s3Env.includes(key)) addIssue(`S3 storage env schema missing key: ${key}`);
     }
     await checkFiles("storage.s3.provider", ["lib/storage/s3.ts", "lib/storage/providers/s3.ts"]);
   }
 
   if (modules.storage === "supabase") {
     const supEnvPath = path.join(input.projectRoot, "lib/env/storage-supabase.ts");
-    if (!(await exists(supEnvPath))) note("Storage (Supabase) enabled but missing lib/env/storage-supabase.ts");
+    if (!(await exists(supEnvPath))) addIssue("Storage (Supabase) enabled but missing lib/env/storage-supabase.ts");
     const supEnv = (await exists(supEnvPath)) ? await fs.readFile(supEnvPath, "utf8") : "";
     for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STORAGE_BUCKET"]) {
-      if (!supEnv.includes(key)) note(`Supabase storage env schema missing key: ${key}`);
+      if (!supEnv.includes(key)) addIssue(`Supabase storage env schema missing key: ${key}`);
     }
     await checkFiles("storage.supabase.provider", ["lib/storage/supabase.ts", "lib/storage/providers/supabase.ts"]);
   }
@@ -282,7 +303,7 @@ export async function runDoctor(input: DoctorInput) {
   const mustHaveSeo = !!modules.seo;
   if (mustHaveSeo) {
     for (const f of ["app/robots.ts", "app/sitemap.ts", "lib/seo/jsonld.ts", "lib/seo/runtime.ts"]) {
-      if (!(await exists(path.join(input.projectRoot, f)))) note(`SEO enabled but missing: ${f}`);
+      if (!(await exists(path.join(input.projectRoot, f)))) addIssue(`SEO enabled but missing: ${f}`);
     }
     await checkFiles("seo.social-images", ["app/opengraph-image.tsx", "app/twitter-image.tsx"]);
   }
@@ -300,7 +321,7 @@ export async function runDoctor(input: DoctorInput) {
   const mustHaveBlog = !!modules.blogMdx;
   if (mustHaveBlog) {
     for (const f of ["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts", "lib/loaders/blog.loader.ts"]) {
-      if (!(await exists(path.join(input.projectRoot, f)))) note(`Blog enabled but missing: ${f}`);
+      if (!(await exists(path.join(input.projectRoot, f)))) addIssue(`Blog enabled but missing: ${f}`);
     }
     await checkFiles("blog.content", ["content/blog/hello-world.mdx"]);
   }
@@ -315,7 +336,13 @@ export async function runDoctor(input: DoctorInput) {
       "lib/email/auth-emails.ts",
       "lib/email/templates/verify-email.tsx",
       "lib/email/templates/reset-password.tsx",
+      "lib/email/templates/welcome-email.tsx",
     ]);
+    const emailEnvPath = path.join(input.projectRoot, "lib/env/email.ts");
+    const emailEnv = (await exists(emailEnvPath)) ? await fs.readFile(emailEnvPath, "utf8") : "";
+    for (const key of ["RESEND_API_KEY", "RESEND_FROM"]) {
+      if (!emailEnv.includes(key)) addIssue(`Email env schema missing required key: ${key}`);
+    }
   }
   if (modules.email !== "resend") {
     await checkAbsent("email.disabled", [
@@ -377,11 +404,11 @@ export async function runDoctor(input: DoctorInput) {
   // Migration expectations (baseline)
   const drizzleConfig = path.join(input.projectRoot, "drizzle.config.ts");
   const drizzleDir = path.join(input.projectRoot, "drizzle", "migrations");
-  if (!(await exists(drizzleConfig))) note("Missing drizzle.config.ts (required for migrations)");
-  if (!(await exists(drizzleDir))) note("Missing drizzle/migrations directory");
+  if (!(await exists(drizzleConfig))) addIssue("Missing drizzle.config.ts (required for migrations)");
+  if (!(await exists(drizzleDir))) addIssue("Missing drizzle/migrations directory");
   const journal = path.join(input.projectRoot, "drizzle", "migrations", "meta", "_journal.json");
   if (!(await exists(journal)))
-    note("Missing drizzle/migrations/meta/_journal.json (migration journal). Run baseline to initialize migrations.");
+    addIssue("Missing drizzle/migrations/meta/_journal.json (migration journal). Run baseline to initialize migrations.");
   try {
     const schemaPath = path.join(input.projectRoot, "lib", "db", "schema.ts");
     const schemaSrc = (await exists(schemaPath)) ? await fs.readFile(schemaPath, "utf8") : "";
@@ -389,7 +416,7 @@ export async function runDoctor(input: DoctorInput) {
     const migrationFiles = (await exists(drizzleDir)) ? await fs.readdir(drizzleDir).catch(() => []) : [];
     const sqlMigrations = migrationFiles.filter((f) => f.endsWith(".sql"));
     if (hasTables && sqlMigrations.length === 0) {
-      note("Migration drift: schema has tables but drizzle/migrations has no .sql migrations. Run baseline to generate migrations.");
+      addIssue("Migration drift: schema has tables but drizzle/migrations has no .sql migrations. Run baseline to generate migrations.");
     }
   } catch {
     // ignore
@@ -404,7 +431,7 @@ export async function runDoctor(input: DoctorInput) {
         const tag = String(e.tag ?? "");
         if (!tag) continue;
         const sqlPath = path.join(input.projectRoot, "drizzle", "migrations", `${tag}.sql`);
-        if (!(await exists(sqlPath))) note(`Migration drift: journal entry ${tag} missing file drizzle/migrations/${tag}.sql`);
+        if (!(await exists(sqlPath))) addIssue(`Migration drift: journal entry ${tag} missing file drizzle/migrations/${tag}.sql`);
       }
       const metaDir = path.join(input.projectRoot, "drizzle", "migrations", "meta");
       const metaFiles = (await exists(metaDir)) ? await fs.readdir(metaDir).catch(() => []) : [];
@@ -412,11 +439,11 @@ export async function runDoctor(input: DoctorInput) {
       const expectedSnapshots = entries.map((e) => String(e.tag ?? "")).filter(Boolean);
       // Best-effort: ensure at least one snapshot exists when journal has entries
       if (entries.length > 0 && snapshotFiles.length === 0) {
-        note("Migration drift: journal has entries but no meta/*_snapshot.json files exist.");
+        addIssue("Migration drift: journal has entries but no meta/*_snapshot.json files exist.");
       }
     }
   } catch {
-    note("Unable to validate drizzle journal/migration drift (journal unreadable).");
+    addIssue("Unable to validate drizzle journal/migration drift (journal unreadable).");
   }
 
   // Architecture boundary enforcement (static scan, v1)
@@ -436,7 +463,7 @@ export async function runDoctor(input: DoctorInput) {
           (rel.endsWith("app/api/v1/billing/webhook/route.ts") || rel.endsWith("app/api/v1/billing/webhook/route.tsx")) &&
           src.includes("webhook-events.repo");
         if (isWebhookLedgerAllowed) continue;
-        note(`Boundary violation in ${path.relative(input.projectRoot, f)}: ${b.msg}`);
+        addIssue(`Boundary violation in ${rel}: ${b.msg}`, "critical", "Architecture");
       }
     }
   }
@@ -450,7 +477,7 @@ export async function runDoctor(input: DoctorInput) {
       const src = await fs.readFile(f, "utf8");
       for (const b of bannedImports) {
         if (b.re.test(src)) {
-          note(`${label}: ${path.relative(input.projectRoot, f)} ${b.msg}`);
+          addIssue(`${label}: ${path.relative(input.projectRoot, f)} ${b.msg}`, "critical", "Architecture");
         }
       }
     }
@@ -480,16 +507,16 @@ export async function runDoctor(input: DoctorInput) {
     for (const f of loaderFiles) {
       const src = await fs.readFile(f, "utf8");
       if (/from\s+["']@\/lib\/actions/.test(src) || /from\s+["']@\/lib\/rules/.test(src)) {
-        note(`Loader purity: ${path.relative(input.projectRoot, f)} must not import actions or rules`);
+        addIssue(`Loader purity: ${path.relative(input.projectRoot, f)} must not import actions or rules`, "warning", "Architecture");
       }
     }
   }
 
   if (!(await exists(path.join(input.projectRoot, "eslint.0xstack-boundaries.mjs")))) {
-    noteStrict("Missing eslint.0xstack-boundaries.mjs — run `0xstack baseline` for PRD no-restricted-imports wiring.");
+    addStrict("Missing eslint.0xstack-boundaries.mjs", "warning", "Hygiene", "Run `0xstack baseline`");
   }
   if (!(await exists(path.join(input.projectRoot, "lib", "services", "module-factories.ts")))) {
-    noteStrict("Missing lib/services/module-factories.ts — run `0xstack baseline` for getBillingService/getStorageService/getSeoConfig.");
+    addStrict("Missing lib/services/module-factories.ts", "warning", "Hygiene", "Run `0xstack baseline`");
   }
 
   // Module factories completeness (when modules are enabled)
@@ -497,13 +524,13 @@ export async function runDoctor(input: DoctorInput) {
   if (await exists(moduleFactoriesPath)) {
     const src = await fs.readFile(moduleFactoriesPath, "utf8");
     if (modules.billing && !src.includes("getBillingService")) {
-      note("Module factories: billing enabled but getBillingService() missing");
+      addIssue("Module factories: billing enabled but getBillingService() missing", "critical", "Module Factories");
     }
     if (modules.storage && !src.includes("getStorageService")) {
-      note("Module factories: storage enabled but getStorageService() missing");
+      addIssue("Module factories: storage enabled but getStorageService() missing", "critical", "Module Factories");
     }
     if (modules.seo && !src.includes("getSeoConfig")) {
-      note("Module factories: SEO enabled but getSeoConfig() missing");
+      addIssue("Module factories: SEO enabled but getSeoConfig() missing", "critical", "Module Factories");
     }
   }
 
@@ -528,21 +555,96 @@ export async function runDoctor(input: DoctorInput) {
       for (const suffix of [`${base}.repo.test.ts`, `${base}.rules.test.ts`, `${base}.actions.test.ts`]) {
         const tp = path.join(testDir, suffix);
         if (!(await exists(tp))) {
-          noteStrict(`Domain "${base}" missing tests/${base}/${suffix} (PRD minimal tests)`);
+          addStrict(`Domain "${base}" missing tests/${base}/${suffix}`, "info", "Tests");
         }
       }
     }
   }
 
-  if (!input.strict && strictOnly.length) {
-    for (const s of strictOnly) logger.warn(`doctor: ${s}`);
+  // Calculate health score
+  const criticalCount = issues.filter(i => i.severity === "critical").length;
+  const warningCount = [...issues, ...strictOnly].filter(i => i.severity === "warning").length;
+  const infoCount = [...issues, ...strictOnly].filter(i => i.severity === "info").length;
+
+  // Health score: 100 - (critical * 15) - (warning * 5) - (info * 1), min 0
+  const healthScore = Math.max(0, 100 - (criticalCount * 15) - (warningCount * 5) - (infoCount * 1));
+
+  // Print formatted output
+  logger.info("");
+  logger.info(chalk.bold.cyan("┌" + "─".repeat(50) + "┐"));
+  logger.info(chalk.bold.cyan("│") + chalk.bold.white("  🔍 0xstack Doctor — Project Health       ") + chalk.bold.cyan("│"));
+  logger.info(chalk.bold.cyan("└" + "─".repeat(50) + "┘"));
+  logger.info("");
+
+  // Category summary
+  const categories = new Map<string, { critical: number; warning: number; info: number }>();
+  for (const issue of issues) {
+    const cat = categories.get(issue.category) || { critical: 0, warning: 0, info: 0 };
+    cat[issue.severity]++;
+    categories.set(issue.category, cat);
   }
 
-  if (issues.length || (input.strict && strictOnly.length)) {
-    const combined = [...issues, ...(input.strict ? strictOnly : [])];
-    throw new Error(`doctor failed (${input.profile}):\n- ${combined.join("\n- ")}`);
+  logger.info(chalk.bold("Categories:"));
+  for (const [cat, counts] of categories.entries()) {
+    const parts = [];
+    if (counts.critical) parts.push(chalk.red(`${counts.critical} critical`));
+    if (counts.warning) parts.push(chalk.yellow(`${counts.warning} warnings`));
+    if (counts.info) parts.push(chalk.blue(`${counts.info} info`));
+    logger.info(`  ${chalk.white(cat)}: ${parts.join(", ")}`);
+  }
+  logger.info("");
+
+  // Health score display
+  const scoreColor = healthScore >= 80 ? chalk.green : healthScore >= 60 ? chalk.yellow : chalk.red;
+  const scoreBar = "█".repeat(Math.floor(healthScore / 5)) + "░".repeat(20 - Math.floor(healthScore / 5));
+  logger.info(chalk.bold("Health Score:"));
+  logger.info(`  ${scoreColor(scoreBar)} ${scoreColor(healthScore)}/100`);
+  logger.info("");
+
+  // Issues by severity
+  if (criticalCount > 0) {
+    logger.info(chalk.bold.red("❌ Critical Issues (must fix):"));
+    for (const issue of issues.filter(i => i.severity === "critical")) {
+      logger.info(chalk.red(`  • ${issue.message}`));
+      if (issue.fix) logger.info(chalk.dim(`    💡 ${issue.fix}`));
+    }
+    logger.info("");
   }
 
-  logger.success(`doctor ok (${input.profile})`);
+  if (warningCount > 0) {
+    logger.info(chalk.bold.yellow("⚠️  Warnings (should fix):"));
+    for (const issue of [...issues, ...strictOnly].filter(i => i.severity === "warning")) {
+      logger.info(chalk.yellow(`  • ${issue.message}`));
+      if (issue.fix) logger.info(chalk.dim(`    💡 ${issue.fix}`));
+    }
+    logger.info("");
+  }
+
+  if (infoCount > 0 && input.strict) {
+    logger.info(chalk.bold.blue("ℹ️  Info (nice to have):"));
+    for (const issue of [...issues, ...strictOnly].filter(i => i.severity === "info")) {
+      logger.info(chalk.blue(`  • ${issue.message}`));
+    }
+    logger.info("");
+  }
+
+  // Quick fix summary
+  if (issues.length > 0) {
+    logger.info(chalk.bold.green("💡 Quick Fixes:"));
+    const hasMissingFiles = issues.some(i => i.message.includes("missing") || i.message.includes("Missing"));
+    const hasMissingDeps = issues.some(i => i.message.includes("dependencies"));
+    if (hasMissingFiles) logger.info(chalk.green(`  1. Run: ${chalk.bold("npx 0xstack baseline --profile " + input.profile)}`));
+    if (hasMissingDeps) logger.info(chalk.green(`  2. Run: ${chalk.bold("pnpm install")}`));
+    logger.info("");
+  }
+
+  // Exit with appropriate status
+  if (criticalCount > 0 || (!!input.strict && (issues.length + strictOnly.length) > 0)) {
+    const allIssues = [...issues, ...(input.strict ? strictOnly : [])];
+    throw new Error(`doctor failed (${input.profile}): ${criticalCount} critical, ${warningCount} warnings, ${infoCount} info`);
+  }
+
+  logger.success(chalk.green(`✓ All checks passed (${input.profile}) — Health: ${healthScore}/100`));
+  logger.info("");
 }
 

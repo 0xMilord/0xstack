@@ -6,7 +6,8 @@
       "Bash(powershell *)",
       "Bash(`n  },`n *)",
       "Bash(\")\nset-content -path `$file -value `$content -nonewline\n\"@)",
-      "Bash(rm *)"
+      "Bash(rm *)",
+      "Bash(select-object *)"
     ]
   },
   "$version": 3

@@ -4,7 +4,7 @@ import type { Module } from "./types";
 
 export const blogMdxModule: Module = {
   id: "blogMdx",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     if (!ctx.modules.blogMdx) {
       await backupAndRemove(ctx.projectRoot, "app/blog/page.tsx");
@@ -21,8 +21,82 @@ export const blogMdxModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "lib", "loaders"));
 
     await writeFileEnsured(
-      path.join(ctx.projectRoot, "content", "blog", "hello-world.mdx"),
-      `---\ntitle: Hello World\ndescription: First post\ndate: 2026-03-31\npublished: true\n---\n\n# Hello World\n\nThis is your first post.\n`
+      path.join(ctx.projectRoot, "content", "blog", "what-is-0xstack.mdx"),
+      `---
+title: "What is 0xstack?"
+description: "A deep dive into the production-ready Next.js architecture built for vibecoders."
+date: "2026-04-02"
+published: true
+---
+
+# Welcome to 0xstack
+
+0xstack is a production-ready Next.js framework designed for the modern web. It provides a solid foundation with **Next.js App Router**, **Better Auth**, and **Drizzle ORM**—all wired together to save you weeks of configuration.
+
+## Why 0xstack?
+
+We wanted a stack that gets out of the way so we can focus on building features. With CQRS patterns, unified configuration, and built-in CLI doctors, 0xstack ensures your project stays healthy as it scales.
+
+- **Flat Architecture**: No deep nesting. Repositories, Services, and Loaders live clearly in \`lib/\`.
+- **Integrated Auth & Billing**: Hooks into Better Auth and Dodo Payments out of the box.
+- **Built for AI Development**: We call it *vibecoding mentor*. Clear boundaries make it perfectly suited for AI code generation contexts.
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "content", "blog", "how-0xstack-works.mdx"),
+      `---
+title: "How 0xstack Works: The Architecture Layer"
+description: "Understanding the CQRS pattern and boundaries inside the 0xstack framework."
+date: "2026-04-01"
+published: true
+---
+
+# Architecture in 0xstack
+
+The core philosophy of 0xstack is strict boundary enforcement. Let's look at the layers:
+
+## 1. Repositories (\`lib/repos/\`)
+The only layer allowed to talk to Drizzle ORM directly. No HTTP, no business logic.
+
+## 2. Services (\`lib/services/\`)
+The business logic layer. Services coordinate repository calls, apply permissions, and trigger webhooks.
+
+## 3. Loaders & Actions (\`lib/loaders/\`, \`lib/actions/\`)
+The boundary between Server Components and your underlying data. Loaders read (cached), Actions mutate.
+
+## 4. The Presentation Layer
+Server Components and Client Components in the \`app/\` directory safely consume loaders and actions.
+
+By keeping these layers distinct, your application is inherently easier to test, secure, and refactor.
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "content", "blog", "vibecoding-with-0xstack.mdx"),
+      `---
+title: "Vibecoding with 0xstack"
+description: "How to leverage AI coding assistants within the structured boundaries of 0xstack."
+date: "2026-03-31"
+published: true
+---
+
+# The Era of Vibecoding
+
+*Vibecoding* is the act of scaffolding, writing, and refactoring code fluidly with an AI companion. 
+
+## The Problem with AI Code
+AI is amazing at writing isolated functions, but terrible at architecting complex, interconnected systems over time. When using raw Next.js, an AI will quickly create a tangled mess of server components talking directly to databases.
+
+## The 0xstack Solution
+0xstack provides the rigid scaffolding that AI needs. Because the architecture (Repos -> Services -> Actions) is strictly defined and checked by the \`0xstack doctor\`, you can safely ask an AI to "create a new feature" and know exactly where its generated code should live.
+
+1. Tell the AI to generate a Drizzle schema.
+2. Ask it to write a Repository to query that schema.
+3. Hook it up to a UI.
+
+It's that simple. Happy vibecoding!
+`
     );
 
     await writeFileEnsured(
@@ -269,7 +343,7 @@ function escapeXml(s: string) {
 `
     );
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 
