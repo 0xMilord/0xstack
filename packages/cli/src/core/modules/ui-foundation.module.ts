@@ -48,41 +48,47 @@ import { buttonVariants } from "@/components/ui/button";
 import { loadViewer } from "@/lib/loaders/viewer.loader";
 import { signOutAction } from "@/lib/actions/auth.actions";
 import { cn } from "@/lib/utils";
+import { PwaInstallButton } from "@/components/pwa/pwa-install-button";
+import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
 
 export async function SiteHeader() {
   const viewer = await loadViewer();
   return (
-    <header className="border-b">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="font-semibold">
-          {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}
-        </Link>
-        <nav className="hidden items-center gap-1 md:flex">
-          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
-          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
-          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/about">About</Link>
-          <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/contact">Contact</Link>
-        </nav>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {viewer ? (
-            <>
-              <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href="/app/orgs">App</Link>
-              <form action={signOutAction}>
-                <button className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "cursor-pointer")} type="submit">
-                  Sign out
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/login">Sign in</Link>
-              <Link className={buttonVariants({ variant: "default", size: "sm" })} href="/get-started">Get started</Link>
-            </>
-          )}
+    <>
+      <PwaUpdateBanner />
+      <header className="border-b">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <Link href="/" className="font-semibold">
+            {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}
+          </Link>
+          <nav className="hidden items-center gap-1 md:flex">
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/about">About</Link>
+            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/contact">Contact</Link>
+          </nav>
+          <div className="flex items-center gap-2">
+            <PwaInstallButton />
+            <ThemeToggle />
+            {viewer ? (
+              <>
+                <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href="/app/orgs">App</Link>
+                <form action={signOutAction}>
+                  <button className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "cursor-pointer")} type="submit">
+                    Sign out
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/login">Sign in</Link>
+                <Link className={buttonVariants({ variant: "default", size: "sm" })} href="/get-started">Get started</Link>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
 `
@@ -106,6 +112,100 @@ export function SiteFooter() {
         </div>
       </div>
     </footer>
+  );
+}
+`
+    );
+
+    // PWA components
+    await ensureDir(path.join(ctx.projectRoot, "components", "pwa"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "pwa", "pwa-install-button.tsx"),
+      `"use client";
+
+import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export function PwaInstallButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+  }, []);
+
+  if (!deferredPrompt || isInstalled) return null;
+
+  const handleInstall = async () => {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleInstall} className="hidden sm:flex">
+      <Download className="mr-2 h-4 w-4" />
+      Install
+    </Button>
+  );
+}
+`
+    );
+
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "pwa", "pwa-update-banner.tsx"),
+      `"use client";
+
+import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export function PwaUpdateBanner() {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+    const handleUpdate = () => setUpdateAvailable(true);
+    window.addEventListener("sw-update-available", handleUpdate);
+    return () => window.removeEventListener("sw-update-available", handleUpdate);
+  }, []);
+
+  const handleRefresh = () => {
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "SKIP_WAITING" });
+      window.location.reload();
+    }
+  };
+
+  if (!updateAvailable) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border bg-background p-3 shadow-lg">
+      <RefreshCw className="h-4 w-4 animate-spin" />
+      <span className="text-sm">New version available</span>
+      <Button variant="default" size="sm" onClick={handleRefresh}>
+        Refresh
+      </Button>
+    </div>
   );
 }
 `

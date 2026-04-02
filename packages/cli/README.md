@@ -15,10 +15,10 @@
 </p>
 
 <p align="center">
-  <a href="#what-is-0xstack"><strong>What it is</strong></a> ·
+  <a href="#-what-is-0xstack"><strong>What it is</strong></a> ·
   <a href="#architecture"><strong>Architecture</strong></a> ·
   <a href="#getting-started"><strong>Get Started</strong></a> ·
-  <a href="#comparison-t3-stack-tanstack-starters-and-0xstack"><strong>vs T3</strong></a>
+  <a href="#the-saas-starter-landscape"><strong>Landscape</strong></a>
 </p>
 
 ---
@@ -71,7 +71,7 @@ npx 0xstack sync --apply
 - [Architecture](#architecture)
 - [Naming: 0xstack vs oxstack](#naming-0xstack-vs-oxstack)
 - [Who is this for?](#who-is-this-for)
-- [Comparison: T3 Stack, TanStack starters, and 0xstack](#comparison-t3-stack-tanstack-starters-and-0xstack)
+- [The SaaS Starter Landscape](#the-saas-starter-landscape)
 - [Frequently asked questions](#frequently-asked-questions)
 - [What you need vs optional](#what-you-need-vs-optional)
 - [Modules (capabilities)](#modules-capabilities)
@@ -156,33 +156,28 @@ The project name is **0xstack** ( **`0xstack`** on npm ) — a leading **zero**,
 - **Supabase Postgres** (or any Postgres) with migrations and **optional** modules: **billing** (Dodo or Stripe), **object storage** (GCS, S3, or Supabase Storage), **MDX blog**, **SEO** metadata routes, **PWA**, **observability** stubs.
 - A **repeatable operator CLI** (`doctor`, `sync`, `generate`, `add`) comparable in spirit to a **framework for your repo** — closer to a **managed starter** than a one-shot template unzip.
 
-If your top priority is **end-to-end types from a single tRPC router**, **Create T3 App** remains the most direct fit; 0xstack optimizes for **RSC + actions + versioned HTTP APIs** and **long-term repo hygiene**.
+## The SaaS Starter Landscape
 
-## Comparison: T3 Stack, TanStack starters, and 0xstack
+This table is a **high-level tradeoff guide**, helping you choose the right tool for your project requirements.
 
-This table is a **high-level tradeoff guide**, not a ranking: different tools win for different teams.
-
-| Topic | **T3 Stack** (Create T3 App) | **Typical “TanStack” Next starter** | **0xstack** |
+| Topic | **One-shot Templates** (ShipFast, etc.) | **Component-First** (Shadcn/UI starters) | **0xstack** (The Architecture Engine) |
 |------|------------------------------|-------------------------------------|--------------|
-| **Primary API shape** | **tRPC** procedures (excellent E2E inference) | Varies; often REST or ad hoc fetch | **Server Actions** internally + **`/api/v1/*`** for external clients |
-| **ORM / DB** | **Prisma** by default | Varies | **Drizzle** + SQL migrations |
-| **Auth** | Often **NextAuth.js** / Auth.js patterns | Varies | **Better Auth** + Drizzle adapter |
-| **TanStack Query** | Yes, paired with tRPC | Yes (often the headline feature) | Yes — for client transport, not domain rules |
-| **Postgres / Supabase** | Common; not prescriptive | Varies | **First-class** Postgres; Supabase URLs documented |
-| **Starter “shape”** | Opinionated **monolith** generator | Less standardized across repos | **Module flags** + **profiles** (`core` / `full`) + **`0xstack.config.ts`** |
-| **After day one** | You maintain the stack yourself | You maintain yourself | **`baseline`**, **`doctor`**, **`sync`**, **`upgrade`** for drift and docs |
-| **Billing / storage** | Bring your own | Bring your own | **Optional modules** (Dodo/Stripe, GCS/S3/Supabase) with routing gating |
+| **Core Value** | Speed of initial setup (Zip/Git clone) | Great UI out of the box | **Long-term architecture integrity** |
+| **Lifecycle** | "Generating" is the end of the tool's job | Manual updates and maintenance | **Continuous sync, doctor, and baseline** |
+| **Architecture** | Often a "flat" structure | Often UI-component centric | **Strict CQRS (Loaders vs. Actions vs. Repos)** |
+| **After Day 30** | You own a large, drifted codebase | Manually keeping up with UI updates | **CLI helps reconcile code with config** |
+| **AI Experience** | AI can easily break the "flat" layers | AI generates components well | **AI is constrained by architectural rules** |
 
-**When 0xstack is a strong alternative to T3:** you want **Drizzle**, **Better Auth**, **strict server/client boundaries** (ESLint + doctor), **webhook + idempotency** patterns, and a **factory CLI** that keeps **docs and deps** aligned with config.
+**When 0xstack is the right fit:** You are building a serious SaaS or internal tool and want a **factory CLI** that keeps **docs, deps, and boundaries** aligned with your config as you grow.
 
-**When T3 may stay a better fit:** you want **tRPC** as the primary contract for both server and client, or you are standardized on **Prisma** and the **Create T3 App** ecosystem.
+---
 
 ## Frequently asked questions
 
 Discovery-oriented answers (T3 Stack, TanStack Query starter, Supabase Drizzle, npm package):
 
-**Is 0xstack a T3 Stack clone or fork?**  
-No. It is a separate **Next.js + Drizzle + Better Auth + TanStack Query** opinionated starter with a different API philosophy (**actions + REST v1** instead of **tRPC** as the core spine).
+**Is 0xstack a starter or a framework?**  
+It is an **Architecture Engine**. Unlike a standard starter that you clone once, 0xstack stays with your project. You use the CLI to sync dependencies and enforce boundaries throughout the app's life.
 
 **Is this a TanStack starter?**  
 It is a **TanStack Query–friendly Next.js starter**: generated apps include **TanStack Query** for client data fetching and cache invalidation; routing and server data use **RSC** and **loaders** per the “two highways” model.
@@ -404,13 +399,24 @@ npx 0xstack doctor --profile full
 pnpm dev
 ```
 
-## Release process
+## 🎯 Why 0xstack for Vibecoders & AI-First Devs
 
-See [`RELEASING.md`](RELEASING.md).
+If you are a **"vibecoder"**—someone who flows with creativity, experiments fast, and leans on **AI-assisted development** (Cursor, GitHub Copilot, or AI Agents)—0xstack is designed to be your best friend.
 
-## Contributing
+When you're generating code with AI at 100mph, you need a framework that acts as a **mentor**, ensuring that even your most "vibey" sessions result in a scalable, production-ready codebase.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please read it before opening a PR.
+### 🚀 Why it vibes with AI-assisted dev:
+- **Guardrail Architecture**: CQRS (Reads/Writes separation) enforces discipline automatically. If you drop AI-generated logic into the repo, the framework nudges you to put it in the right layer (Rules vs. Services vs. Repos).
+- **AI Synergy**: AI agents perform better when they have clear boundaries. 0xstack's strict folder structure and `doctor` command ensure that AI-generated boilerplate fits into a predictable, robust pattern.
+- **No "Rewrite Wall"**: Most "fast" prototypes hit a wall and need a complete rewrite at 10k users. with 0xstack, you prototype *and* build for scale simultaneously. You don't have to choose between speed and stability.
+- **Self-Healing Loop**: Use **`baseline`**, **`sync`**, and **`doctor`** to auto-reconcile your repo. If your AI coding session drifts too far, the CLI helps pull the architecture back into alignment.
+
+### 🧭 The Paradigm Difference
+- **One-shot Boilerplates**: Great for a weekend project where you want to hack something together and ship.
+- **0xstack**: Great for devs who want to build a serious SaaS that stays clean, secure, and professional as it grows.
+
+
+---
 
 [downloads-image]: https://img.shields.io/npm/dm/0xstack
 [npm-url]: https://www.npmjs.com/package/0xstack

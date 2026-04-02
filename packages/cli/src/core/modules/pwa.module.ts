@@ -267,13 +267,69 @@ export default async function Page() {
 `
     );
 
+    // Dynamic manifest that reads from env vars
+    await ensureDir(path.join(ctx.projectRoot, "app", "manifest"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "manifest", "route.ts"),
+      `import { NextResponse } from "next/server";
+import { getSeoData } from "@/lib/seo/jsonld";
+
+export async function GET() {
+  const seo = getSeoData();
+  const shortName = seo.name.substring(0, 12);
+  
+  return NextResponse.json({
+    "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+    "id": "/?source=pwa",
+    "name": seo.name,
+    "short_name": shortName,
+    "description": seo.description,
+    "start_url": "/?source=pwa",
+    "scope": "/",
+    "display": "standalone",
+    "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+    "orientation": "any",
+    "theme_color": "#000000",
+    "background_color": "#ffffff",
+    "categories": ["productivity", "business"],
+    "lang": "en-US",
+    "prefer_related_applications": false,
+    "shortcuts": [
+      {
+        "name": "Settings",
+        "short_name": "Settings",
+        "description": "Open app settings",
+        "url": "/app/settings",
+        "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "Dashboard",
+        "short_name": "Dashboard",
+        "description": "Open your dashboard",
+        "url": "/app",
+        "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+      }
+    ],
+    "icons": [
+      { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+      { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+      { "src": "/icons/maskable-icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ]
+  }, {
+    headers: { "Content-Type": "application/manifest+json" }
+  });
+}
+`
+    );
+
+    // Static fallback manifest (for older browsers)
     await writeFileEnsured(
       path.join(ctx.projectRoot, "public", "manifest.webmanifest"),
       `{
   "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "id": "/?source=pwa",
-  "name": "${ctx.projectName || "0xstack"}",
-  "short_name": "${(ctx.projectName || "0xstack").substring(0, 12)}",
+  "name": "0xstack App",
+  "short_name": "0xstack",
   "description": "Production-ready Next.js starter.",
   "start_url": "/?source=pwa",
   "scope": "/",
@@ -291,13 +347,6 @@ export default async function Page() {
       "short_name": "Settings",
       "description": "Open app settings",
       "url": "/app/settings",
-      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "description": "Open your dashboard",
-      "url": "/app",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ],

@@ -7,12 +7,57 @@
 </h1>
 
 <p align="center">
-  <strong>0xstack</strong> (npm: <code>0xstack</code>) — a production-minded <strong>Next.js starter</strong> and <strong>CLI factory</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>. Not the same as <strong>T3 Stack</strong> — see <a href="#comparison-t3-stack-tanstack-starters-and-0xstack">comparison</a> below.
+  <strong>Production CQRS Architecture system for Next.js | PostgreSQL | Drizzle | Better Auth | TanStack Query</strong>
 </p>
 
 <p align="center">
-  Generate a project once, then keep it correct over time with <code>baseline</code>, <code>doctor</code>, <code>sync</code>, and optional <code>upgrade</code>. <em>Next.js Drizzle starter</em>, <em>TanStack Query Next.js boilerplate</em>, <em>Supabase Drizzle starter kit</em>, <em>server actions architecture starter</em>, <em>modular billing and storage scaffolding</em>.
+  <strong>0xstack</strong> (npm: <code>0xstack</code>) is a <strong>self-healing architecture engine</strong> for <strong>SaaS</strong> and internal apps: <strong>React Server Components</strong>, <strong>Server Actions</strong>, <strong>TanStack Query</strong> on the client, <strong>Drizzle ORM</strong> + <strong>Postgres</strong> (Supabase-friendly), and <strong>Better Auth</strong>.
 </p>
+
+<p align="center">
+  <a href="#-what-is-0xstack"><strong>What it is</strong></a> ·
+  <a href="#architecture"><strong>Architecture</strong></a> ·
+  <a href="#getting-started"><strong>Get Started</strong></a> ·
+  <a href="#the-saas-starter-landscape"><strong>Landscape</strong></a>
+</p>
+
+---
+
+## 🚀 What is 0xstack?
+
+**0xstack = Production architecture system for Next.js**
+
+- **📐 Read/Write separation** — Two highways: fast reads (loaders) + safe writes (actions → rules → repos)
+- **🛡️ Enforced boundaries** — ESLint + `doctor` prevent architecture drift
+- **🔧 CLI that keeps your repo correct** — `baseline`, `sync`, `upgrade` auto-heal your codebase over time
+
+```bash
+# Start a new project in 2 minutes
+npx 0xstack@latest init
+
+# Install full production baseline (idempotent)
+npx 0xstack baseline --profile full
+
+# Validate architecture, deps, and env
+npx 0xstack doctor
+
+# Reconcile repo with config (plan or apply)
+npx 0xstack sync --apply
+```
+
+> [!IMPORTANT]
+> **Do NOT install this package with `npm i 0xstack`.** 
+> 0xstack is a project initializer. Installing it as a dependency will only give you a `node_modules` folder and a `package.json`.
+>
+> To start a new project, use:
+> ```bash
+> npx 0xstack@latest init
+> ```
+
+> [!WARNING]
+> **Experimental Stage**: 0xstack is currently in an experimental stage. Implementation details and APIs may change. Use with caution in critical environments. Found a bug? [Report it here](https://github.com/0xmilord/0xstack/issues) and help us build!
+
+---
 
 <div align="center">
 
@@ -22,12 +67,12 @@
 
 ## Table of contents
 
+- [What is 0xstack?](#-what-is-0xstack)
+- [Architecture](#architecture)
 - [Naming: 0xstack vs oxstack](#naming-0xstack-vs-oxstack)
 - [Who is this for?](#who-is-this-for)
-- [Comparison: T3 Stack, TanStack starters, and 0xstack](#comparison-t3-stack-tanstack-starters-and-0xstack)
+- [The SaaS Starter Landscape](#the-saas-starter-landscape)
 - [Frequently asked questions](#frequently-asked-questions)
-- [What is 0xstack?](#what-is-0xstack)
-- [Generated app architecture](#generated-app-architecture)
 - [What you need vs optional](#what-you-need-vs-optional)
 - [Modules (capabilities)](#modules-capabilities)
 - [CLI commands](#cli-commands)
@@ -36,82 +81,7 @@
 - [Release process](#release-process)
 - [Contributing](#contributing)
 
-## Naming: 0xstack vs oxstack
-
-The project name is **0xstack** ( **`0xstack`** on npm ) — a leading **zero**, not the letter **o**. Common web search typo: **oxstack**. This section uses both spellings so search engines and readers land in the right place.
-
-## Who is this for?
-
-0xstack fits teams that want:
-
-- A **typed Next.js App Router** codebase with **Zod** validation and a **clear CQRS-style split** (loaders vs actions vs repos).
-- **TanStack Query** for **client-side cache and mutations** without putting business logic in hooks.
-- **Drizzle** instead of Prisma, and **Better Auth** instead of legacy NextAuth-only patterns.
-- **Supabase Postgres** (or any Postgres) with migrations and **optional** modules: **billing** (Dodo or Stripe), **object storage** (GCS, S3, or Supabase Storage), **MDX blog**, **SEO** metadata routes, **PWA**, **observability** stubs.
-- A **repeatable operator CLI** (`doctor`, `sync`, `generate`, `add`) comparable in spirit to a **framework for your repo** — closer to a **managed starter** than a one-shot template unzip.
-
-If your top priority is **end-to-end types from a single tRPC router**, **Create T3 App** remains the most direct fit; 0xstack optimizes for **RSC + actions + versioned HTTP APIs** and **long-term repo hygiene**.
-
-## Comparison: T3 Stack, TanStack starters, and 0xstack
-
-This table is a **high-level tradeoff guide**, not a ranking: different tools win for different teams.
-
-| Topic | **T3 Stack** (Create T3 App) | **Typical “TanStack” Next starter** | **0xstack** |
-|------|------------------------------|-------------------------------------|--------------|
-| **Primary API shape** | **tRPC** procedures (excellent E2E inference) | Varies; often REST or ad hoc fetch | **Server Actions** internally + **`/api/v1/*`** for external clients |
-| **ORM / DB** | **Prisma** by default | Varies | **Drizzle** + SQL migrations |
-| **Auth** | Often **NextAuth.js** / Auth.js patterns | Varies | **Better Auth** + Drizzle adapter |
-| **TanStack Query** | Yes, paired with tRPC | Yes (often the headline feature) | Yes — for client transport, not domain rules |
-| **Postgres / Supabase** | Common; not prescriptive | Varies | **First-class** Postgres; Supabase URLs documented |
-| **Starter “shape”** | Opinionated **monolith** generator | Less standardized across repos | **Module flags** + **profiles** (`core` / `full`) + **`0xstack.config.ts`** |
-| **After day one** | You maintain the stack yourself | You maintain yourself | **`baseline`**, **`doctor`**, **`sync`**, **`upgrade`** for drift and docs |
-| **Billing / storage** | Bring your own | Bring your own | **Optional modules** (Dodo/Stripe, GCS/S3/Supabase) with routing gating |
-
-**When 0xstack is a strong alternative to T3:** you want **Drizzle**, **Better Auth**, **strict server/client boundaries** (ESLint + doctor), **webhook + idempotency** patterns, and a **factory CLI** that keeps **docs and deps** aligned with config.
-
-**When T3 may stay a better fit:** you want **tRPC** as the primary contract for both server and client, or you are standardized on **Prisma** and the **Create T3 App** ecosystem.
-
-## Frequently asked questions
-
-Discovery-oriented answers (T3 Stack, TanStack Query starter, Supabase Drizzle, npm package):
-
-**Is 0xstack a T3 Stack clone or fork?**  
-No. It is a separate **Next.js + Drizzle + Better Auth + TanStack Query** opinionated starter with a different API philosophy (**actions + REST v1** instead of **tRPC** as the core spine).
-
-**Is this a TanStack starter?**  
-It is a **TanStack Query–friendly Next.js starter**: generated apps include **TanStack Query** for client data fetching and cache invalidation; routing and server data use **RSC** and **loaders** per the “two highways” model.
-
-**Supabase Drizzle starter — is Supabase required?**  
-Any **Postgres** works with **`DATABASE_URL`**. Docs and examples often mention **Supabase** because it is a common host for managed Postgres.
-
-**Next.js server actions starter with architecture enforcement?**  
-Yes: generated apps prefer **Server Actions** for writes, **`lib/rules`** + **`lib/services`** + **`lib/repos`**, and **`doctor`** checks for common boundary mistakes.
-
-**npm package name?**  
-**`0xstack`** — search **“0xstack npm”** to install.
-
-## What is 0xstack?
-
-0xstack is a **starter system** (not just a template):
-
-- **Scaffold** a new app via `init` (interactive wizard or flags for CI)
-- **Install and activate** capabilities via `baseline` (driven by `0xstack.config.ts` + profile)
-- **Validate** env, dependencies, and layer boundaries via `doctor` (add `--strict` for extra PRD hygiene)
-- **Reconcile** the repo over time via `sync` (plan by default; `--apply` runs baseline + docs, optional lint/format/drizzle)
-- **Progressive activation**: **installed ≠ activated** — heavy SDKs and routes stay off until a module is enabled in config
-
-The generated app uses two entry points:
-
-| Surface | Use |
-|--------|-----|
-| **Internal (RSC + server actions)** | Product UI: reads via loaders, writes via actions → rules → services → repos |
-| **External (`/api/v1/*`)** | Clients, webhooks, cron: stable HTTP routes that reuse the same services/rules |
-
-Billing and storage can be wired to **Dodo** or **Stripe**, and **GCS**, **S3**, or **Supabase Storage**, depending on config.
-
-## Generated app architecture
-
-High-level data flow in a 0xstack app:
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -144,7 +114,7 @@ flowchart TB
   CFG -.->|gates routes + imports| API
 ```
 
-CLI and repo hygiene loop:
+**CLI and repo hygiene loop:**
 
 ```mermaid
 flowchart LR
@@ -157,6 +127,67 @@ flowchart LR
   SYN -->|optional| UP[upgrade --apply]
   DOC2 --> DEV
 ```
+
+### Layer definitions
+
+| Layer | Purpose | Rules |
+|-------|---------|-------|
+| **Repos** | Data access only | No business logic, no imports from UI |
+| **Loaders** | Read-only facades | Use `React.cache()`, shape output for viewer/public |
+| **Rules** | Business rules for writes | Authz + invariants + validation glue |
+| **Services** | Orchestration only | Multi-step flows, transactions, integrations |
+| **Server actions** | Internal API for the app | Call `requireAuth()`, validate with Zod, trigger revalidation |
+| **API routes** | External only | Call same rules/services as actions |
+| **Client hooks** | Transport + cache | TanStack Query only, no business logic |
+
+---
+
+## Naming: 0xstack vs oxstack
+
+The project name is **0xstack** ( **`0xstack`** on npm ) — a leading **zero**, not the letter **o**. Common web search typo: **oxstack**. This section uses both spellings so search engines and readers land in the right place.
+
+## Who is this for?
+
+0xstack fits teams that want:
+
+- A **typed Next.js App Router** codebase with **Zod** validation and a **clear CQRS-style split** (loaders vs actions vs repos).
+- **TanStack Query** for **client-side cache and mutations** without putting business logic in hooks.
+- **Drizzle** instead of Prisma, and **Better Auth** instead of legacy NextAuth-only patterns.
+- **Supabase Postgres** (or any Postgres) with migrations and **optional** modules: **billing** (Dodo or Stripe), **object storage** (GCS, S3, or Supabase Storage), **MDX blog**, **SEO** metadata routes, **PWA**, **observability** stubs.
+## The SaaS Starter Landscape
+
+This table is a **high-level tradeoff guide**, helping you choose the right tool for your project requirements.
+
+| Topic | **One-shot Templates** (ShipFast, etc.) | **Component-First** (Shadcn/UI starters) | **0xstack** (The Architecture Engine) |
+|------|------------------------------|-------------------------------------|--------------|
+| **Core Value** | Speed of initial setup (Zip/Git clone) | Great UI out of the box | **Long-term architecture integrity** |
+| **Lifecycle** | "Generating" is the end of the tool's job | Manual updates and maintenance | **Continuous sync, doctor, and baseline** |
+| **Architecture** | Often a "flat" structure | Often UI-component centric | **Strict CQRS (Loaders vs. Actions vs. Repos)** |
+| **After Day 30** | You own a large, drifted codebase | Manually keeping up with UI updates | **CLI helps reconcile code with config** |
+| **AI Experience** | AI can easily break the "flat" layers | AI generates components well | **AI is constrained by architectural rules** |
+
+**When 0xstack is the right fit:** You are building a serious SaaS or internal tool and want a **factory CLI** that keeps **docs, deps, and boundaries** aligned with your config as you grow.
+
+---
+
+## Frequently asked questions
+
+Discovery-oriented answers (T3 Stack, TanStack Query starter, Supabase Drizzle, npm package):
+
+**Is 0xstack a starter or a framework?**  
+It is an **Architecture Engine**. Unlike a standard starter that you clone once, 0xstack stays with your project. You use the CLI to sync dependencies and enforce boundaries throughout the app's life.
+
+**Is this a TanStack starter?**  
+It is a **TanStack Query–friendly Next.js starter**: generated apps include **TanStack Query** for client data fetching and cache invalidation; routing and server data use **RSC** and **loaders** per the “two highways” model.
+
+**Supabase Drizzle starter — is Supabase required?**  
+Any **Postgres** works with **`DATABASE_URL`**. Docs and examples often mention **Supabase** because it is a common host for managed Postgres.
+
+**Next.js server actions starter with architecture enforcement?**  
+Yes: generated apps prefer **Server Actions** for writes, **`lib/rules`** + **`lib/services`** + **`lib/repos`**, and **`doctor`** checks for common boundary mistakes.
+
+**npm package name?**  
+**`0xstack`** — search **“0xstack npm”** to install.
 
 ## What you need vs optional
 
@@ -297,6 +328,26 @@ cp .env.example .env.local
 npx 0xstack doctor --profile full
 pnpm dev
 ```
+
+## 🎯 Why 0xstack for Vibecoders & AI-First Devs
+
+If you are a **"vibecoder"**—someone who flows with creativity, experiments fast, and leans on **AI-assisted development** (Cursor, GitHub Copilot, or AI Agents)—0xstack is designed to be your best friend.
+
+When you're generating code with AI at 100mph, you need a framework that acts as a **mentor**, ensuring that even your most "vibey" sessions result in a scalable, production-ready codebase.
+
+### 🚀 Why it vibes with AI-assisted dev:
+- **Guardrail Architecture**: CQRS (Reads/Writes separation) enforces discipline automatically. If you drop AI-generated logic into the repo, the framework nudges you to put it in the right layer (Rules vs. Services vs. Repos).
+- **AI Synergy**: AI agents perform better when they have clear boundaries. 0xstack's strict folder structure and `doctor` command ensure that AI-generated boilerplate fits into a predictable, robust pattern.
+- **No "Rewrite Wall"**: Most "fast" prototypes hit a wall and need a complete rewrite at 10k users. with 0xstack, you prototype *and* build for scale simultaneously. You don't have to choose between speed and stability.
+- **Self-Healing Loop**: Use **`baseline`**, **`sync`**, and **`doctor`** to auto-reconcile your repo. If your AI coding session drifts too far, the CLI helps pull the architecture back into alignment.
+
+### 🧭 The Paradigm Difference
+- **One-shot Boilerplates**: Great for a weekend project where you want to hack something together and ship.
+- **0xstack**: Great for devs who want to build a serious SaaS that stays clean, secure, and professional as it grows.
+
+👉 **Build the "right way" from the start.** 0xstack lets you vibe with AI while keeping your architecture professional, modular, and ready for production drift.
+
+---
 
 ## Release process
 
