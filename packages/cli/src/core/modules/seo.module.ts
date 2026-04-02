@@ -59,7 +59,7 @@ async function patchRootLayoutForSeo(projectRoot: string) {
 
 export const seoModule: Module = {
   id: "seo",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     if (!ctx.modules.seo) {
       await backupAndRemove(ctx.projectRoot, "app/robots.ts");
@@ -114,6 +114,68 @@ export function websiteJsonLd() {
     "@type": "WebSite",
     name,
     url,
+  } as const;
+}
+
+/**
+ * SoftwareApplication JSON-LD for SaaS discoverability in SERPs and AI crawlers.
+ * Use on homepage and product pages.
+ */
+export function softwareApplicationJsonLd(input?: {
+  applicationCategory?: string;
+  operatingSystem?: string;
+  offers?: { price: string; priceCurrency: string }[];
+}) {
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const description = env.NEXT_PUBLIC_APP_DESCRIPTION ?? "Production-ready Next.js starter.";
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name,
+    description,
+    url,
+    applicationCategory: input?.applicationCategory ?? "DeveloperApplication",
+    operatingSystem: input?.operatingSystem ?? "Web",
+    offers: input?.offers?.map((o) => ({
+      "@type": "Offer",
+      price: o.price,
+      priceCurrency: o.priceCurrency,
+    })),
+  } as const;
+}
+
+/**
+ * FAQPage JSON-LD for FAQ sections. Helps with rich snippets in Google.
+ */
+export function faqPageJsonLd(faqs: { question: string; answer: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
+  } as const;
+}
+
+/**
+ * BreadcrumbList JSON-LD for navigation structure.
+ */
+export function breadcrumbListJsonLd(items: { name: string; item: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.item,
+    })),
   } as const;
 }
 `
@@ -241,12 +303,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "opengraph-image.tsx"),
       `import { ImageResponse } from "next/og";
+import { env } from "@/lib/env/server";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default function Image() {
+  const appName = env.NEXT_PUBLIC_APP_NAME || "0xstack";
   return new ImageResponse(
     (
       <div
@@ -257,12 +321,12 @@ export default function Image() {
           flexDirection: "column",
           justifyContent: "center",
           padding: 64,
-          background: "#0a0a0a",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           color: "#ffffff",
         }}
       >
-        <div style={{ fontSize: 56, fontWeight: 800, lineHeight: 1.05 }}>0xstack</div>
-        <div style={{ marginTop: 16, fontSize: 28, color: "#d4d4d4" }}>Production-ready starter</div>
+        <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1.05 }}>{appName}</div>
+        <div style={{ marginTop: 20, fontSize: 28, color: "#e0e0e0" }}>Production-ready Next.js Starter</div>
       </div>
     ),
     size
@@ -277,7 +341,7 @@ export default function Image() {
 
     await patchRootLayoutForSeo(ctx.projectRoot);
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 

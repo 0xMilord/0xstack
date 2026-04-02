@@ -12,6 +12,7 @@ type PackageManager = "pnpm" | "npm";
 export type InitInput = {
   dir: string;
   name: string;
+  description: string;
   packageManager: PackageManager;
   theme?: GlobalsTheme;
   features?: {
@@ -301,7 +302,7 @@ export default function Page() {
 }
 `;
 
-        // Sophisticated 0xstack homepage
+        // Sophisticated 0xstack homepage with brand identity
         const homepage = `import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -325,10 +326,10 @@ export default function Page() {
           <div className="text-center">
             <Badge variant="secondary" className="mb-4">Production Architecture System</Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              Ship SaaS faster with <span className="text-primary">0xstack</span>
+              Ship faster with <span className="text-primary">${input.name}</span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-              A self-healing architecture engine for Next.js. Clean boundaries, real auth, production DB workflows, and a CLI that keeps your repo correct.
+              ${input.description}
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link className={buttonVariants({ size: "lg" })} href="/get-started">Get started</Link>
@@ -432,6 +433,19 @@ export default function Page() {
         await writeFileEnsured(
           path.join(projectRoot, "app", "get-started", "page.tsx"),
           mkPublicPage("Get started", "Configure env, run migrations, and enable modules as needed.")
+        );
+
+        // Favicon scaffolding (brand-neutral, high-quality defaults)
+        await writeFileEnsured(
+          path.join(projectRoot, "app", "icon.svg"),
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="oklch(var(--primary))"/>
+  <text x="50" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="60" font-weight="700" fill="oklch(var(--primary-foreground))" text-anchor="middle">${input.name.charAt(0).toUpperCase()}</text>
+</svg>`
+        );
+        await writeFileEnsured(
+          path.join(projectRoot, "app", "apple-icon.png"),
+          Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64")
         );
 
         // Replace create-next-app README with a real, PRD-equivalent overview (docs sync can refresh later).
@@ -550,7 +564,13 @@ export default async function Layout({ children }: { children: React.ReactNode }
         );
         await writeFileEnsured(
           path.join(projectRoot, ".env.example"),
-          `NEXT_PUBLIC_APP_URL="http://localhost:3000"\nBETTER_AUTH_URL="http://localhost:3000"\nBETTER_AUTH_SECRET="change-me-to-32+chars................................"\nDATABASE_URL="postgres://..."\n`
+          `NEXT_PUBLIC_APP_NAME="${input.name}"
+NEXT_PUBLIC_APP_DESCRIPTION="${input.description}"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+BETTER_AUTH_URL="http://localhost:3000"
+BETTER_AUTH_SECRET="change-me-to-32+chars................................"
+DATABASE_URL="postgres://..."
+`
         );
 
         // DB + Drizzle wiring (production-grade)

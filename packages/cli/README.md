@@ -46,13 +46,16 @@ npx 0xstack sync --apply
 ```
 
 > [!IMPORTANT]
-> **Do NOT install this package with `npm i 0xstack`.**
-> 0xstack is a project initializer and CLI factory. Installing it as a dependency will only give you a `node_modules` folder.
+> **Do NOT install this package with `npm i 0xstack`.** 
+> 0xstack is a project initializer. Installing it as a dependency will only give you a `node_modules` folder and a `package.json`.
 >
 > To start a new project, use:
 > ```bash
 > npx 0xstack@latest init
 > ```
+
+> [!WARNING]
+> **Experimental Stage**: 0xstack is currently in an experimental stage. Implementation details and APIs may change. Use with caution in critical environments. Found a bug? [Report it here](https://github.com/0xmilord/0xstack/issues) and help us build!
 
 ---
 

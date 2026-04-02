@@ -67,6 +67,7 @@ export function registerInitCommand(cli: CAC) {
     .command("init", "Initialize a new 0xstack app (progressive TUI when interactive)")
     .option("--dir <dir>", "Target directory (default: current)")
     .option("--name <name>", "Project name (default: folder name)")
+    .option("--description <desc>", "App description (default: auto-generated)")
     .option("--pm <pm>", "Package manager: pnpm|npm (default: pnpm)")
     .option("--theme <theme>", "Theme: default|corporate-blue|amber|grass (default: default)")
     .option("--billing <provider>", "Billing: none|dodo|stripe (with --yes or other module flags)")
@@ -92,6 +93,7 @@ export function registerInitCommand(cli: CAC) {
         await runInit({
           dir: answers.dir,
           name: answers.name,
+          description: answers.description,
           packageManager: answers.packageManager,
           theme: answers.theme,
           features: answers.modules,
@@ -105,6 +107,7 @@ export function registerInitCommand(cli: CAC) {
       await runInit({
         dir,
         name,
+        description: options.description ?? `${name} - Production Next.js App`,
         packageManager: pm === "npm" ? "npm" : "pnpm",
         theme:
           options.theme === "corporate-blue" || options.theme === "amber" || options.theme === "grass"

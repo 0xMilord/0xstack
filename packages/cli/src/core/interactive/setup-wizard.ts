@@ -6,6 +6,7 @@ export type InitAnswers = {
   locationMode: "new-dir" | "current-dir";
   dir: string;
   name: string;
+  description: string;
   packageManager: "pnpm" | "npm";
   theme: "default" | "corporate-blue" | "amber" | "grass";
   modules: {
@@ -88,6 +89,17 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
       message: "App display name",
       initial: mode === "new-dir" ? dirName : path.basename(cwd),
       validate: (v: string) => (v?.trim() ? true : "Name is required"),
+    },
+    { onCancel }
+  );
+
+  const desc = await prompts(
+    {
+      type: "text",
+      name: "description",
+      message: "Brief description (for SEO & hero section)",
+      initial: "Production-ready Next.js starter",
+      validate: (v: string) => (v?.trim() ? true : "Description is required"),
     },
     { onCancel }
   );
@@ -243,6 +255,7 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
     `\n${chalk.bold("Summary")}\n` +
     `  ${chalk.dim("Location:")} ${dir}\n` +
     `  ${chalk.dim("Name:")} ${String(id.name).trim()}\n` +
+    `  ${chalk.dim("Description:")} ${String(desc.description).trim()}\n` +
     `  ${chalk.dim("PM:")} ${tool.packageManager}\n` +
     `  ${chalk.dim("Modules:")} SEO=${seo.v} Blog=${blog.v} Billing=${bp} Storage=${sp} Email=${email.v}\n` +
     `  ${chalk.dim("Platform:")} cache=${cache.v} pwa=${pwa.v} jobs=${jobs.v}\n` +
@@ -266,6 +279,7 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
     locationMode: mode,
     dir,
     name: String(id.name).trim(),
+    description: String(desc.description).trim(),
     packageManager: tool.packageManager === "npm" ? "npm" : "pnpm",
     theme:
       themeAns.theme === "corporate-blue" || themeAns.theme === "amber" || themeAns.theme === "grass"
