@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7
+
+### Patch Changes
+
+- cb8e15e: - **Blog reading experience**: Table of contents, reading progress bar, related posts by tags, author bio ("{AppName} Team"), social share buttons (Twitter, LinkedIn, copy link). **Homepage blog section**: Three sample posts with featured badges, responsive grid, "View all posts" link. **Docs navigation**: Auto-generated TOC for PRD/ARCH/ERD, version tracking, last updated date, cross-references. **Storage UX**: Drag-and-drop, progress bar, file validation (10MB max), image thumbnails, delete confirmation, asset count badge. **RSS auto-discovery**: Browser-detectable feed.
+
 ## 0.1.6
 
 ### Minor Changes
@@ -15,6 +21,7 @@
 ### Minor Changes
 
 - **Enterprise hardening**: Production architecture system with self-healing capabilities
+
   - **Locked dependency versions** — CLI deps pinned for reproducible installs (no floating `^` versions)
   - **Sync file removal** — `sync --apply` now removes disabled module files (billing, storage, SEO, blog, email, PWA, jobs)
   - **Consolidated validation** — Module validation with categorized error reporting by module
