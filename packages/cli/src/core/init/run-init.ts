@@ -7,7 +7,7 @@ import { logger } from "../logger";
 import { runPipeline } from "../pipeline";
 import { writeDefaultConfig } from "../config";
 import { writeBrandingEnv } from "../modules/env-edit";
-import { ensureDir } from "../modules/fs-utils";
+import { ensureDir, writeFileEnsured } from "../modules/fs-utils";
 import { generateAppIcon, generateFaviconDataUrl } from "../utils/icon-generator";
 
 type PackageManager = "pnpm" | "npm";
@@ -53,11 +53,6 @@ function assertValidCreateNextAppDirName(folderName: string) {
       `Invalid project directory name "${folderName}". It cannot start with an underscore. Use e.g. "my-app".`
     );
   }
-}
-
-async function writeFileEnsured(filePath: string, content: string) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, content, "utf8");
 }
 
 async function ensurePnpmOnlyBuiltDependencies(projectRoot: string) {
