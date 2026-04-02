@@ -1,10 +1,20 @@
 # Changelog
 
-All notable changes to the **[0xstack](https://www.npmjs.com/package/0xstack)** CLI are documented in this file.  
+All notable changes to the **[0xstack](https://www.npmjs.com/package/0xstack)** CLI are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The canonical copy for npm tarballs is also published as [`packages/cli/CHANGELOG.md`](./packages/cli/CHANGELOG.md).  
+The canonical copy for npm tarballs is also published as [`packages/cli/CHANGELOG.md`](./packages/cli/CHANGELOG.md).
 Release automation uses [Changesets](https://github.com/changesets/changesets); see [`RELEASING.md`](./RELEASING.md).
+
+## [0.1.6]
+
+### Added
+
+- **Blog reading experience**: Table of contents, reading progress bar, related posts by tags, author bio ("{AppName} Team"), social share buttons (Twitter, LinkedIn, copy link). **Homepage blog section**: Three sample posts with featured badges, responsive grid, "View all posts" link. **Docs navigation**: Auto-generated TOC for PRD/ARCH/ERD, version tracking, last updated date, cross-references. **Storage UX**: Drag-and-drop, progress bar, file validation (10MB max), image thumbnails, delete confirmation, asset count badge. **RSS auto-discovery**: Browser-detectable feed.
+
+### Fixed
+
+- **Homepage server/client error**: Added `"use client"` directive. **CLI permission prompt**: Added `--yes` flag to `pnpm install`. **Code duplication**: Removed duplicate `writeFileEnsured` from `run-init.ts`. **Template literal corruption**: Fixed JSX strings in storage module.
 
 ## [Unreleased]
 

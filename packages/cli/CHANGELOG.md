@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.6
+
+### Minor Changes
+
+- **Blog & Docs 10/10** — Table of contents, reading progress bar, related posts, author bio, social share buttons, RSS auto-discovery, cross-references in docs, version tracking. **Homepage 10/10** — Blog section with 3 posts, brand integration, responsive grid. **Storage 10/10** — Drag-and-drop, upload progress bar, file validation, image thumbnails, delete confirmation, asset count badge. **CLI UX** — No permission prompts, fixed server/client error, removed duplicate writeFileEnsured.
+
+### Patch Changes
+
+- Fixed template literal corruption in storage module, added missing `cn` import, fixed variable name bug in handleUpload.
+
 ## 0.1.5
 
 ### Minor Changes
