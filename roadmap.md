@@ -1,255 +1,153 @@
-# Roadmap — 0xstack Starter System (7-day build)
+# 0xstack Product Roadmap
 
-Build window: **7 days**. Goal: ship a **working v1** of the 0xstack factory: CLI that can `init` and `baseline` a Next.js (App Router) + Supabase Postgres + Drizzle app, enforce the architecture, and progressively activate modules (auth/orgs required; blog/seo/billing/storage gated).
-
----
-
-## Guiding constraints (from prior discussion + PRD)
-
-- **Flat layout**: Next.js routes in `app/`, everything else in `lib/`. **No `src/`**. **No `()` route groups**.
-- **Auth**: **Better Auth only**. **User IDs are text** (`string`) everywhere; no UUID assumptions.
-- **Entrypoints**:
-  - **Internal app DB ops**: **server actions** in `lib/actions/*` (write highway).
-  - **External clients**: **HTTP API routes** under `app/api/**/route.ts` (external highway).
-- **Progressive activation**: installed ≠ activated; disabled modules must not expose routes and should avoid heavy imports.
-- **Baseline modules** (PRD): orgs (core), blog (MDX), SEO (robots/sitemap/OG/Twitter/JSON-LD/RSS), billing (Dodo + webhook), storage (GCS signed URLs), security baseline (proxy + headers + CSP + rate limiting), observability baseline (logger; optional Sentry/OTel), jobs (optional driver).
-- **Operator commands**: `doctor` (checks), `sync` (reconcile), `docs sync` (marker-based doc regen).
-- **Docs outputs**: root `PRD.md`, plus generated `ERD.md` + `ARCHITECTURE.md` inventories and per-`lib/*` READMEs.
+0xstack is a **Production-Grade Next.js Architecture Factory**. Our mission is to provide developers with the "Gold Standard" baseline for high-velocity application development. By combining strict architectural enforcement with progressive module activation, 0xstack ensures your project scales from MVP to Enterprise without the usual technical debt.
 
 ---
 
-## Dependency map (build order backbone)
+## Core Architectural Principles
 
-1. **CLI foundation** (command runner, logging, error handling) → needed by every command.
-2. **Config system** (`0xstack.config.ts`, `defineConfig`, Zod validation, defaults) → needed for activation gating, baseline, doctor, sync.
-3. **Deterministic pipeline engine** (`runPipeline(step[])`) → required for `init`, `baseline`, `doctor`, `sync`.
-4. **Template scaffolding + AST transforms** → required for safe reruns / idempotent merges.
-5. **Init minimal app** (Next.js + shadcn + env + db wiring + auth handler + UI foundation + orgs core) → required before baseline modules can be activated.
-6. **Module lifecycle contract** (`install/activate/validate/sync`) + progressive activation boundaries → required before enabling blog/seo/billing/storage surfaces.
-7. **Doctor + Sync** (static checks + reconciliation) → required to keep “factory output” consistent.
-8. **Domain generator** (`generate <domain>`) → depends on schema/repo/action patterns + keys/hooks + doc inventory.
-
----
-
-## Definition of Done (v1 ship gate)
-
-- **CLI**: `npx 0xstack init|baseline|generate|doctor|sync|docs sync` all run deterministically (no accidental prompts unless explicitly required).
-- **Progressive activation**:
-  - Disabled modules **do not** ship route handlers.
-  - Disabled modules avoid heavy top-level imports where practical.
-  - Attempting to use a disabled module yields a clear “module not enabled” error.
-- **Architecture contracts** enforced:
-  - UI and API routes do **not** import repos/DB directly.
-  - Read highway uses loaders; write highway uses actions → rules → (service) → repo.
-- **Better Auth text IDs**: DB FKs to user use text/varchar; all code types reflect `string`.
-- **Baseline app output**: installs, boots, and contains required pages, shells, env validation, and schema wiring.
-- **Enterprise surfaces**: security headers + CSP + request IDs + API error envelope + rate limiting are present where required.
-- **Docs**: markers-based docs sync works without clobbering user text.
-- **Global CSS**: generated app contains the **exact** `app/globals.css` baseline tokens required by the PRD (shadcn layers may be appended, but tokens must not be removed/renamed).
+- **Standardized "Flat" Project Structure**: Optimized for readability and search. Next.js routes live in `app/`, and all business logic, models, and services live in `lib/`. No confusing nested groups or `src/` directories.
+- **Unified Identity Backbone**: Native support for **Better Auth** with text-based User IDs to ensure a future-proof, easy-to-map data model across all services.
+- **Strict I/O Boundaries**:
+  - **Internal Data Writes**: Handled via secure **Server Actions** (`lib/actions/*`).
+  - **External Integrations**: Gated through versioned **API Routes** (`app/api/v1/*`).
+- **Progressive Activation**: Modules are only "activated" when needed. If a feature (like Billing or Blog) is disabled, it ships **no routes** and zero runtime overhead.
+- **Self-Healing Ecosystem**: Built-in CLI commands like `doctor`, `baseline`, and `docs sync` work together to prevent architectural drift and maintenance debt.
+- **Automated Living Documentation**: Markers-based regeneration of `ERD.md` and `ARCHITECTURE.md` ensures your documentation always reflects the reality of your code.
 
 ---
 
-## 7-day phase plan (dependency-ordered)
+## The 0xstack Platform Backbone
 
-### Day 1 — CLI core + config + pipeline engine (foundation)
+Our engine is built on two core primitives: **Autonomous Scaffolding** and **Continuous Governance**.
 
-- **Deliverables**
-  - CLI project structure (commands/core/wrappers/generators/utils) per PRD.
-  - **Command framework** (cac/commander), structured logger, error formatting.
-  - **Config system**
-    - `0xstack.config.ts` scaffold
-    - `defineConfig()` + Zod schema + defaults
-  - profiles: `full`, `core`
-    - module flags: auth (fixed), orgs, blogMdx, seo, billing(dodo/false), storage(gcs/false), observability, jobs
-  - **Deterministic pipeline engine**
-    - named steps with duration, skip conditions, and clear failure output
-    - step result model (ok/skip/fail + metadata)
+### Phase 1: The Core Execution Engine
+- **Deterministic Pipeline Engine**: Every change (installation, activation, or audit) runs through a structured, multi-step pipeline for predictable results.
+- **Config-Driven Architecture**: A centralized `0xstack.config.ts` acts as the single source of truth for the entire repo layout and active modules.
+- **AST-Aware Scaffolding**: Uses intelligent code transformations rather than simple text replacement to ensure safe, idempotent merges during updates.
 
-- **Acceptance checks**
-  - `0xstack config validate` (or `doctor` in config-only mode) detects invalid config and prints fixes.
-  - Pipeline logs show step boundaries and underlying commands when wrappers are used.
-  - Wrapper namespace stubs exist for all baseline wrapped CLIs: `0xstack shadcn ...`, `0xstack auth ...`, `0xstack drizzle ...` (even if only passthrough on Day 1).
+### Phase 2: High-Velocity Productivity
+- **Modular Plugin System**: A standardized lifecycle (`install / activate / sync`) that enables complex features like Billing or SEO without the manual overhead.
+- **Intelligent Generators**: Automate the creation of entire domains (Schema → Repo → Loader → UI) with built-in architectural boundary checks.
+- **Comprehensive Runtime Hygiene**: Commands like `doctor` and `sync` ensure your project continues to adhere to the core principles (strict boundaries, security, and schema matching) long after you’ve shipped.
 
 ---
 
-### Day 2 — `init` minimal (core app skeleton, no optional surfaces activated)
+## The 0xstack Standard (Quality Gates)
 
-- **Deliverables**
-  - `npx 0xstack init` generates a runnable Next.js App Router repo (TS).
-  - **Flat layout** created (`app/`, `lib/`, `drizzle/`, `content/`, etc.) with no route groups.
-  - **shadcn** installed + base components included; theme provider + theme toggle.
-  - **Global CSS**: `app/globals.css` uses the PRD’s required baseline tokens verbatim (plus any required shadcn layers).
-  - **Env subsystem** (`lib/env/schema.ts`, `lib/env/server.ts`, `.env.example`) fail-fast in dev.
-  - **DB wiring** (Supabase Postgres + Drizzle): `lib/db/index.ts`, `lib/db/schema.ts` as canonical export surface.
-  - **Security proxy**: repo-root `proxy.ts` with route protection + request-id propagation + baseline headers/CSP hooks.
-  - Marketing + legal pages + app shell pages present per PRD:
-    - `/`, `/about`, `/contact`, `/pricing`, `/terms`, `/privacy`, plus `/login`, `/get-started`, `/app/*`
+We define "Production Ready" by strict adherence to these platform guarantees:
 
-- **Dependencies satisfied for later**
-  - Project has a config file, env validation, and the folder structure that doctor/generators will rely on.
-
-- **Acceptance checks**
-  - Generated app boots locally (no runtime crashes with placeholder env).
-  - Theme toggle works and persists.
-  - Proxy redirects unauthenticated `/app/*` to `/login?redirect=...`.
+- **Zero-Drift Architecture**: The system enforces boundaries via CLI Static Analysis, ensuring no prohibited imports (e.g., direct DB access from UI components) exist in the project and failing builds when rules are breached.
+- **Enterprise-Grade Security Baseline**: All projects ship with pre-configured Security Headers, Content-Security-Policy (CSP), and automated Request ID propagation through the platform proxy.
+- **Progressive "Zero-Route" Activation**: Features that are disabled are **physically absent** from the route manifest and consume no runtime resources.
+- **Unified Identity Compliance**: Better Auth integration is mandatory but flexible, with text-based User IDs and pre-baked server-side helpers (`getViewer`, `requireAuth`) that work out-of-the-box.
+- **"Source of Truth" Documentation**: Automated marker-sync for `ERD.md` and `ARCHITECTURE.md` ensures that documentation is never out-of-sync with implementation.
+- **Standardized UI Tokens**: The platform enforces a consistent CSS baseline based on the 0xstack "globals" specification, providing a rock-solid foundation for any branding.
 
 ---
 
-### Day 3 — Better Auth integration + baseline schema (auth/profile/orgs core)
+## Product Milestones (v1 Cycle)
 
-- **Deliverables**
-  - Better Auth wired end-to-end:
-    - `app/api/auth/[...all]/route.ts`
-    - `lib/auth/*` server helpers (`getViewer`, `requireAuth`) using `React.cache()`
-  - Better Auth schema generated via Better Auth CLI and integrated into Drizzle exports.
-  - **Baseline product schema** implemented/verified in `lib/db/schema.ts` (or re-exports):
-    - Better Auth tables (generated)
-    - `user_profiles` (FK to user.id as **text**)
-    - `orgs`, `org_members` (multi-tenant baseline; roles; unique constraints)
-  - **Core orgs domain** skeleton (minimum):
-    - repo/loader/rules/actions + initial UI stubs under `app/app/orgs/*`
-  - CLI wrappers added (passthrough + auditable):
-    - `0xstack shadcn ...` (shadcn)
-    - `0xstack auth ...` (Better Auth CLI)
-    - `0xstack drizzle ...` (drizzle-kit)
+### Milestone 1 — Core CLI Engine & Config Governance
+The foundation of the 0xstack platform is a robust command-line engine that provides deterministic outputs and strict governance over project configuration.
 
-- **Acceptance checks**
-  - All `userId` columns referencing Better Auth are text/varchar.
-  - Internal writes go through server actions; UI does not import repos directly.
+- **Intelligent Command Framework**: A high-performance CLI that handles all platform operations—from bootstrapping to auditing—with built-in error resilience.
+- **Config-as-Code (Single Source of Truth)**: Centralized schema-based configuration that defines your architecture, active modules, and environment profiles.
+- **Deterministic Pipeline Architecture**: Every action is broken down into auditable, named steps with clear skip/fail logic to ensure predictable results in any environment.
+- **Interoperable Tooling Wrappers**: Native, auditable interfaces for essential industry tools, including **shadcn/ui**, **Better Auth**, and **Drizzle**.
 
 ---
 
-### Day 4 — Progressive activation + module lifecycle + baseline `baseline` command
+### Milestone 2 — Production Scaffolding & Tiered Architecture
+Generating a feature-complete application skeleton that adheres to the 0xstack standard for security, branding, and performance.
 
-- **Deliverables**
-  - **Module lifecycle contract** implemented for: orgs (core), blogMdx, seo, billing(dodo), storage(gcs), observability, jobs.
-  - **Progressive activation boundaries**
-    - route-level gating: module-disabled ⇒ route handlers absent/not emitted
-    - import-level gating: dynamic import heavy SDKs when module enabled
-    - factory getters: `getBillingService()`, `getStorageService()`, `getSeoConfig()`
-  - `npx 0xstack baseline`
-    - installs deps (capability-aware)
-    - installs files for enabled modules
-    - activates enabled modules’ routes/surfaces
-    - runs validate + sync steps through pipeline engine
-
-- **Acceptance checks**
-  - `baseline --profile=core` does not expose blog/billing/storage routes.
-  - `baseline --profile=full` activates all configured modules.
+- **Standardized Next.js App Router Skeleton**: A "Flat Layout" architecture that replaces confusing route-group bloat with explicit, search-optimized structure.
+- **Unified Security & Governance Proxy**: A central platform proxy (`proxy.ts`) providing request tracing, security headers, and CSP enforcement.
+- **Integrated UI & Branding System**: Native **shadcn/ui** integration with pre-configured CSS tokens, theme-management, and accessibility-first components.
+- **Fail-Fast Environment System**: A robust environment validation subsystem (`zod`-based) that prevents runtime errors by verifying configuration at startup.
+- **Transactional Database Wiring**: Out-of-the-box support for **Supabase Postgres + Drizzle ORM**, providing a high-performance database layer with built-in migrations.
+- **Marketing, Legal & App Foundation**: Ready-made templates for Home, About, Terms, and Privacy pages, alongside a secure `/app` shell.
 
 ---
 
-### Day 5 — SEO + Blog (MDX) module, fully gated
+### Milestone 3 — Identity & Multi-Tenant Foundations
+Establishing the project’s identity layer through built-in support for organizations, permissions, and session governance.
 
-- **Deliverables**
-  - **Blog (MDX)** (module `blogMdx`)
-    - `content/blog/*.mdx` source + frontmatter contract + loader
-    - `app/blog/page.tsx` (index) + `app/blog/[slug]/page.tsx` (post)
-    - RSS route `app/rss.xml/route.ts`
-  - **SEO** (module `seo`)
-    - `app/robots.ts` + `app/sitemap.ts` with marketing + blog inclusion
-    - metadata defaults in root layout; canonical strategy using baseUrl
-    - per-post metadata + OG/Twitter
-    - JSON-LD helpers that escape `<` → `\\u003c`; sitewide Organization/WebSite + per-post Article
-  - **Doctor rules (SEO/blog)**
-    - verifies required SEO files when module enabled
-    - verifies sitemap includes blog routes when blog enabled
-
-- **Acceptance checks**
-  - When disabled: no blog routes, no RSS route, and SEO metadata routes absent (or noop).
-  - When enabled: sitemap includes posts; robots points to sitemap; pages emit JSON-LD.
+- **Unified Identity Infrastructure (Better Auth)**: A production-ready API for handling complex authentication flows (social, magic-link) with text-based user IDs for maximum database flexibility.
+- **Enterprise Multi-Tenancy (Organizations)**: First-class support for Organizations and Memberships, including role-based access control and tenant isolation.
+- **Identity-Aware Server Helpers**: Secure, cached server-side routines (`getViewer`, `requireAuth`) for seamless and high-performance session management tracking.
+- **Automated Domain Lifecycle**: The CLI manages the initial Auth schema generation and database migration steps, ensuring that identity architecture and data remain in sync.
+- **Gated Write Highway**: All database writes are isolated to secure **Server Actions**, preventing unauthenticated, rogue access.
 
 ---
 
-### Day 6 — Billing (Dodo) + Storage (GCS) modules + security hardening
+### Milestone 4 — Modern Module Ecosystem & On-Demand Activation
+The bridge to enterprise maturity, where complex platform modules (Blog, Billing, Storage) are progressively and securely activated on as as-needed basis.
 
-- **Deliverables**
-  - **Billing (Dodo)** (module `billing: "dodo"`)
-    - API routes under `app/api/v1/billing/*`:
-      - checkout, portal, webhook
-    - webhook signature verification (raw body), **idempotency ledger** (`webhook_events`)
-    - `lib/services/billing.service.ts` reconciliation + DB sync tables:
-      - `billing_customers`, `billing_subscriptions`
-    - rate limit + API auth guard for `app/api/v1/*`
-    - standardized API error envelope (`code`, `message`, `requestId`, `details?`)
-  - **Storage (GCS)** (module `storage: "gcs"`)
-    - signed upload/download URL issuance (V4), short expiry, content-type restrictions
-    - canonical object key strategy and `assets` table writes
-  - **Security baseline finalized**
-    - `lib/security/*` central subsystem (headers/csp/rate-limit/api-auth/request-id)
-    - `doctor` checks that proxy + routes use security subsystem
-
-- **Acceptance checks**
-  - Webhook route: verifies signature, writes ledger first, acks quickly.
-  - Assets: signed URL issuance requires ownership checks.
-  - Disabled modules: no billing/storage routes exist.
+- **Progressive "Zero-Leak" Architecture**: A core platform guarantee where disabled modules ship zero routes, zero runtime handlers, and no top-level imports.
+- **The 0xstack Module Lifecycle**: A robust contract (`install / activate / sync`) that ensures complex features are added to your project without clobbering existing code or adding technical debt.
+- **Automated Dependency Convergence**: Building with `npx 0xstack baseline` to reconcile project state across code, environment, and dependencies in a single, auditable command.
+- **Dynamic Configuration Primitives**: A unified API for accessing platform services, providing a single point of interaction for Storage, Billing, and Identity drivers.
 
 ---
 
-### Day 7 — Generators + Doctor + Sync + Docs + polish (ship hardening)
+### Milestone 5 — Enterprise Content Strategy & Discovery
+Deploying a premium, architectural standard for content and search engine dominance through built-in MDX and SEO metadata governance.
 
-- **Deliverables**
-  - `npx 0xstack generate <domain>`
-    - schema additions + migration stub
-    - repo/loader/rules/actions
-    - query keys + mutation keys + TanStack hooks
-    - optional external API route generation
-    - UI stubs + route placeholders (explicit routes, no groups)
-    - minimal tests per domain (repo/rules/actions) per PRD (warn-only acceptable if time tight, but stubs must exist)
-  - `npx 0xstack doctor`
-    - env var checks per enabled modules
-    - boundary violations (restricted imports)
-    - migration state checks
-    - checks for security/SEO/billing/storage surfaces when enabled
-  - `npx 0xstack sync` + `docs sync`
-    - marker-based regeneration for:
-      - root docs sections (PRD inventory, ERD, Architecture inventory)
-      - per `lib/*` README.md files
-    - reconcile config ↔ deps ↔ routes ↔ docs without destructive deletes by default
-  - CLI UX polish
-    - spinners, clear remediation, idempotent reruns
-  - **Optional-but-recommended (PRD)**: stub the namespaces (no “engine”) so teams can extend after v1:
-    - `npx 0xstack git ...` (shells out)
-    - `npx 0xstack release` (changesets-based in monorepo setups)
-  - **Stretch (PRD)**: `npx 0xstack upgrade` codemods hook point (may ship as a no-op placeholder in v1).
-
-- **Acceptance checks**
-  - Running `init` then `baseline` then `doctor` succeeds for both `core` and `full` profiles (or produces actionable guidance for missing env).
-  - Regenerating docs does not overwrite user-authored text outside markers.
+- **High-Performance MDX Blog Engine**: A content-as-code pipeline featuring frontmatter management, RSS feed generation, and fully customizable MDX rendering.
+- **Unified Metadata Governance**: Centrally managed SEO defaults for root layouts, with granular support for per-post overrides, OpenGraph/Twitter social cards, and Canonical URL strategies.
+- **Automated Search Integration**: Site-wide `robots.txt` and `sitemap.xml` that automatically synchronize with your marketing pages and blog content.
+- **Structured Data (JSON-LD)**: Pre-baked support for schema.org entities—including Article, WebSite, and Organization—to maximize visibility for search engines and AI agents.
+- **Automated Validation**: Built-in "doctor" rules ensure your discovery surfaces follow industry best practices and required configurations.
 
 ---
 
-## “Don’t miss anything” checklist (feature inventory)
+### Milestone 6 — Financial Operations & Scalable Infrastructure
+Deploying modern revenue and cloud storage infrastructure with a focus on security, idempotency, and high-performance asset delivery.
 
-- **Core**
-  - `init`, `baseline`, `generate`, `add` (optional), `doctor`, `sync`, `docs sync`
-  - pipeline engine, typed config + profiles, wrappers (shadcn/auth/drizzle), idempotency
-- **App output**
-  - marketing + legal pages, auth pages, app shell, settings page with theme toggle
-  - TanStack Query provider + canonical query/mutation key structure
-  - ESLint import restrictions + doctor static checks
-- **DB**
-  - Supabase Postgres + Drizzle wiring
-  - Better Auth tables via CLI generator; **text** user IDs everywhere
-  - baseline tables: profiles, orgs/members, billing customers/subscriptions, webhook ledger, assets
-- **Blog/SEO**
-  - MDX content pipeline + blog routes + RSS
-  - robots/sitemap, OG/Twitter defaults + per-post, JSON-LD helpers
-- **Billing/Storage**
-  - Dodo checkout/portal/webhook; signature + idempotency + async reconciliation hooks
-  - GCS signed URLs; canonical object keys; ownership checks; assets table
-- **Security/Observability/Jobs**
-  - proxy-based route protection + headers + CSP
-  - rate limiting + api auth for external routes
-  - logger + requestId correlation; optional sentry/otel scaffolds; optional jobs driver
-- **Docs**
-  - root docs + per-subsystem READMEs; marker-based regeneration
+- **Integrated Revenue Engine (Dodo Payments)**: Ready-made financial infrastructure including checkouts, customer portals, and enterprise-grade **Webhook Idempotency** (pre-baked into the ledger subsystem).
+- **Hardened Cloud Storage Lifecycle (GCS/S3)**: Secure issuance of signed URLs for uploads and downloads, utilizing ownership-aware asset tracking and content-type restrictions.
+- **Transactional Governance**: Centralized services for both Storage and Billing that abstract complex provider details while maintaining strict TypeScript safety.
+- **Enterprise-Scale Security Hardening**: A comprehensive security subsystem (`lib/security/*`) providing built-in rate-limiting and identity-gated access for all external API surfaces.
+- **End-to-End Traceability**: Integration of request-level correlation IDs into the system proxy, ensuring every financial and storage event is auditable.
 
 ---
 
-## Timeboxing notes (to hit 7 days)
+### Milestone 7 — Advanced Generation & Continuous Governance
+Delivering the high-velocity "Vibecoding" experience through intelligent domain generation, automated documentation, and self-healing governance systems.
 
-- Prefer **working, gated** module stubs over perfect polish: activation boundaries + routes gating are the hard requirements.
-- Keep v1 generators to a constrained set of templates + a small set of safe AST transforms (only for “index/wiring” files).
-- Keep tests minimal but present; allow `doctor` to warn on incomplete coverage unless `strict` profile is enabled.
+- **Intelligent Domain Generation Engine**: A high-velocity generator that automates the creation of entire features (Schema → Repos → Actions → UI Hooks) while ensuring zero-drift architectural logic.
+- **Self-Healing Platform Governance (Doctor)**: A comprehensive audit engine that ensures your project remains compliant with 0xstack standards for security, environment, and boundary isolation.
+- **The Living Platform Runbook (Docs Sync)**: Market-based documentation engine that automatically regenerates `PRD.md`, `ERD.md`, and `ARCHITECTURE.md` to reflect the ground-truth of your code.
+- **Architectural Harmony (Sync)**: A reconciliation mechanism that ensures platform configuration, dependencies, and route manifests are always in sync.
+- **Extensible Command Infrastructure**: Pre-configured hooks for release management (Changesets), CI/CD diagnostics, and future platform upgrades (Codemods).
+- **Platform Refinement**: Continuous CLI UX polish, including spinners, clear remediation paths, and idempotent execution flows.
+
+---
+
+## Platform Capability Matrix (v1 Feature Set)
+
+### Core Engine Primitives
+- **Autonomous Scaffolding**: Standardized Next.js + shadcn + Auth booting.
+- **Architectural Enforcement**: Static import audits and boundary verification.
+- **Progressive Feature Activation**: On-demand route and SDK emission.
+- **Living Documentation Engine**: Real-time architectural and data-model sync.
+
+### Enterprise Surface Areas
+- **Identity & Governance**: Built-in Better Auth + Multi-Tenant Isolation.
+- **Financial Operations**: Dodo Payments integration with Webhook idling logic.
+- **Global Storage Assets**: Signed-URL lifecycle management for GCS/S3.
+- **Deep Content Discovery**: Premium MDX Blog, Global SEO, and sitemap/RSS automation.
+- **Hardened Security Foundations**: Integrated CSP, Request Tracing, and API Authorization.
+
+### Continuous Development Experience
+- **Intelligent Generators**: Rapid feature domain creation (CRUD and more).
+- **Self-Healing Commands**: Centralized `doctor` and `sync` for runtime hygiene.
+- **Enterprise UI Hooks**: Pre-configured TanStack query keys and mutation patterns.
+
+---
+
+## The 0xstack Commitment
+
+A "working v1" of 0xstack represents more than just a starter kit; it's a **Standard of Excellence** for the modern web. We prioritize architectural integrity over cosmetic polish, ensuring that your foundation is unbreakable, your security is absolute, and your velocity is maximized through automated governance. 
 

@@ -8,7 +8,7 @@ function storageEnabled(ctx: { modules: { storage: false | "gcs" | "s3" | "supab
 
 export const storageCoreModule: Module = {
   id: "storage-core",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     const enabled = storageEnabled(ctx);
     const routes = [
@@ -549,6 +549,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { assetsDeleteAction, assetsSignReadAction, assetsSignUploadAction } from "@/lib/actions/assets.actions";
+import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Asset = {
   id: string;
@@ -557,17 +571,99 @@ type Asset = {
   createdAt?: string | Date;
 };
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ["image/", "application/pdf", "text/"];
+
+function validateFile(file: File): string | null {
+  if (file.size > MAX_FILE_SIZE) {
+    return "File too large. Maximum size is 10MB.";
+  }
+  const isAllowed = ALLOWED_TYPES.some(type => file.type.startsWith(type));
+  if (!isAllowed) {
+    return "File type not allowed. Allowed types: images, PDFs, text files.";
+  }
+  return null;
+}
+
 export function AssetsClient({ assets }: { assets: Asset[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const sorted = useMemo(
     () => [...assets].sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""))),
     [assets]
   );
+
+  const handleUpload = async (file: File) => {
+    const validationError = validateFile(file);
+    if (validationError) {
+      setErr(validationError);
+      return;
+    }
+
+    setErr(null);
+    setUploadProgress(0);
+    start(async () => {
+      try {
+        const signed = await assetsSignUploadAction({
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+        });
+
+        // Upload with progress tracking
+        const xhr = new XMLHttpRequest();
+        await new Promise<void>((resolve, reject) => {
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              setUploadProgress((e.loaded / e.total) * 100);
+            }
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error("Upload failed"));
+            }
+          });
+          xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+          xhr.open("PUT", signed.uploadUrl);
+          xhr.setRequestHeader("Content-Type", signed.uploadHeaders?.["content-type"] || file.type || "application/octet-stream");
+          xhr.send(file);
+        });
+
+        if (inputRef.current) inputRef.current.value = "";
+        setUploadProgress(100);
+        setTimeout(() => {
+          setUploadProgress(0);
+          router.refresh();
+        }, 500);
+      } catch (e: any) {
+        setErr(String(e?.message ?? e));
+        setUploadProgress(0);
+      }
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -575,57 +671,86 @@ export function AssetsClient({ assets }: { assets: Asset[] }) {
         <CardHeader>
           <CardTitle className="text-base">Upload</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input ref={inputRef} type="file" className="cursor-pointer sm:max-w-md" disabled={busy} />
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              const f = inputRef.current?.files?.[0];
-              if (!f) return;
-              setErr(null);
-              start(async () => {
-                try {
-                  const signed = await assetsSignUploadAction({
-                    filename: f.name,
-                    contentType: f.type || "application/octet-stream",
-                  });
-                  const put = await fetch(signed.uploadUrl, {
-                    method: "PUT",
-                    body: f,
-                    headers: signed.uploadHeaders ?? { "content-type": f.type || "application/octet-stream" },
-                  });
-                  if (!put.ok) throw new Error("upload_failed");
-                  if (inputRef.current) inputRef.current.value = "";
-                  router.refresh();
-                } catch (e: any) {
-                  setErr(String(e?.message ?? e));
-                }
-              });
-            }}
+        <CardContent className="space-y-4">
+          {/* Drag and Drop Zone */}
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={cn(
+              "flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors",
+              isDragging ? "border-primary bg-primary/5" : "border-muted",
+              busy && "opacity-50 pointer-events-none"
+            )}
           >
-            {busy ? "Working…" : "Upload"}
-          </Button>
+            <div className="text-center">
+              <p className="text-sm font-medium">Drop files here or click to select</p>
+              <p className="text-xs text-muted-foreground mt-1">Max 10MB • Images, PDFs, Text files</p>
+            </div>
+          </div>
+
+          {/* File Input */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Input ref={inputRef} type="file" className="cursor-pointer sm:max-w-md" disabled={busy} onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file);
+            }} />
+            <Button type="button" disabled={busy} onClick={() => {
+              const f = inputRef.current?.files?.[0];
+              if (f) handleUpload(f);
+            }}>
+              {busy ? "Uploading…" : "Upload"}
+            </Button>
+          </div>
+
+          {/* Progress Bar */}
+          {uploadProgress > 0 && (
+            <div className="space-y-2">
+              <Progress value={uploadProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground text-right">{Math.round(uploadProgress)}%</p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {err ? <p className="text-sm text-destructive">{err}</p> : null}
         </CardContent>
-        {err ? <p className="px-6 pb-4 text-sm text-destructive">{err}</p> : null}
       </Card>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Library</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Library</h2>
+          <Badge variant="secondary">{sorted.length} assets</Badge>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((a) => (
-            <Card key={a.id}>
+            <Card key={a.id} className="overflow-hidden">
+              {/* Thumbnail for images */}
+              {a.contentType?.startsWith("image/") && (
+                <div className="aspect-video w-full bg-muted">
+                  <img
+                    src={'/api/v1/storage/sign-read?assetId=' + a.id'}
+                    alt={a.objectKey}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              )}
               <CardHeader>
-                <CardTitle className="text-sm font-mono">{a.id}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-sm font-mono break-all">{a.id}</CardTitle>
+                  {a.contentType?.startsWith("image/") && (
+                    <Badge variant="outline" className="text-xs">Image</Badge>
+                  )}
+                </div>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <CardContent className="space-y-2 text-xs">
                 <p>
-                  <span className="text-foreground">Type:</span> {a.contentType ?? "—"}
+                  <span className="text-muted-foreground">Type:</span> {a.contentType ?? "—"}
                 </p>
                 <p className="break-all">
-                  <span className="text-foreground">Key:</span> {a.objectKey}
+                  <span className="text-muted-foreground">Key:</span> {a.objectKey}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Button
                     type="button"
                     variant="secondary"
@@ -651,30 +776,49 @@ export function AssetsClient({ assets }: { assets: Asset[] }) {
                   <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => router.push("/app/assets/" + encodeURIComponent(a.id))}>
                     Details
                   </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => {
-                      setErr(null);
-                      start(async () => {
-                        try {
-                          await assetsDeleteAction({ assetId: a.id });
-                          router.refresh();
-                        } catch (e: any) {
-                          setErr(String(e?.message ?? e));
-                        }
-                      });
-                    }}
-                  >
-                    Delete
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="destructive" size="sm" disabled={busy}>
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this asset?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This cannot be undone. The file will be permanently deleted from storage.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={async () => {
+                            setErr(null);
+                            start(async () => {
+                              try {
+                                await assetsDeleteAction({ assetId: a.id });
+                                router.refresh();
+                              } catch (e: any) {
+                                setErr(String(e?.message ?? e));
+                              }
+                            });
+                          }}
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+        {sorted.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>No assets yet. Upload your first file!</p>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -850,6 +994,6 @@ export function useAssetsMutations() {
 
     await ensureDir(path.join(ctx.projectRoot, "lib", "hooks", "client"));
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };

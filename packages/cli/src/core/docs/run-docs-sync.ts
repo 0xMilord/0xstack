@@ -32,13 +32,67 @@ async function listDirFilesOneLevel(dirPath: string) {
   }
 }
 
+// Extract headings from markdown for table of contents
+function extractHeadings(content: string): { level: number; text: string; id: string }[] {
+  const headings: { level: number; text: string; id: string }[] = [];
+  const regex = /^#{1,6}\s+(.+)$/gm;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const level = match[0].indexOf(" ");
+    const text = match[1] ?? "";
+    const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    headings.push({ level, text, id });
+  }
+  return headings;
+}
+
+// Generate table of contents markdown
+function generateTOC(headings: { level: number; text: string; id: string }[]): string {
+  if (headings.length === 0) return "";
+
+  const lines: string[] = ["## Table of Contents", ""];
+  for (const h of headings) {
+    const indent = "  ".repeat(h.level - 1);
+    lines.push(`${indent}- [${h.text}](#${h.id})`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+// Get version from CHANGELOG.md or package.json
+async function getVersion(projectRoot: string): Promise<string> {
+  try {
+    const pkgPath = path.join(projectRoot, "package.json");
+    const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+// Get related docs for cross-references
+function getRelatedDocs(docType: string): string[] {
+  const relations: Record<string, string[]> = {
+    "PRD.md": ["ARCHITECTURE.md", "ERD.md", "RUNBOOKS.md"],
+    "ARCHITECTURE.md": ["PRD.md", "ERD.md", "RUNBOOKS.md"],
+    "ERD.md": ["PRD.md", "ARCHITECTURE.md"],
+    "RUNBOOKS.md": ["PRD.md", "ARCHITECTURE.md"],
+  };
+  return relations[docType] ?? [];
+}
+
 export async function runDocsSync(input: DocsSyncInput) {
   const state = await computeProjectState(input.projectRoot, input.profile ?? "core");
+  const version = await getVersion(input.projectRoot);
+  const lastUpdated = new Date().toISOString().split("T")[0];
+
   const inv = [
     "## Inventory",
     "",
     `- Profile (computed): \`${state.appliedProfile}\``,
     `- Modules: \`${JSON.stringify(state.modules)}\``,
+    `- Version: ${version}`,
+    `- Last Updated: ${lastUpdated}`,
     "",
     "### Routes (detected)",
     ...state.routes.slice(0, 200).map((r) => `- \`${r.kind}\` ${r.path}`),
@@ -48,8 +102,31 @@ export async function runDocsSync(input: DocsSyncInput) {
   const archPath = path.join(input.projectRoot, "ARCHITECTURE.md");
   const erdPath = path.join(input.projectRoot, "ERD.md");
 
-  const prd = replaceAutoSection(await readOrEmpty(prdPath), inv);
-  const arch = replaceAutoSection(await readOrEmpty(archPath), inv);
+  // Read existing docs to extract headings for TOC
+  const prdContent = await readOrEmpty(prdPath);
+  const archContent = await readOrEmpty(archPath);
+  const erdContent = await readOrEmpty(erdPath);
+
+  // Generate TOCs
+  const prdTOC = generateTOC(extractHeadings(prdContent));
+  const archTOC = generateTOC(extractHeadings(archContent));
+  const erdTOC = generateTOC(extractHeadings(erdContent));
+
+  // Cross-reference links
+  const prdRelated = getRelatedDocs("PRD.md");
+  const archRelated = getRelatedDocs("ARCHITECTURE.md");
+  const erdRelated = getRelatedDocs("ERD.md");
+
+  const relatedDocsSection = (related: string[]) => [
+    "",
+    "## Related Docs",
+    "",
+    ...related.map(f => `- [${f.replace(".md", "")}](./${f.replace(".md", "").toLowerCase()})`),
+    "",
+  ].join("\n");
+
+  const prd = replaceAutoSection(prdContent, [prdTOC, inv, relatedDocsSection(prdRelated)].join("\n"));
+  const arch = replaceAutoSection(archContent, [archTOC, inv, relatedDocsSection(archRelated)].join("\n"));
   const erdPrev = await readOrEmpty(erdPath);
 
   // ERD: best-effort parse from Drizzle SQL migrations (tables + FKs).
@@ -123,11 +200,11 @@ export async function runDocsSync(input: DocsSyncInput) {
   }
 
   const erdBody = await buildErdFromMigrations();
-  const erd = replaceAutoSection(erdPrev, [inv, "", erdBody].join("\n"));
+  const erd = replaceAutoSection(erdPrev, [erdTOC, inv, relatedDocsSection(erdRelated), erdBody].join("\n"));
 
-  await writeEnsured(prdPath, prd || `# PRD\n\n${inv}\n`);
-  await writeEnsured(archPath, arch || `# ARCHITECTURE\n\n${inv}\n`);
-  await writeEnsured(erdPath, erd || `# ERD\n\n${inv}\n`);
+  await writeEnsured(prdPath, prd || `# PRD\n\n${prdTOC}${inv}${relatedDocsSection(prdRelated)}\n`);
+  await writeEnsured(archPath, arch || `# ARCHITECTURE\n\n${archTOC}${inv}${relatedDocsSection(archRelated)}\n`);
+  await writeEnsured(erdPath, erd || `# ERD\n\n${erdTOC}${inv}${relatedDocsSection(erdRelated)}\n`);
 
   // Root README.md (PRD-equivalent, barebones but complete)
   const readmePath = path.join(input.projectRoot, "README.md");
@@ -423,6 +500,7 @@ export async function runDocsSync(input: DocsSyncInput) {
       "### Required environment",
       "- `RESEND_API_KEY` — Resend API key",
       "- `RESEND_FROM` — Verified sender (e.g. `Acme <noreply@acme.com>`)",
+      "- `COMPANY_ADDRESS` — Physical address for legal compliance (CAN-SPAM/GDPR)",
       "",
       "### Testing locally",
       "1. Use `RESEND_API_KEY=re_test_...` for test mode (emails logged, not sent)",

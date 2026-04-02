@@ -1,9 +1,0 @@
-At line:1 char:126
-+ ... \src\core\modules\security-api.module.ts' -Raw; $insert = @'\n\n    a ...
-+                                                                 ~
-No characters are allowed after a here-string header but before the end of the 
-line.
-    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordEx 
-   ception
-    + FullyQualifiedErrorId : UnexpectedCharactersAfterHereStringHeader
- 

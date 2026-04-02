@@ -180,7 +180,7 @@ export async function runInit(input: InitInput) {
         // pnpm safety: allow required build scripts (esbuild) for common tooling.
         if (input.packageManager === "pnpm") {
           await ensurePnpmOnlyBuiltDependencies(projectRoot);
-          await execCmd("pnpm", ["install"], { cwd: projectRoot });
+          await execCmd("pnpm", ["install", "--yes"], { cwd: projectRoot });
         }
         return { kind: "ok" };
       },
@@ -330,7 +330,9 @@ export default function Page() {
 `;
 
         // Sophisticated 0xstack homepage with brand identity
-        const homepage = `import Link from "next/link";
+        const homepage = `"use client";
+
+import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -427,6 +429,62 @@ export default function Page() {
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link className={buttonVariants({ variant: "secondary", size: "lg" })} href="/get-started">Get started</Link>
             <Link className={buttonVariants({ variant: "outline", size: "lg", className: "bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10" })} href="/pricing">Pricing</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Blog Section */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Latest from the blog</h2>
+            <p className="mt-4 text-lg text-muted-foreground">Insights on building with ${input.name}.</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Link href="/blog/what-is-${input.name.toLowerCase().replace(/\s+/g, '-')}" className="group">
+              <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+                <div className="aspect-video w-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent" />
+                <CardHeader>
+                  <Badge variant="secondary" className="mb-2 w-fit">Featured</Badge>
+                  <CardTitle className="text-xl group-hover:underline">What is ${input.name}?</CardTitle>
+                  <CardDescription>A deep dive into the production-ready architecture built for vibecoders.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <time className="text-sm text-muted-foreground">April 2, 2026</time>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/blog/how-${input.name.toLowerCase().replace(/\s+/g, '-')}-works" className="group">
+              <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+                <div className="aspect-video w-full bg-gradient-to-br from-muted/50 to-muted/20" />
+                <CardHeader>
+                  <Badge variant="secondary" className="mb-2 w-fit">Tutorial</Badge>
+                  <CardTitle className="text-xl group-hover:underline">How ${input.name} Works</CardTitle>
+                  <CardDescription>Understanding the CQRS pattern and boundaries inside the framework.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <time className="text-sm text-muted-foreground">April 1, 2026</time>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/blog/vibecoding-with-${input.name.toLowerCase().replace(/\s+/g, '-')}" className="group">
+              <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
+                <div className="aspect-video w-full bg-gradient-to-br from-muted/50 to-muted/20" />
+                <CardHeader>
+                  <Badge variant="secondary" className="mb-2 w-fit">AI</Badge>
+                  <CardTitle className="text-xl group-hover:underline">Vibecoding with ${input.name}</CardTitle>
+                  <CardDescription>How to leverage AI coding assistants within structured boundaries.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <time className="text-sm text-muted-foreground">March 31, 2026</time>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+          <div className="mt-8 text-center">
+            <Link href="/blog" className={buttonVariants({ variant: "outline" })}>
+              View all posts →
+            </Link>
           </div>
         </div>
       </section>

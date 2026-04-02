@@ -323,7 +323,11 @@ export async function runDoctor(input: DoctorInput) {
     for (const f of ["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts", "lib/loaders/blog.loader.ts"]) {
       if (!(await exists(path.join(input.projectRoot, f)))) addIssue(`Blog enabled but missing: ${f}`);
     }
-    await checkFiles("blog.content", ["content/blog/hello-world.mdx"]);
+    await checkFiles("blog.content", [
+      "content/blog/what-is-0xstack.mdx",
+      "content/blog/how-0xstack-works.mdx",
+      "content/blog/vibecoding-with-0xstack.mdx",
+    ]);
   }
   if (!mustHaveBlog) {
     await checkAbsent("blog.disabled", ["app/blog/page.tsx", "app/blog/[slug]/page.tsx", "app/rss.xml/route.ts", "lib/loaders/blog.loader.ts"]);
@@ -337,6 +341,7 @@ export async function runDoctor(input: DoctorInput) {
       "lib/email/templates/verify-email.tsx",
       "lib/email/templates/reset-password.tsx",
       "lib/email/templates/welcome-email.tsx",
+      "lib/email/EMAIL_SETUP.md",
     ]);
     const emailEnvPath = path.join(input.projectRoot, "lib/env/email.ts");
     const emailEnv = (await exists(emailEnvPath)) ? await fs.readFile(emailEnvPath, "utf8") : "";
@@ -351,6 +356,7 @@ export async function runDoctor(input: DoctorInput) {
       "lib/email/auth-emails.ts",
       "lib/email/templates/verify-email.tsx",
       "lib/email/templates/reset-password.tsx",
+      "lib/email/EMAIL_SETUP.md",
     ]);
   }
 
