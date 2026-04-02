@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <strong>Production architecture system for Next.js</strong>
+  <strong>Production CQRS Architecture system for Next.js | PostgreSQL | Drizzle | Better Auth | TanStack Query</strong>
 </p>
 
 <p align="center">

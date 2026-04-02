@@ -32,7 +32,7 @@ async function patchRootLayoutForPwa(projectRoot: string) {
 
 export const pwaModule: Module = {
   id: "pwa",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     if (!ctx.modules.pwa) {
       await backupAndRemove(ctx.projectRoot, "public/manifest.webmanifest");
@@ -272,19 +272,35 @@ export default async function Page() {
       `{
   "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "id": "/?source=pwa",
-  "name": "${ctx.profile === "full" ? "0xstack" : "0xstack"}",
-  "short_name": "0xstack",
-  "description": "Production-grade Next.js starter.",
+  "name": "${ctx.projectName || "0xstack"}",
+  "short_name": "${(ctx.projectName || "0xstack").substring(0, 12)}",
+  "description": "Production-ready Next.js starter.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "any",
   "theme_color": "#000000",
-  "background_color": "#000000",
+  "background_color": "#ffffff",
   "categories": ["productivity", "business"],
   "lang": "en-US",
   "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "description": "Open app settings",
+      "url": "/app/settings",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open your dashboard",
+      "url": "/app",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
@@ -399,6 +415,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
 });
 
+// Handle SKIP_WAITING message from client
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   const data = event.data.json();
@@ -426,13 +449,90 @@ self.addEventListener("notificationclick", (event) => {
       path.join(ctx.projectRoot, "lib", "pwa", "register-sw.client.ts"),
       `"use client";
 
+import { useEffect, useState } from "react";
+
 export async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   try {
-    await navigator.serviceWorker.register("/sw.js");
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    
+    // Listen for updates
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+      
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          // New service worker available, user needs to refresh
+          window.dispatchEvent(new CustomEvent("sw-update-available"));
+        }
+      });
+    });
   } catch {
     // ignore
   }
+}
+
+/**
+ * PWA status hook - tracks installability and update availability.
+ * Use this to show custom install prompts and update notifications.
+ */
+export function usePwaStatus() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+    }
+
+    // Listen for install prompt
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+
+    // Listen for SW updates
+    const handleUpdate = () => setUpdateAvailable(true);
+    window.addEventListener("sw-update-available", handleUpdate);
+
+    // Listen for successful install
+    window.addEventListener("appinstalled", () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("sw-update-available", handleUpdate);
+    };
+  }, []);
+
+  const canInstall = !!deferredPrompt && !isInstalled;
+
+  const install = async () => {
+    if (!deferredPrompt) return false;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+    return outcome === "accepted";
+  };
+
+  const refreshForUpdate = () => {
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "SKIP_WAITING" });
+      window.location.reload();
+    }
+  };
+
+  return { canInstall, isInstalled, updateAvailable, install, refreshForUpdate };
 }
 `
     );
@@ -682,7 +782,7 @@ export async function POST(req: Request) {
 
     await patchRootLayoutForPwa(ctx.projectRoot);
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 

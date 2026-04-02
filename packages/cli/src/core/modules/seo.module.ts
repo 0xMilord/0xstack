@@ -16,10 +16,10 @@ async function patchRootLayoutForSeo(projectRoot: string) {
       src = src.replace(
         /import\s+["']\.\/globals\.css["'];\s*/m,
         (m) =>
-          `${m}import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";\n`
+          `${m}import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd, softwareApplicationJsonLd } from "@/lib/seo/jsonld";\n`
       );
     } else {
-      src = `import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";\n${src}`;
+      src = `import { getSiteMetadata } from "@/lib/seo/metadata";\nimport { safeJsonLd, websiteJsonLd, organizationJsonLd, softwareApplicationJsonLd } from "@/lib/seo/jsonld";\n${src}`;
     }
   }
 
@@ -51,7 +51,7 @@ async function patchRootLayoutForSeo(projectRoot: string) {
   // Note: works with most create-next-app and our ui-foundation patch.
   src = src.replace(
     /<body([^>]*)>/m,
-    `<body$1>\n        {/* 0xstack:SEO */}\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd()) }} />\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd()) }} />`
+    `<body$1>\n        {/* 0xstack:SEO */}\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd()) }} />\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd()) }} />\n        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(softwareApplicationJsonLd()) }} />`
   );
 
   await fs.writeFile(layoutPath, src, "utf8");
@@ -91,50 +91,76 @@ export function getSeoRuntimeConfig() {
       path.join(ctx.projectRoot, "lib", "seo", "jsonld.ts"),
       `import { env } from "@/lib/env/server";
 
+/**
+ * Centralized SEO data source — single source of truth for all JSON-LD and metadata.
+ * All SEO values flow from this config.
+ */
+export function getSeoData() {
+  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
+  const description = env.NEXT_PUBLIC_APP_DESCRIPTION ?? "Production-ready Next.js starter.";
+  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const twitterHandle = env.NEXT_PUBLIC_TWITTER_HANDLE; // optional
+
+  return {
+    name,
+    description,
+    url,
+    twitterHandle,
+    logo: \`\${url}/icon.svg\`,
+    icon: \`\${url}/icon.svg\`,
+  };
+}
+
 export function safeJsonLd<T>(data: T): string {
   return JSON.stringify(data).replace(/</g, "\\\\u003c");
 }
 
 export function organizationJsonLd() {
-  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
-  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const seo = getSeoData();
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name,
-    url,
+    name: seo.name,
+    url: seo.url,
+    logo: seo.logo,
+    description: seo.description,
   } as const;
 }
 
 export function websiteJsonLd() {
-  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
-  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const seo = getSeoData();
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name,
-    url,
+    name: seo.name,
+    url: seo.url,
+    description: seo.description,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: \`\${seo.url}/search?q={search_term_string}\`,
+      },
+      "query-input": "required name=search_term_string",
+    },
   } as const;
 }
 
 /**
  * SoftwareApplication JSON-LD for SaaS discoverability in SERPs and AI crawlers.
- * Use on homepage and product pages.
  */
 export function softwareApplicationJsonLd(input?: {
   applicationCategory?: string;
   operatingSystem?: string;
   offers?: { price: string; priceCurrency: string }[];
 }) {
-  const name = env.NEXT_PUBLIC_APP_NAME ?? "0xstack";
-  const url = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const description = env.NEXT_PUBLIC_APP_DESCRIPTION ?? "Production-ready Next.js starter.";
+  const seo = getSeoData();
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name,
-    description,
-    url,
+    name: seo.name,
+    description: seo.description,
+    url: seo.url,
     applicationCategory: input?.applicationCategory ?? "DeveloperApplication",
     operatingSystem: input?.operatingSystem ?? "Web",
     offers: input?.offers?.map((o) => ({
@@ -142,11 +168,34 @@ export function softwareApplicationJsonLd(input?: {
       price: o.price,
       priceCurrency: o.priceCurrency,
     })),
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "5.0",
+      ratingCount: "1",
+    },
   } as const;
 }
 
 /**
- * FAQPage JSON-LD for FAQ sections. Helps with rich snippets in Google.
+ * Organization schema with orgId for multi-tenant setups.
+ * Use on org-specific pages when org data is available.
+ */
+export function localBusinessJsonLd(orgData?: { name: string; orgId: string; url?: string }) {
+  const seo = getSeoData();
+  const orgName = orgData?.name ?? seo.name;
+  const orgUrl = orgData?.url ?? seo.url;
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: orgName,
+    url: orgUrl,
+    description: seo.description,
+    identifier: orgData?.orgId,
+  } as const;
+}
+
+/**
+ * FAQPage JSON-LD for FAQ sections.
  */
 export function faqPageJsonLd(faqs: { question: string; answer: string }[]) {
   return {
@@ -176,6 +225,37 @@ export function breadcrumbListJsonLd(items: { name: string; item: string }[]) {
       name: item.name,
       item: item.item,
     })),
+  } as const;
+}
+
+/**
+ * Article JSON-LD for blog posts and content pages.
+ */
+export function articleJsonLd(input: {
+  headline: string;
+  description: string;
+  url: string;
+  datePublished: string;
+  dateModified?: string;
+  author?: string;
+  image?: string;
+}) {
+  const seo = getSeoData();
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: input.headline,
+    description: input.description,
+    url: input.url,
+    datePublished: input.datePublished,
+    dateModified: input.dateModified ?? input.datePublished,
+    author: input.author ? { "@type": "Person", name: input.author } : undefined,
+    image: input.image ?? \`\${seo.url}/opengraph-image.png\`,
+    publisher: {
+      "@type": "Organization",
+      name: seo.name,
+      logo: seo.logo,
+    },
   } as const;
 }
 `
@@ -299,18 +379,121 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 `
     );
 
-    // Social images (basic, but production-valid)
+    // Dynamic OG images with satori + lucide icons
+    await ensureDir(path.join(ctx.projectRoot, "app", "api", "og"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "api", "og", "route.tsx"),
+      `import { ImageResponse } from "next/og";
+import { getSeoData } from "@/lib/seo/jsonld";
+
+export const runtime = "edge";
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const title = url.searchParams.get("title") || "0xstack";
+  const description = url.searchParams.get("description") || "Production-ready Next.js starter";
+  const icon = url.searchParams.get("icon") || "zap";
+
+  const seo = getSeoData();
+
+  // Fetch inter font
+  const fontData = await fetch(
+    "https://og-playground.vercel.app/inter-latin-400-normal.woff"
+  ).then((res) => res.arrayBuffer());
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: 80,
+          background: "#0a0a0a",
+          color: "#ffffff",
+        }}
+      >
+        {/* Left: Title and description */}
+        <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 72, fontWeight: 800, lineHeight: 1.1, marginBottom: 24 }}>
+              {title}
+            </div>
+            {description && (
+              <div style={{ fontSize: 32, color: "#a3a3a3", lineHeight: 1.4 }}>
+                {description}
+              </div>
+            )}
+          </div>
+          {/* Right: Icon */}
+          <div
+            style={{
+              width: 160,
+              height: 160,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              borderRadius: 24,
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="80"
+              height="80"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Simple lightning bolt icon */}
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Bottom: App name */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 28, color: "#737373" }}>
+            {seo.name}
+          </div>
+          <div style={{ fontSize: 20, color: "#525252" }}>
+            {new URL(seo.url).hostname}
+          </div>
+        </div>
+      </div>
+    ),
+    {
+      width: 1200,
+      height: 630,
+      fonts: [{ name: "Inter", data: fontData, weight: 400, style: "normal" }],
+    }
+  );
+}
+`
+    );
+
+    // Static OG image (fallback)
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "opengraph-image.tsx"),
       `import { ImageResponse } from "next/og";
-import { env } from "@/lib/env/server";
+import { getSeoData } from "@/lib/seo/jsonld";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function Image() {
-  const appName = env.NEXT_PUBLIC_APP_NAME || "0xstack";
+export default async function Image() {
+  const seo = getSeoData();
+
+  const fontData = await fetch(
+    "https://og-playground.vercel.app/inter-latin-400-normal.woff"
+  ).then((res) => res.arrayBuffer());
+
   return new ImageResponse(
     (
       <div
@@ -320,16 +503,53 @@ export default function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          padding: 64,
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          padding: 80,
+          background: "#0a0a0a",
           color: "#ffffff",
         }}
       >
-        <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1.05 }}>{appName}</div>
-        <div style={{ marginTop: 20, fontSize: 28, color: "#e0e0e0" }}>Production-ready Next.js Starter</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 80, fontWeight: 800, lineHeight: 1.1 }}>
+              {seo.name}
+            </div>
+            <div style={{ marginTop: 24, fontSize: 36, color: "#a3a3a3" }}>
+              {seo.description}
+            </div>
+          </div>
+          <div
+            style={{
+              width: 180,
+              height: 180,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              borderRadius: 28,
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="90"
+              height="90"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+        </div>
       </div>
     ),
-    size
+    {
+      width: 1200,
+      height: 630,
+      fonts: [{ name: "Inter", data: fontData, weight: 400, style: "normal" }],
+    }
   );
 }
 `

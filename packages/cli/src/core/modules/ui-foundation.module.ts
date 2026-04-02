@@ -36,7 +36,7 @@ async function patchRootLayout(projectRoot: string) {
 
 export const uiFoundationModule: Module = {
   id: "ui-foundation",
-  install: async () => {},
+  install: async () => { },
   activate: async (ctx) => {
     // Layout components
     await ensureDir(path.join(ctx.projectRoot, "components", "layout"));
@@ -96,7 +96,10 @@ export function SiteFooter() {
   return (
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-        <p>© {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}. All rights reserved.</p>
+        <div className="flex flex-col gap-1">
+          <p>© {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">Powered by <Link href="https://github.com/0xmilord/0xstack" target="_blank" className="hover:underline">0xstack</Link></p>
+        </div>
         <div className="flex items-center gap-4">
           <Link className="hover:underline" href="/terms">Terms</Link>
           <Link className="hover:underline" href="/privacy">Privacy</Link>
@@ -443,7 +446,7 @@ export default function Page() {
 
     await patchRootLayout(ctx.projectRoot);
   },
-  validate: async () => {},
-  sync: async () => {},
+  validate: async () => { },
+  sync: async () => { },
 };
 

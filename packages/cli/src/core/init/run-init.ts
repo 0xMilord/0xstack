@@ -326,7 +326,7 @@ export default function Page() {
           <div className="text-center">
             <Badge variant="secondary" className="mb-4">Production Architecture System</Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              Ship faster with <span className="text-primary">${input.name}</span>
+              ${input.name}
             </h1>
             <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
               ${input.description}
@@ -442,10 +442,6 @@ export default function Page() {
   <rect width="100" height="100" rx="20" fill="oklch(var(--primary))"/>
   <text x="50" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="60" font-weight="700" fill="oklch(var(--primary-foreground))" text-anchor="middle">${input.name.charAt(0).toUpperCase()}</text>
 </svg>`
-        );
-        await writeFileEnsured(
-          path.join(projectRoot, "app", "apple-icon.png"),
-          Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64")
         );
 
         // Replace create-next-app README with a real, PRD-equivalent overview (docs sync can refresh later).
