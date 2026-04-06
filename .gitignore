@@ -29,6 +29,9 @@ coverage/
 PRD.md
 storage-expansion.md
 roadmap.md
+# Local / vendor docs clones (not part of this repo)
+dodo-docs/
+
 # IDE
 .vscode/
 .idea/
