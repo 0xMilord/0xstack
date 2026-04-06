@@ -268,6 +268,23 @@ import { pwaSendTestPushAction, pwaUnsubscribeEndpointAction } from "@/lib/actio
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 
+/**
+ * Parse a push subscription endpoint URL into human-readable browser/platform info.
+ */
+function describeEndpoint(endpoint: string) {
+  try {
+    const u = new URL(endpoint);
+    if (u.hostname.includes("fcm.googleapis.com")) return "Chrome (FCM)";
+    if (u.hostname.includes("push.services.mozilla.com")) return "Firefox";
+    if (u.hostname.includes("web.push.apple.com")) return "Safari (Apple)";
+    if (u.hostname.includes("notify.windows.com")) return "Edge (Windows)";
+    if (u.hostname.includes("wns")) return "Windows (WNS)";
+    return u.hostname;
+  } catch {
+    return endpoint;
+  }
+}
+
 export default async function Page() {
   const { vapidPublicKey, subscriptions } = await loadPwaSettings();
   return (
@@ -304,7 +321,10 @@ export default async function Page() {
           {subscriptions.length ? (
             subscriptions.map((s: any) => (
               <div key={s.endpoint} className="flex items-center justify-between gap-3 rounded-md border p-3">
-                <p className="font-mono text-xs truncate">{s.endpoint}</p>
+                <div className="min-w-0">
+                  <p className="font-medium">{describeEndpoint(s.endpoint)}</p>
+                  <p className="font-mono text-xs text-muted-foreground truncate">{s.endpoint}</p>
+                </div>
                 <form
                   action={async () => {
                     "use server";
