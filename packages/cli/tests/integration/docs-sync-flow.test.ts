@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { runBaseline } from "../../src/core/baseline/run-baseline";
+import { runDocsSync } from "../../src/core/docs/run-docs-sync";
 
-describe("Baseline Command - Full Flow Tests", () => {
+describe("Docs Sync Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-baseline-flow-"));
-    // Create minimal app structure (simulating what init would create)
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-docs-flow-"));
+    // Create minimal app structure
     await fs.mkdir(path.join(tmpDir, "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "db"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "env"), { recursive: true });
@@ -223,137 +223,120 @@ export async function getSeoConfig() {}`, "utf8");
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it("baseline validates project root", async () => {
-    // Should not throw - valid project root
-    await expect(runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
-  }, 120_000);
+  it("docs sync generates README", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline ensures drizzle config exists", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const readme = await fs.readFile(path.join(tmpDir, "README.md"), "utf8");
+    expect(readme).toContain("TestApp");
+    expect(readme).toContain("0xstack");
+    expect(readme).toContain("CQRS");
+  }, 30_000);
 
-    const drizzleConfig = await fs.readFile(path.join(tmpDir, "drizzle.config.ts"), "utf8");
-    expect(drizzleConfig).toContain("defineConfig");
-    expect(drizzleConfig).toContain("./lib/db/schema.ts");
-    expect(drizzleConfig).toContain("postgresql");
-  }, 120_000);
+  it("docs sync generates PRD", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline ensures config exists", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const prd = await fs.readFile(path.join(tmpDir, "PRD.md"), "utf8");
+    expect(prd).toContain("Product Requirements Document");
+    expect(prd).toContain("TestApp");
+  }, 30_000);
 
-    const config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
-    expect(config).toContain("defineConfig");
-    expect(config).toContain("TestApp");
-  }, 120_000);
+  it("docs sync generates ARCH", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline ensures env schema stubs", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
+    expect(arch).toContain("Architecture");
+    expect(arch).toContain("CQRS");
+  }, 30_000);
 
-    const billingEnv = await fs.readFile(path.join(tmpDir, "lib/env/billing.ts"), "utf8");
-    expect(billingEnv).toContain("BillingEnvSchema");
+  it("docs sync generates ERD from migrations", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-    const storageEnv = await fs.readFile(path.join(tmpDir, "lib/env/storage.ts"), "utf8");
-    expect(storageEnv).toContain("StorageEnvSchema");
-  }, 120_000);
+    const erd = await fs.readFile(path.join(tmpDir, "ERD.md"), "utf8");
+    expect(erd).toContain("Entity Relationship Diagram");
+  }, 30_000);
 
-  it("baseline upgrades config runtime schema", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("docs sync generates lib/*/README.md for each module", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-    const runtimeSchema = await fs.readFile(path.join(tmpDir, "lib/0xstack/config.ts"), "utf8");
-    expect(runtimeSchema).toContain("ConfigSchema");
-    expect(runtimeSchema).toContain("defineConfig");
-  }, 120_000);
+    // Check that lib READMEs exist for core modules
+    const authReadme = await fs.readFile(path.join(tmpDir, "lib/auth/README.md"), "utf8");
+    expect(authReadme).toContain("Auth");
 
-  it("baseline loads config and applies profile", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const orgsReadme = await fs.readFile(path.join(tmpDir, "lib/orgs/README.md"), "utf8");
+    expect(orgsReadme).toContain("Orgs");
 
-    const state = await fs.readFile(path.join(tmpDir, "lib/0xstack/state.json"), "utf8");
-    const parsed = JSON.parse(state);
-    expect(parsed).toHaveProperty("appliedProfile", "core");
-    expect(parsed).toHaveProperty("modules");
-  }, 120_000);
+    const cacheReadme = await fs.readFile(path.join(tmpDir, "lib/cache/README.md"), "utf8");
+    expect(cacheReadme).toContain("Cache");
 
-  it("baseline installs module deps", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const securityReadme = await fs.readFile(path.join(tmpDir, "lib/security/README.md"), "utf8");
+    expect(securityReadme).toContain("Security");
+  }, 30_000);
 
-    const pkg = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
-    expect(pkg.dependencies).toHaveProperty("better-auth");
-    expect(pkg.dependencies).toHaveProperty("drizzle-orm");
-    expect(pkg.dependencies).toHaveProperty("zod");
-    expect(pkg.devDependencies).toHaveProperty("drizzle-kit");
-    expect(pkg.devDependencies).toHaveProperty("vitest");
-  }, 120_000);
+  it("docs sync includes module inventory in README", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline generates PRD tooling", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const readme = await fs.readFile(path.join(tmpDir, "README.md"), "utf8");
+    expect(readme).toContain("Modules");
+    expect(readme).toContain("auth");
+    expect(readme).toContain("orgs");
+    expect(readme).toContain("cache");
+  }, 30_000);
 
-    const eslintBoundaries = await fs.readFile(path.join(tmpDir, "eslint.0xstack-boundaries.mjs"), "utf8");
-    expect(eslintBoundaries).toContain("no-restricted-imports");
+  it("docs sync includes CQRS contract in ARCH", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-    const moduleFactories = await fs.readFile(path.join(tmpDir, "lib/services/module-factories.ts"), "utf8");
-    expect(moduleFactories).toContain("getBillingService");
-    expect(moduleFactories).toContain("getStorageService");
-    expect(moduleFactories).toContain("getSeoConfig");
+    const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
+    expect(arch).toContain("Read");
+    expect(arch).toContain("Write");
+    expect(arch).toContain("Loaders");
+    expect(arch).toContain("Actions");
+    expect(arch).toContain("Repos");
+    expect(arch).toContain("Services");
+  }, 30_000);
 
-    const vitestConfig = await fs.readFile(path.join(tmpDir, "vitest.config.ts"), "utf8");
-    expect(vitestConfig).toContain("vitest/config");
-    expect(vitestConfig).toContain("tests/**/*.test.ts");
-  }, 120_000);
+  it("docs sync includes layer definitions in ARCH", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline activates modules", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
+    expect(arch).toContain("Repos");
+    expect(arch).toContain("Loaders");
+    expect(arch).toContain("Rules");
+    expect(arch).toContain("Services");
+    expect(arch).toContain("Server actions");
+    expect(arch).toContain("API routes");
+    expect(arch).toContain("Client hooks");
+  }, 30_000);
 
-    // Core modules should exist
-    const cacheConfig = await fs.access(path.join(tmpDir, "lib/cache/config.ts")).then(() => true).catch(() => false);
-    expect(cacheConfig).toBe(true);
+  it("docs sync is idempotent (can run twice)", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
+    await expect(runDocsSync({ projectRoot: tmpDir, profile: "core" })).resolves.not.toThrow();
+  }, 60_000);
 
-    const authHandler = await fs.access(path.join(tmpDir, "app/api/auth/[...all]/route.ts")).then(() => true).catch(() => false);
-    expect(authHandler).toBe(true);
+  it("docs sync generates docs for all enabled modules", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-    const orgsPage = await fs.access(path.join(tmpDir, "app/app/orgs/page.tsx")).then(() => true).catch(() => false);
-    expect(orgsPage).toBe(true);
-  }, 120_000);
+    // Core modules should have READMEs
+    const coreModules = ["auth", "orgs", "cache", "security", "webhook-ledger", "observability"];
+    for (const mod of coreModules) {
+      const readmePath = path.join(tmpDir, "lib", mod, "README.md");
+      const exists = await fs.access(readmePath).then(() => true).catch(() => false);
+      expect(exists).toBe(true);
+    }
+  }, 30_000);
 
-  it("baseline ensures query/mutation key indices", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("docs sync generates ERD with table definitions", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-    const queryIndex = await fs.readFile(path.join(tmpDir, "lib/query-keys/index.ts"), "utf8");
-    expect(queryIndex).toContain("export * from");
+    const erd = await fs.readFile(path.join(tmpDir, "ERD.md"), "utf8");
+    // Should contain table definitions from schema
+    expect(erd.length).toBeGreaterThan(0);
+  }, 30_000);
 
-    const mutationIndex = await fs.readFile(path.join(tmpDir, "lib/mutation-keys/index.ts"), "utf8");
-    expect(mutationIndex).toContain("export * from");
-  }, 120_000);
+  it("docs sync generates PRD with module status", async () => {
+    await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
-  it("baseline upgrades auth pages", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
-    const login = await fs.readFile(path.join(tmpDir, "app/login/page.tsx"), "utf8");
-    expect(login).toContain("authClient.signIn.email");
-
-    const signup = await fs.readFile(path.join(tmpDir, "app/get-started/page.tsx"), "utf8");
-    expect(signup).toContain("authClient.signUp.email");
-
-    const forgot = await fs.readFile(path.join(tmpDir, "app/forgot-password/page.tsx"), "utf8");
-    expect(forgot).toContain("requestPasswordReset");
-
-    const reset = await fs.readFile(path.join(tmpDir, "app/reset-password/page.tsx"), "utf8");
-    expect(reset).toContain("resetPassword");
-  }, 120_000);
-
-  it("baseline generates docs", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
-    const readme = await fs.access(path.join(tmpDir, "README.md")).then(() => true).catch(() => false);
-    expect(readme).toBe(true);
-
-    const prd = await fs.access(path.join(tmpDir, "PRD.md")).then(() => true).catch(() => false);
-    expect(prd).toBe(true);
-
-    const arch = await fs.access(path.join(tmpDir, "ARCHITECTURE.md")).then(() => true).catch(() => false);
-    expect(arch).toBe(true);
-  }, 120_000);
-
-  it("baseline is idempotent (can run twice without errors)", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-    await expect(runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
-  }, 240_000);
+    const prd = await fs.readFile(path.join(tmpDir, "PRD.md"), "utf8");
+    expect(prd).toContain("Modules");
+    expect(prd).toContain("Status");
+  }, 30_000);
 });

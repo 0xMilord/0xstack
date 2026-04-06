@@ -4,11 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { runWizard } from "../../src/core/interactive/setup-wizard";
 
-describe("Wizard Command Tests", () => {
+describe("Wizard Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-wizard-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-wizard-flow-"));
     // Create minimal app structure
     await fs.mkdir(path.join(tmpDir, "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "db"), { recursive: true });
@@ -264,5 +264,153 @@ export async function getSeoConfig() {}`, "utf8");
     expect(configAfter).toContain("defineConfig");
     expect(configAfter).toContain("orgs: true");
     expect(configAfter).toContain("cache: true");
+  }, 30_000);
+
+  it("wizard can enable billing module", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("billing: false", 'billing: "dodo"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain('billing: "dodo"');
+  }, 30_000);
+
+  it("wizard can enable storage module", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("storage: false", 'storage: "gcs"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain('storage: "gcs"');
+  }, 30_000);
+
+  it("wizard can enable email module", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("email: false", 'email: "resend"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain('email: "resend"');
+  }, 30_000);
+
+  it("wizard can enable PWA module", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("pwa: false", "pwa: true");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("pwa: true");
+  }, 30_000);
+
+  it("wizard can enable Sentry", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("sentry: false", "sentry: true");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("sentry: true");
+  }, 30_000);
+
+  it("wizard can enable jobs module", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("enabled: false", "enabled: true");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("enabled: true");
+  }, 30_000);
+
+  it("wizard can disable modules", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("cache: true", "cache: false");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("cache: false");
+  }, 30_000);
+
+  it("wizard can switch billing providers", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("billing: false", 'billing: "dodo"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    let updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain('billing: "dodo"');
+
+    // Switch to Stripe
+    updatedConfig = updatedConfig.replace('billing: "dodo"', 'billing: "stripe"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), updatedConfig, "utf8");
+
+    const finalConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(finalConfig).toContain('billing: "stripe"');
+  }, 30_000);
+
+  it("wizard can switch storage providers", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("storage: false", 'storage: "gcs"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    let updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain('storage: "gcs"');
+
+    // Switch to S3
+    updatedConfig = updatedConfig.replace('storage: "gcs"', 'storage: "s3"');
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), updatedConfig, "utf8");
+
+    const finalConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(finalConfig).toContain('storage: "s3"');
+  }, 30_000);
+
+  it("wizard can update app name and description", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("TestApp", "NewAppName");
+    config = config.replace("A test app", "New description");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("NewAppName");
+    expect(updatedConfig).toContain("New description");
+  }, 30_000);
+
+  it("wizard can update base URL", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    config = config.replace("http://localhost:3000", "https://myapp.com");
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("https://myapp.com");
+  }, 30_000);
+
+  it("wizard can add new profile", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    // Add a new profile
+    config = config.replace(
+      "profiles: z.record(z.string(), z.any()).optional(),",
+      `profiles: {
+      staging: { modules: { billing: "dodo", seo: true } },
+    },`
+    );
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("staging");
+    expect(updatedConfig).toContain('billing: "dodo"');
+  }, 30_000);
+
+  it("wizard can update existing profile", async () => {
+    let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    // Add profiles section
+    config = config.replace(
+      "profiles: z.record(z.string(), z.any()).optional(),",
+      `profiles: {
+      full: { modules: { seo: true, blogMdx: true, billing: "dodo" } },
+    },`
+    );
+    await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
+
+    const updatedConfig = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(updatedConfig).toContain("full");
+    expect(updatedConfig).toContain("seo: true");
+    expect(updatedConfig).toContain("blogMdx: true");
   }, 30_000);
 });

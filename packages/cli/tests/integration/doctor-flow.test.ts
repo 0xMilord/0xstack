@@ -309,4 +309,185 @@ export const orgs = pgTable("orgs", {
     );
     expect(hasFactoryIssue).toBe(true);
   }, 30_000);
+
+  it("detects architecture boundary violations (app importing db directly)", async () => {
+    // Create a file that imports db from app/
+    const violatingFile = path.join(tmpDir, "app", "api", "v1", "bad", "route.ts");
+    await fs.mkdir(path.dirname(violatingFile), { recursive: true });
+    await fs.writeFile(violatingFile, `import { db } from "@/lib/db";\nexport async function GET() { return new Response("bad"); }\n`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasBoundaryIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("lib/db")
+    );
+    expect(hasBoundaryIssue).toBe(true);
+  }, 30_000);
+
+  it("detects architecture boundary violations (app importing repos directly)", async () => {
+    const violatingFile = path.join(tmpDir, "app", "api", "v1", "bad", "route.ts");
+    await fs.mkdir(path.dirname(violatingFile), { recursive: true });
+    await fs.writeFile(violatingFile, `import { db } from "@/lib/repos/orgs.repo";\nexport async function GET() { return new Response("bad"); }\n`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasBoundaryIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("lib/repos")
+    );
+    expect(hasBoundaryIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (loader importing actions)", async () => {
+    const violatingLoader = path.join(tmpDir, "lib", "loaders", "bad.loader.ts");
+    await fs.writeFile(violatingLoader, `import { someAction } from "@/lib/actions/orgs.actions";\nexport const loadBad = async () => { someAction(); };`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("loader") && i.message.includes("action")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (loader importing rules)", async () => {
+    const violatingLoader = path.join(tmpDir, "lib", "loaders", "bad.loader.ts");
+    await fs.writeFile(violatingLoader, `import { someRule } from "@/lib/rules/orgs.rules";\nexport const loadBad = async () => { someRule(); };`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("loader") && i.message.includes("rule")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (actions importing db directly)", async () => {
+    const violatingAction = path.join(tmpDir, "lib", "actions", "bad.actions.ts");
+    await fs.writeFile(violatingAction, `import { db } from "@/lib/db";\nexport async function badAction() { await db.select(); }`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("action") && i.message.includes("lib/db")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (actions importing repos directly)", async () => {
+    const violatingAction = path.join(tmpDir, "lib", "actions", "bad.actions.ts");
+    await fs.writeFile(violatingAction, `import { insertOrg } from "@/lib/repos/orgs.repo";\nexport async function badAction() { await insertOrg({}); }`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("action") && i.message.includes("lib/repos")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (services importing loaders)", async () => {
+    const violatingService = path.join(tmpDir, "lib", "services", "bad.service.ts");
+    await fs.writeFile(violatingService, `import { loadMyOrgs } from "@/lib/loaders/orgs.loader";\nexport async function badService() { await loadMyOrgs(); }`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("service") && i.message.includes("loader")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects CQRS purity violations (services importing actions)", async () => {
+    const violatingService = path.join(tmpDir, "lib", "services", "bad.service.ts");
+    await fs.writeFile(violatingService, `import { createOrg } from "@/lib/actions/orgs.actions";\nexport async function badService() { await createOrg({}); }`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasPurityIssue = result.issues.some(i =>
+      i.category === "Architecture" && i.message.includes("service") && i.message.includes("action")
+    );
+    expect(hasPurityIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing required files", async () => {
+    // Remove a required file
+    await fs.unlink(path.join(tmpDir, "lib/orgs/active-org.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasMissingFileIssue = result.issues.some(i =>
+      i.message.includes("active-org") || i.message.includes("Missing")
+    );
+    expect(hasMissingFileIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing env vars", async () => {
+    // Remove DATABASE_URL from env schema
+    await fs.writeFile(path.join(tmpDir, "lib/env/schema.ts"), `import { z } from "zod";
+export const EnvSchema = z.object({
+  NEXT_PUBLIC_APP_NAME: z.string().min(1),
+});
+`, "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasEnvIssue = result.issues.some(i =>
+      i.message.includes("DATABASE_URL") || i.message.includes("env")
+    );
+    expect(hasEnvIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing deps", async () => {
+    // Remove better-auth from package.json
+    const pkgPath = path.join(tmpDir, "package.json");
+    const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8"));
+    delete pkg.dependencies["better-auth"];
+    await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2), "utf8");
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasDepIssue = result.issues.some(i =>
+      i.message.includes("better-auth") || i.message.includes("Missing")
+    );
+    expect(hasDepIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing query keys index", async () => {
+    await fs.unlink(path.join(tmpDir, "lib/query-keys/index.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasKeysIssue = result.issues.some(i =>
+      i.message.includes("index") || i.message.includes("query")
+    );
+    expect(hasKeysIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing mutation keys index", async () => {
+    await fs.unlink(path.join(tmpDir, "lib/mutation-keys/index.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasKeysIssue = result.issues.some(i =>
+      i.message.includes("index") || i.message.includes("mutation")
+    );
+    expect(hasKeysIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing drizzle config", async () => {
+    await fs.unlink(path.join(tmpDir, "drizzle.config.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasDrizzleIssue = result.issues.some(i =>
+      i.message.includes("drizzle.config") || i.message.includes("migration")
+    );
+    expect(hasDrizzleIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing proxy.ts", async () => {
+    await fs.unlink(path.join(tmpDir, "proxy.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasProxyIssue = result.issues.some(i =>
+      i.message.includes("proxy.ts") || i.message.includes("Missing")
+    );
+    expect(hasProxyIssue).toBe(true);
+  }, 30_000);
+
+  it("detects missing core files", async () => {
+    await fs.unlink(path.join(tmpDir, "lib/db/index.ts"));
+
+    const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
+    const hasCoreIssue = result.issues.some(i =>
+      i.message.includes("lib/db/index.ts") || i.message.includes("Missing")
+    );
+    expect(hasCoreIssue).toBe(true);
+  }, 30_000);
 });

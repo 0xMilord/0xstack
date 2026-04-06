@@ -4,11 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { runUpgrade } from "../../src/core/upgrade/run-upgrade";
 
-describe("Upgrade Command Tests", () => {
+describe("Upgrade Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-upgrade-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-upgrade-flow-"));
     // Create minimal app structure
     await fs.mkdir(path.join(tmpDir, "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "db"), { recursive: true });
@@ -279,5 +279,31 @@ export async function getSeoConfig() {}`, "utf8");
     // Config should still contain original values
     expect(configAfter).toContain("TestApp");
     expect(configAfter).toContain("defineConfig");
+  }, 30_000);
+
+  it("upgrade is idempotent (can run twice)", async () => {
+    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await expect(runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
+  }, 60_000);
+
+  it("upgrade adds vitest test script to package.json", async () => {
+    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+
+    const pkg = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
+    expect(pkg.scripts).toHaveProperty("test");
+    expect(pkg.scripts.test).toContain("vitest");
+  }, 30_000);
+
+  it("upgrade preserves existing package.json scripts", async () => {
+    // Add a custom script
+    const pkgPath = path.join(tmpDir, "package.json");
+    const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8"));
+    pkg.scripts = { ...pkg.scripts, custom: "echo hello" };
+    await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2), "utf8");
+
+    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+
+    const updatedPkg = JSON.parse(await fs.readFile(pkgPath, "utf8"));
+    expect(updatedPkg.scripts).toHaveProperty("custom", "echo hello");
   }, 30_000);
 });

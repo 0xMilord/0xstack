@@ -4,11 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { runInit } from "../../src/core/init/run-init";
 
-describe("Init Command Tests", () => {
+describe("Init Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-init-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-init-flow-"));
   });
 
   afterEach(async () => {

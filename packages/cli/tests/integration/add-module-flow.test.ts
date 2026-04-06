@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { runBaseline } from "../../src/core/baseline/run-baseline";
+import { runAddModule } from "../../src/core/add/run-add-module";
 
-describe("Baseline Command - Full Flow Tests", () => {
+describe("Add Module Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-baseline-flow-"));
-    // Create minimal app structure (simulating what init would create)
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-add-flow-"));
+    // Create minimal app structure
     await fs.mkdir(path.join(tmpDir, "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "db"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "env"), { recursive: true });
@@ -223,137 +223,118 @@ export async function getSeoConfig() {}`, "utf8");
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it("baseline validates project root", async () => {
-    // Should not throw - valid project root
-    await expect(runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
+  it("add module enables SEO and updates config", async () => {
+    // Verify SEO is disabled initially
+    const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configBefore).toContain("seo: false");
+
+    // Add SEO module
+    await runAddModule({ projectRoot: tmpDir, moduleId: "seo", profile: "core", packageManager: "pnpm" });
+
+    // Verify config was updated
+    const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configAfter).toContain("seo: true");
+
+    // Verify SEO files were generated
+    const robotsExists = await fs.access(path.join(tmpDir, "app/robots.ts")).then(() => true).catch(() => false);
+    expect(robotsExists).toBe(true);
+
+    const sitemapExists = await fs.access(path.join(tmpDir, "app/sitemap.ts")).then(() => true).catch(() => false);
+    expect(sitemapExists).toBe(true);
+
+    const jsonldExists = await fs.access(path.join(tmpDir, "lib/seo/jsonld.ts")).then(() => true).catch(() => false);
+    expect(jsonldExists).toBe(true);
   }, 120_000);
 
-  it("baseline ensures drizzle config exists", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module enables blog and updates config", async () => {
+    const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configBefore).toContain("blogMdx: false");
 
-    const drizzleConfig = await fs.readFile(path.join(tmpDir, "drizzle.config.ts"), "utf8");
-    expect(drizzleConfig).toContain("defineConfig");
-    expect(drizzleConfig).toContain("./lib/db/schema.ts");
-    expect(drizzleConfig).toContain("postgresql");
+    await runAddModule({ projectRoot: tmpDir, moduleId: "blogMdx", profile: "core", packageManager: "pnpm" });
+
+    const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configAfter).toContain("blogMdx: true");
+
+    const blogPageExists = await fs.access(path.join(tmpDir, "app/blog/page.tsx")).then(() => true).catch(() => false);
+    expect(blogPageExists).toBe(true);
+
+    const blogLoaderExists = await fs.access(path.join(tmpDir, "lib/loaders/blog.loader.ts")).then(() => true).catch(() => false);
+    expect(blogLoaderExists).toBe(true);
   }, 120_000);
 
-  it("baseline ensures config exists", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module enables PWA and updates config", async () => {
+    const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configBefore).toContain("pwa: false");
 
-    const config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
-    expect(config).toContain("defineConfig");
-    expect(config).toContain("TestApp");
+    await runAddModule({ projectRoot: tmpDir, moduleId: "pwa", profile: "core", packageManager: "pnpm" });
+
+    const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configAfter).toContain("pwa: true");
+
+    const manifestExists = await fs.access(path.join(tmpDir, "public/manifest.webmanifest")).then(() => true).catch(() => false);
+    expect(manifestExists).toBe(true);
   }, 120_000);
 
-  it("baseline ensures env schema stubs", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module enables Sentry and updates config", async () => {
+    const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configBefore).toContain("sentry: false");
 
-    const billingEnv = await fs.readFile(path.join(tmpDir, "lib/env/billing.ts"), "utf8");
-    expect(billingEnv).toContain("BillingEnvSchema");
+    await runAddModule({ projectRoot: tmpDir, moduleId: "observability", profile: "core", packageManager: "pnpm" });
 
-    const storageEnv = await fs.readFile(path.join(tmpDir, "lib/env/storage.ts"), "utf8");
-    expect(storageEnv).toContain("StorageEnvSchema");
+    const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configAfter).toContain("sentry: true");
+
+    const sentryClientExists = await fs.access(path.join(tmpDir, "sentry.client.config.ts")).then(() => true).catch(() => false);
+    expect(sentryClientExists).toBe(true);
   }, 120_000);
 
-  it("baseline upgrades config runtime schema", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module enables jobs and updates config", async () => {
+    const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configBefore).toContain("enabled: false");
 
-    const runtimeSchema = await fs.readFile(path.join(tmpDir, "lib/0xstack/config.ts"), "utf8");
-    expect(runtimeSchema).toContain("ConfigSchema");
-    expect(runtimeSchema).toContain("defineConfig");
+    await runAddModule({ projectRoot: tmpDir, moduleId: "jobs", profile: "core", packageManager: "pnpm" });
+
+    const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
+    expect(configAfter).toContain("enabled: true");
+
+    const reconcileExists = await fs.access(path.join(tmpDir, "lib/jobs/reconcile.ts")).then(() => true).catch(() => false);
+    expect(reconcileExists).toBe(true);
   }, 120_000);
 
-  it("baseline loads config and applies profile", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module rejects invalid module ID", async () => {
+    await expect(runAddModule({ projectRoot: tmpDir, moduleId: "nonexistent-module", profile: "core", packageManager: "pnpm" })).rejects.toThrow();
+  }, 30_000);
 
-    const state = await fs.readFile(path.join(tmpDir, "lib/0xstack/state.json"), "utf8");
-    const parsed = JSON.parse(state);
-    expect(parsed).toHaveProperty("appliedProfile", "core");
-    expect(parsed).toHaveProperty("modules");
-  }, 120_000);
+  it("add module runs baseline after enabling", async () => {
+    // Add a module that triggers baseline
+    await runAddModule({ projectRoot: tmpDir, moduleId: "seo", profile: "core", packageManager: "pnpm" });
 
-  it("baseline installs module deps", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
-    const pkg = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
-    expect(pkg.dependencies).toHaveProperty("better-auth");
-    expect(pkg.dependencies).toHaveProperty("drizzle-orm");
-    expect(pkg.dependencies).toHaveProperty("zod");
-    expect(pkg.devDependencies).toHaveProperty("drizzle-kit");
-    expect(pkg.devDependencies).toHaveProperty("vitest");
-  }, 120_000);
-
-  it("baseline generates PRD tooling", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
+    // Baseline should have generated ESLint boundaries
     const eslintBoundaries = await fs.readFile(path.join(tmpDir, "eslint.0xstack-boundaries.mjs"), "utf8");
     expect(eslintBoundaries).toContain("no-restricted-imports");
 
+    // Baseline should have generated module factories
     const moduleFactories = await fs.readFile(path.join(tmpDir, "lib/services/module-factories.ts"), "utf8");
     expect(moduleFactories).toContain("getBillingService");
-    expect(moduleFactories).toContain("getStorageService");
-    expect(moduleFactories).toContain("getSeoConfig");
-
-    const vitestConfig = await fs.readFile(path.join(tmpDir, "vitest.config.ts"), "utf8");
-    expect(vitestConfig).toContain("vitest/config");
-    expect(vitestConfig).toContain("tests/**/*.test.ts");
   }, 120_000);
 
-  it("baseline activates modules", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module installs new dependencies", async () => {
+    const pkgBefore = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
+    expect(pkgBefore.dependencies).not.toHaveProperty("schema-dts");
 
-    // Core modules should exist
-    const cacheConfig = await fs.access(path.join(tmpDir, "lib/cache/config.ts")).then(() => true).catch(() => false);
-    expect(cacheConfig).toBe(true);
+    await runAddModule({ projectRoot: tmpDir, moduleId: "seo", profile: "core", packageManager: "pnpm" });
 
-    const authHandler = await fs.access(path.join(tmpDir, "app/api/auth/[...all]/route.ts")).then(() => true).catch(() => false);
-    expect(authHandler).toBe(true);
-
-    const orgsPage = await fs.access(path.join(tmpDir, "app/app/orgs/page.tsx")).then(() => true).catch(() => false);
-    expect(orgsPage).toBe(true);
+    const pkgAfter = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
+    expect(pkgAfter.dependencies).toHaveProperty("schema-dts");
   }, 120_000);
 
-  it("baseline ensures query/mutation key indices", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+  it("add module generates docs after enabling", async () => {
+    await runAddModule({ projectRoot: tmpDir, moduleId: "seo", profile: "core", packageManager: "pnpm" });
 
-    const queryIndex = await fs.readFile(path.join(tmpDir, "lib/query-keys/index.ts"), "utf8");
-    expect(queryIndex).toContain("export * from");
+    const readmeExists = await fs.access(path.join(tmpDir, "README.md")).then(() => true).catch(() => false);
+    expect(readmeExists).toBe(true);
 
-    const mutationIndex = await fs.readFile(path.join(tmpDir, "lib/mutation-keys/index.ts"), "utf8");
-    expect(mutationIndex).toContain("export * from");
+    const prdExists = await fs.access(path.join(tmpDir, "PRD.md")).then(() => true).catch(() => false);
+    expect(prdExists).toBe(true);
   }, 120_000);
-
-  it("baseline upgrades auth pages", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
-    const login = await fs.readFile(path.join(tmpDir, "app/login/page.tsx"), "utf8");
-    expect(login).toContain("authClient.signIn.email");
-
-    const signup = await fs.readFile(path.join(tmpDir, "app/get-started/page.tsx"), "utf8");
-    expect(signup).toContain("authClient.signUp.email");
-
-    const forgot = await fs.readFile(path.join(tmpDir, "app/forgot-password/page.tsx"), "utf8");
-    expect(forgot).toContain("requestPasswordReset");
-
-    const reset = await fs.readFile(path.join(tmpDir, "app/reset-password/page.tsx"), "utf8");
-    expect(reset).toContain("resetPassword");
-  }, 120_000);
-
-  it("baseline generates docs", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-
-    const readme = await fs.access(path.join(tmpDir, "README.md")).then(() => true).catch(() => false);
-    expect(readme).toBe(true);
-
-    const prd = await fs.access(path.join(tmpDir, "PRD.md")).then(() => true).catch(() => false);
-    expect(prd).toBe(true);
-
-    const arch = await fs.access(path.join(tmpDir, "ARCHITECTURE.md")).then(() => true).catch(() => false);
-    expect(arch).toBe(true);
-  }, 120_000);
-
-  it("baseline is idempotent (can run twice without errors)", async () => {
-    await runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-    await expect(runBaseline({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
-  }, 240_000);
 });

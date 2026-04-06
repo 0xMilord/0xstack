@@ -4,11 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { runRelease } from "../../src/core/release/run-release";
 
-describe("Release Command Tests", () => {
+describe("Release Command - Full Flow Tests", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-release-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-release-flow-"));
   });
 
   afterEach(async () => {
@@ -42,5 +42,26 @@ describe("Release Command Tests", () => {
     // Note: This will fail if changesets CLI is not installed, but the function should handle it gracefully
     const result = await runRelease({ projectRoot: tmpDir });
     expect(result).toBeDefined();
+  }, 30_000);
+
+  it("release detects .changeset directory correctly", async () => {
+    const resultNoChangeset = await runRelease({ projectRoot: tmpDir });
+    expect(resultNoChangeset.hasChangeset).toBe(false);
+
+    // Create .changeset directory
+    const changesetDir = path.join(tmpDir, ".changeset");
+    await fs.mkdir(changesetDir, { recursive: true });
+
+    const resultWithChangeset = await runRelease({ projectRoot: tmpDir });
+    expect(resultWithChangeset.hasChangeset).toBe(true);
+  }, 30_000);
+
+  it("release provides helpful hints when no changeset", async () => {
+    const result = await runRelease({ projectRoot: tmpDir });
+    expect(result.hints).toBeDefined();
+    expect(result.hints.length).toBeGreaterThan(0);
+    // Hints should mention changesets
+    const hintsText = result.hints.join(" ");
+    expect(hintsText.toLowerCase()).toMatch(/changeset|release|version/i);
   }, 30_000);
 });
