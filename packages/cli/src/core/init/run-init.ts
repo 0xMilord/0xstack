@@ -27,7 +27,7 @@ export type InitInput = {
     cache?: boolean;
     pwa?: boolean;
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
-    observability: { sentry: boolean; otel: boolean };
+    observability: { sentry: boolean };
   };
 };
 
@@ -587,7 +587,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
     pwa: z.boolean().optional(),
     seo: z.boolean(),
     blogMdx: z.boolean(),
-    observability: z.object({ sentry: z.boolean(), otel: z.boolean() }).optional(),
+    observability: z.object({ sentry: z.boolean() }).optional(),
     jobs: z.object({ enabled: z.boolean(), driver: z.enum(["inngest", "cron-only"]) }).optional(),
   }),
   profiles: z.record(z.string(), z.any()).optional(),

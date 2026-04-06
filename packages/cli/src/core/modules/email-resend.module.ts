@@ -22,7 +22,7 @@ async function patchAuthForEmail(projectRoot: string) {
   } else {
     // Import line exists but may be missing sendWelcomeEmail
     src = src.replace(
-      /(import\s*\{[^}]*)\bfrom\s*["']@\/lib\/email\/auth-emails["'])/,
+      /(import\s*\{[^}]*\})\s*\bfrom\s*["']@\/lib\/email\/auth-emails["']/,
       (match, imports) => {
         if (!imports.includes("sendWelcomeEmail")) {
           // Add sendWelcomeEmail to the import list

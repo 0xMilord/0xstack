@@ -654,7 +654,21 @@ export default async function Page() {
           {sub ? (
             <>
               <p>
-                <span className="text-muted-foreground">Status:</span> {sub.status}
+                <span className="text-muted-foreground">Status:</span>{' '}
+                <span className={
+                  sub.status === "active" ? "text-green-600 font-medium" :
+                  sub.status === "past_due" ? "text-red-600 font-medium" :
+                  sub.status === "canceled" ? "text-muted-foreground" :
+                  sub.status === "trialing" ? "text-blue-600 font-medium" :
+                  "text-yellow-600 font-medium"
+                }>
+                  {sub.status === "active" && "Active"}
+                  {sub.status === "past_due" && "Past Due — update payment method"}
+                  {sub.status === "canceled" && "Canceled"}
+                  {sub.status === "trialing" && "Trial"}
+                  {sub.status === "pending" && "Pending webhook confirmation"}
+                  {!["active","past_due","canceled","trialing","pending"].includes(sub.status ?? "") && sub.status}
+                </span>
               </p>
               <p>
                 <span className="text-muted-foreground">Plan:</span> {sub.planId ?? "—"}
@@ -662,6 +676,17 @@ export default async function Page() {
               {plan ? (
                 <p>
                   <span className="text-muted-foreground">Plan name:</span> {plan.name}
+                </p>
+              ) : null}
+              {sub.currentPeriodEnd ? (
+                <p>
+                  <span className="text-muted-foreground">
+                    {sub.cancelAtPeriodEnd ? "Access until (canceled):" : "Next billing date:"}
+                  </span>{' '}
+                  {sub.currentPeriodEnd.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                  {sub.cancelAtPeriodEnd && (
+                    <span className="ml-2 text-xs text-yellow-600">— Subscription will end</span>
+                  )}
                 </p>
               ) : null}
               <p className="font-mono text-xs text-muted-foreground">Provider id: {sub.providerSubscriptionId}</p>

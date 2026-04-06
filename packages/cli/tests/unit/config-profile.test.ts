@@ -28,7 +28,7 @@ describe("applyProfile", () => {
   it("deep-merges observability and jobs", () => {
     const cfg = ConfigSchema.parse({
       modules: {
-        observability: { sentry: false, otel: true },
+        observability: { sentry: false },
         jobs: { enabled: false, driver: "cron-only" },
       },
       profiles: {
@@ -41,7 +41,7 @@ describe("applyProfile", () => {
       },
     });
     const next = applyProfile(cfg, "staging");
-    expect(next.modules.observability).toEqual({ sentry: true, otel: true });
+    expect(next.modules.observability).toEqual({ sentry: true });
     expect(next.modules.jobs).toEqual({ enabled: true, driver: "inngest" });
   });
 });

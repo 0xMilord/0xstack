@@ -257,7 +257,7 @@ export async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
     next = next.replace(
       /blogMdx:\s*z\.boolean\(\),\s*\n/m,
       (m) =>
-        `${m}    observability: z.object({ sentry: z.boolean(), otel: z.boolean() }).optional(),\n    jobs: z.object({ enabled: z.boolean(), driver: z.enum(["inngest", "cron-only"]) }).optional(),\n`
+        `${m}    observability: z.object({ sentry: z.boolean() }).optional(),\n    jobs: z.object({ enabled: z.boolean(), driver: z.enum(["inngest", "cron-only"]) }).optional(),\n`
     );
   }
 

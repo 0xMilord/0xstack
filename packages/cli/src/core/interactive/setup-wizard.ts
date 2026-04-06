@@ -18,7 +18,7 @@ export type InitAnswers = {
     cache: boolean;
     pwa: boolean;
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
-    observability: { sentry: boolean; otel: boolean };
+    observability: { sentry: boolean };
   };
 };
 
@@ -238,15 +238,8 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
     },
     { onCancel }
   );
-  const otel = await prompts(
-    {
-      type: "confirm",
-      name: "v",
-      message: "Enable OpenTelemetry scaffolding?",
-      initial: false,
-    },
-    { onCancel }
-  );
+
+  // P0 #11: Removed OTEL — was phantom feature (zero implementation)
 
   const bp = billing.provider as string;
   const sp = storage.provider as string;
@@ -259,7 +252,7 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
     `  ${chalk.dim("PM:")} ${tool.packageManager}\n` +
     `  ${chalk.dim("Modules:")} SEO=${seo.v} Blog=${blog.v} Billing=${bp} Storage=${sp} Email=${email.v}\n` +
     `  ${chalk.dim("Platform:")} cache=${cache.v} pwa=${pwa.v} jobs=${jobs.v}\n` +
-    `  ${chalk.dim("Observability:")} sentry=${sentry.v} otel=${otel.v}\n`;
+    `  ${chalk.dim("Observability:")} sentry=${sentry.v}\n`;
 
   // eslint-disable-next-line no-console
   console.log(summary);
@@ -294,7 +287,7 @@ export async function runProgressiveInitWizard(cwd: string): Promise<InitAnswers
       cache: !!cache.v,
       pwa: !!pwa.v,
       jobs: { enabled: !!jobs.v, driver: "cron-only" },
-      observability: { sentry: !!sentry.v, otel: !!otel.v },
+      observability: { sentry: !!sentry.v },
     },
   };
 }
@@ -415,15 +408,7 @@ export async function runProgressiveReconfigureWizard(defaults: WizardDefaults):
     },
     { onCancel }
   );
-  const otel = await prompts(
-    {
-      type: "confirm",
-      name: "v",
-      message: "OpenTelemetry?",
-      initial: defaults.observability?.otel ?? false,
-    },
-    { onCancel }
-  );
+  // P0 #11: Removed OTEL prompt — was phantom feature
 
   const bp = billing.provider as string;
   const sp = storage.provider as string;
@@ -437,7 +422,7 @@ export async function runProgressiveReconfigureWizard(defaults: WizardDefaults):
     cache: !!cache.v,
     pwa: !!pwa.v,
     jobs: { enabled: !!jobs.v, driver: defaults.jobs?.driver ?? "cron-only" },
-    observability: { sentry: !!sentry.v, otel: !!otel.v },
+    observability: { sentry: !!sentry.v },
   };
 }
 

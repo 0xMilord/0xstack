@@ -125,7 +125,7 @@ describe("ensureObservabilityAndJobsKeys", () => {
     pwa: false,
     seo: false,
     blogMdx: false,
-    observability: { sentry: false, otel: false },
+    observability: { sentry: false },
   },
 };
 `,
@@ -150,7 +150,7 @@ describe("ensureObservabilityAndJobsKeys", () => {
     pwa: false,
     seo: false,
     blogMdx: false,
-    observability: { sentry: false, otel: false },
+    observability: { sentry: false },
     jobs: { enabled: false, driver: "cron-only" },
   },
 };

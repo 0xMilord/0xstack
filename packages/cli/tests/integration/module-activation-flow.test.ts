@@ -115,7 +115,7 @@ export default defineConfig({
   app: { name: "TestApp", baseUrl: "http://localhost:3000" },
   modules: {
     orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false,
-    observability: { sentry: false, otel: false },
+    observability: { sentry: false },
     jobs: { enabled: false, driver: "cron-only" },
   },
 });
@@ -134,7 +134,7 @@ const ConfigSchema = z.object({
     pwa: z.boolean().optional(),
     seo: z.boolean(),
     blogMdx: z.boolean(),
-    observability: z.object({ sentry: z.boolean(), otel: z.boolean() }).optional(),
+    observability: z.object({ sentry: z.boolean() }).optional(),
     jobs: z.object({ enabled: z.boolean(), driver: z.enum(["inngest", "cron-only"]) }).optional(),
   }),
   profiles: z.record(z.string(), z.any()).optional(),
@@ -244,7 +244,7 @@ export async function getSeoConfig() {}`, "utf8");
         email: false,
         cache: true,
         pwa: false,
-        observability: { sentry: false, otel: false },
+        observability: { sentry: false },
         jobs: { enabled: false, driver: "cron-only" },
         ...overrides,
       },
@@ -446,7 +446,7 @@ export async function getSeoConfig() {}`, "utf8");
   }, 30_000);
 
   it("observability module generates logger, env schema", async () => {
-    await runModulesLifecycle(minimalCtx({ observability: { sentry: false, otel: false } }));
+    await runModulesLifecycle(minimalCtx({ observability: { sentry: false } }));
 
     const logger = await fs.readFile(path.join(tmpDir, "lib/utils/logger.ts"), "utf8");
     expect(logger).toContain("log");
@@ -781,7 +781,7 @@ export async function getSeoConfig() {}`, "utf8");
       email: "resend",
       cache: true,
       pwa: true,
-      observability: { sentry: true, otel: false },
+      observability: { sentry: true },
       jobs: { enabled: true, driver: "cron-only" },
     }));
 

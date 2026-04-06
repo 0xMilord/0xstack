@@ -58,7 +58,7 @@ export async function providerSignUpload(input: { objectKey: string; contentType
     expires: Date.now() + 15 * 60 * 1000,
     contentType: input.contentType,
     extensionHeaders: {
-      "x-goog-content-length-range": `0,${maxBytes}`,
+      "x-goog-content-length-range": \`0,\${maxBytes}\`,
     },
   });
   return { uploadUrl, headers: { "Content-Type": input.contentType } };

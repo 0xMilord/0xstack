@@ -14,7 +14,7 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
     deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "remark-toc", "rehype-slug", "rehype-autolink-headings");
     devDeps.push("@tailwindcss/typography");
   }
-  if (cfg.modules.seo) deps.push("schema-dts");
+  if (cfg.modules.seo) devDeps.push("satori");
   if (cfg.modules.billing === "dodo") deps.push("@dodopayments/nextjs", "standardwebhooks");
   if (cfg.modules.billing === "stripe") deps.push("stripe");
   if (cfg.modules.storage === "gcs") deps.push("@google-cloud/storage");

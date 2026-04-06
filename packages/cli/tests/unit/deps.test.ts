@@ -89,7 +89,7 @@ describe("expectedDepsForConfig", () => {
   });
 
   it("adds Sentry when observability.sentry is enabled", () => {
-    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: true, otel: false } } });
+    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: true } } });
     const { deps } = expectedDepsForConfig(cfg);
     expect(deps).toContain("@sentry/nextjs");
   });
@@ -110,7 +110,7 @@ describe("expectedDepsForConfig", () => {
         seo: true,
         blogMdx: true,
         cache: true,
-        observability: { sentry: true, otel: false },
+        observability: { sentry: true },
       },
     });
     const { deps } = expectedDepsForConfig(cfg);

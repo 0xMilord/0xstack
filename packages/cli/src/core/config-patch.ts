@@ -12,7 +12,7 @@ export async function ensureObservabilityAndJobsKeys(projectRoot: string) {
 
   if (!/\bobservability:\s*\{/m.test(src)) {
     if (/\blogMdx:\s*[^\n]+\n/.test(src)) {
-      src = src.replace(/(\blogMdx:\s*[^\n]+\n)/, `$1    observability: { sentry: false, otel: false },\n`);
+      src = src.replace(/(\blogMdx:\s*[^\n]+\n)/, `$1    observability: { sentry: false },\n`);
     }
   }
   if (!/\bjobs:\s*\{/m.test(src)) {
@@ -57,7 +57,7 @@ export async function patchConfigModules(projectRoot: string, patch: PatchableMo
   }
 
   if (patch.observability !== undefined) {
-    const expr = `{ sentry: ${patch.observability.sentry}, otel: ${patch.observability.otel} }`;
+    const expr = `{ sentry: ${patch.observability.sentry} }`;
     const re = /(\bobservability:\s*)\{[^}]+\}/m;
     if (!re.test(src)) throw new Error("Could not find observability: { ... } in 0xstack.config.ts");
     src = src.replace(re, `$1${expr}`);

@@ -50,15 +50,13 @@ describe("ConfigSchema - Edge Cases", () => {
   });
 
   it("accepts observability with only sentry", () => {
-    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: true, otel: false } } });
+    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: true } } });
     expect(cfg.modules.observability.sentry).toBe(true);
-    expect(cfg.modules.observability.otel).toBe(false);
   });
 
-  it("accepts observability with only otel", () => {
-    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: false, otel: true } } });
+  it("accepts observability with sentry disabled", () => {
+    const cfg = ConfigSchema.parse({ modules: { observability: { sentry: false } } });
     expect(cfg.modules.observability.sentry).toBe(false);
-    expect(cfg.modules.observability.otel).toBe(true);
   });
 
   it("accepts full profile configuration", () => {
@@ -73,7 +71,7 @@ describe("ConfigSchema - Edge Cases", () => {
         pwa: true,
         seo: true,
         blogMdx: true,
-        observability: { sentry: true, otel: true },
+        observability: { sentry: true },
         jobs: { enabled: true, driver: "inngest" },
       },
       profiles: {
@@ -102,12 +100,11 @@ describe("applyProfile - Edge Cases", () => {
 
   it("merges partial observability config", () => {
     const cfg = ConfigSchema.parse({
-      modules: { observability: { sentry: false, otel: false } },
+      modules: { observability: { sentry: false } },
       profiles: { staging: { modules: { observability: { sentry: true } } } },
     });
     const result = applyProfile(cfg, "staging");
     expect(result.modules.observability.sentry).toBe(true);
-    expect(result.modules.observability.otel).toBe(false); // Preserved from original
   });
 
   it("merges partial jobs config", () => {

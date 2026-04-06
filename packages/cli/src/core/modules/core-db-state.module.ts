@@ -137,24 +137,37 @@ export default async function Page() {
       path.join(ctx.projectRoot, "lib", "repos", "assets.repo.ts"),
       `import { db } from "@/lib/db";
 import { assets } from "@/lib/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 
 export async function insertAsset(input: typeof assets.$inferInsert) {
   const rows = await db.insert(assets).values(input).returning();
   return rows[0] ?? null;
 }
 
-export async function listAssetsForUser(userId: string) {
+export async function listAssetsForUser(userId: string, options?: { limit?: number; cursor?: string }) {
+  const limit = Math.min(options?.limit ?? 50, 200);
+  const cursor = options?.cursor;
+  const conditions = [eq(assets.ownerUserId, userId), isNull(assets.orgId)];
+  if (cursor) conditions.push(gt(assets.id, cursor));
   return await db
     .select()
     .from(assets)
-    .where(and(eq(assets.ownerUserId, userId), isNull(assets.orgId)))
-    .orderBy(assets.createdAt)
-    .limit(200);
+    .where(and(...conditions))
+    .orderBy(assets.id)
+    .limit(limit);
 }
 
-export async function listAssetsForOrg(orgId: string) {
-  return await db.select().from(assets).where(eq(assets.orgId, orgId)).orderBy(assets.createdAt).limit(200);
+export async function listAssetsForOrg(orgId: string, options?: { limit?: number; cursor?: string }) {
+  const limit = Math.min(options?.limit ?? 50, 200);
+  const cursor = options?.cursor;
+  const conditions = [eq(assets.orgId, orgId)];
+  if (cursor) conditions.push(gt(assets.id, cursor));
+  return await db
+    .select()
+    .from(assets)
+    .where(and(...conditions))
+    .orderBy(assets.id)
+    .limit(limit);
 }
 
 export async function getAssetById(assetId: string) {

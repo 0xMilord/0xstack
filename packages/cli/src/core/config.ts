@@ -40,9 +40,8 @@ export const ConfigSchema = z.object({
       observability: z
         .object({
           sentry: z.boolean().default(false),
-          otel: z.boolean().default(false),
         })
-        .default({ sentry: false, otel: false }),
+        .default({ sentry: false }),
       jobs: z
         .object({
           enabled: z.boolean().default(false),
@@ -60,7 +59,7 @@ export const ConfigSchema = z.object({
       pwa: false,
       seo: false,
       blogMdx: false,
-      observability: { sentry: false, otel: false },
+      observability: { sentry: false },
       jobs: { enabled: false, driver: "cron-only" },
     }),
   conventions: z
@@ -85,7 +84,7 @@ export const ConfigSchema = z.object({
             seo: z.boolean().optional(),
             blogMdx: z.boolean().optional(),
             observability: z
-              .object({ sentry: z.boolean().optional(), otel: z.boolean().optional() })
+              .object({ sentry: z.boolean().optional().optional() })
               .optional(),
             jobs: z
               .object({ enabled: z.boolean().optional(), driver: z.enum(["inngest", "cron-only"]).optional() })
@@ -126,7 +125,7 @@ export async function writeDefaultConfig(
     pwa?: boolean;
     cache?: boolean;
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
-    observability: { sentry: boolean; otel: boolean };
+    observability: { sentry: boolean };
   }
 ) {
   const configPath = path.join(targetDir, "0xstack.config.ts");
@@ -137,7 +136,7 @@ export async function writeDefaultConfig(
     // continue
   }
 
-  const initObs = modules?.observability ?? { sentry: false, otel: false };
+  const initObs = modules?.observability ?? { sentry: false };
   const initJobs = modules?.jobs ?? { enabled: false, driver: "cron-only" as const };
 
   const initModules = {
@@ -166,12 +165,12 @@ export default defineConfig({
     pwa: ${JSON.stringify(initModules.pwa)},
     seo: ${JSON.stringify(initModules.seo)},
     blogMdx: ${JSON.stringify(initModules.blogMdx)},
-    observability: { sentry: ${initObs.sentry}, otel: ${initObs.otel} },
+    observability: { sentry: ${initObs.sentry} },
     jobs: { enabled: ${initJobs.enabled}, driver: ${JSON.stringify(initJobs.driver)} },
   },
   profiles: {
-    core: { modules: { orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false, observability: { sentry: false, otel: false }, jobs: { enabled: false, driver: "cron-only" } } },
-    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", cache: true, pwa: true, seo: true, blogMdx: true, observability: { sentry: false, otel: false }, jobs: { enabled: true, driver: "cron-only" } } },
+    core: { modules: { orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false, observability: { sentry: false }, jobs: { enabled: false, driver: "cron-only" } } },
+    full: { modules: { orgs: true, billing: "dodo", storage: "gcs", email: "resend", cache: true, pwa: true, seo: true, blogMdx: true, observability: { sentry: false }, jobs: { enabled: true, driver: "cron-only" } } },
   },
 });
 `;

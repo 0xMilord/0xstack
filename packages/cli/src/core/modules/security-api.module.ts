@@ -146,10 +146,23 @@ export async function guardApiRequest(
     const header = req.headers.get("x-api-key") ?? req.headers.get("authorization");
     const key = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : header;
     if (!key || key.length < 10) throw apiError("UNAUTHORIZED", "Missing API key", 401);
+
+    // EMERGENCY-ONLY BYPASS: env.API_KEY is a global master key that skips normal verification.
+    // This is a security risk and should only be used for short-lived emergency access.
+    // Prefer per-user API keys created via the API keys dashboard instead.
     const ok =
       (env.API_KEY && key === env.API_KEY) ||
       (await verifyApiKey(key).catch(() => false));
     if (!ok) throw apiError("UNAUTHORIZED", "Invalid API key", 401);
+
+    // Deprecation warning for global API_KEY bypass
+    if (env.API_KEY && key === env.API_KEY) {
+      console.warn(
+        "[SECURITY DEPRECATION] Global env.API_KEY bypass was used. " +
+        "This is an emergency-only fallback. Create and use a scoped API key instead. " +
+        "See /app/api-keys to manage keys."
+      );
+    }
   }
 
   // Rate limiting (durable when Upstash env is present; safe fallback for dev)

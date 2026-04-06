@@ -256,9 +256,10 @@ export async function storageService_deleteAsset(input: {
   return { ok: true as const, deleted };
 }
 
-export async function storageService_listAssets(input: { ownerUserId?: string | null; orgId?: string | null }) {
-  if (input.orgId) return await listAssetsForOrg(input.orgId);
-  if (input.ownerUserId) return await listAssetsForUser(input.ownerUserId);
+export async function storageService_listAssets(input: { ownerUserId?: string | null; orgId?: string | null; limit?: number; cursor?: string }) {
+  const opts = { limit: input.limit, cursor: input.cursor };
+  if (input.orgId) return await listAssetsForOrg(input.orgId, opts);
+  if (input.ownerUserId) return await listAssetsForUser(input.ownerUserId, opts);
   return [];
 }
 `
@@ -500,10 +501,20 @@ export async function GET(req: Request) {
     }
   }
 
+  const { searchParams } = new URL(req.url);
+  const rawLimit = searchParams.get("limit");
+  const cursor = searchParams.get("cursor") ?? undefined;
+  const limit = rawLimit ? Math.min(Math.max(Number(rawLimit), 1), 200) : 50;
+
   const assets = orgId
-    ? await storageService_listAssets({ orgId })
-    : await storageService_listAssets({ ownerUserId: session.user.id, orgId: null });
-  return NextResponse.json({ ok: true, requestId, assets, scope: orgId ? "org" : "personal" });
+    ? await storageService_listAssets({ orgId, limit, cursor })
+    : await storageService_listAssets({ ownerUserId: session.user.id, orgId: null, limit, cursor });
+
+  const hasMore = assets.length >= limit;
+  const nextCursor = hasMore ? assets[assets.length - 1]?.id ?? null : null;
+  if (hasMore) assets.pop();
+
+  return NextResponse.json({ ok: true, requestId, assets, nextCursor, scope: orgId ? "org" : "personal" });
 }
 `
     );

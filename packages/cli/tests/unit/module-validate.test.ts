@@ -41,7 +41,7 @@ describe("runConsolidatedModuleValidate", () => {
         email: false,
         cache: true,
         pwa: false,
-        observability: { sentry: false, otel: false },
+        observability: { sentry: false },
         jobs: { enabled: false, driver: "cron-only" },
         ...overrides,
       },
@@ -293,7 +293,7 @@ describe("runConsolidatedModuleValidate", () => {
       "sentry.edge.config.ts": "import * as Sentry from '@sentry/nextjs';",
     };
     await writeFiles(files);
-    await expect(runConsolidatedModuleValidate(minimalCtx({ observability: { sentry: true, otel: false } }))).resolves.not.toThrow();
+    await expect(runConsolidatedModuleValidate(minimalCtx({ observability: { sentry: true } }))).resolves.not.toThrow();
   });
 
   it("requires jobs files when jobs enabled", async () => {

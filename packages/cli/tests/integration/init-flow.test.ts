@@ -32,7 +32,7 @@ describe("Init Command - Full Flow Tests", () => {
         cache: true,
         pwa: false,
         jobs: { enabled: false, driver: "cron-only" },
-        observability: { sentry: false, otel: false },
+        observability: { sentry: false },
       },
     })).rejects.toThrow("not empty");
   }, 30_000);
@@ -54,7 +54,7 @@ describe("Init Command - Full Flow Tests", () => {
         cache: true,
         pwa: false,
         jobs: { enabled: false, driver: "cron-only" },
-        observability: { sentry: false, otel: false },
+        observability: { sentry: false },
       },
     })).rejects.toThrow("Invalid project directory name");
   }, 30_000);
@@ -76,7 +76,7 @@ describe("Init Command - Full Flow Tests", () => {
         cache: true,
         pwa: false,
         jobs: { enabled: false, driver: "cron-only" },
-        observability: { sentry: false, otel: false },
+        observability: { sentry: false },
       },
     })).rejects.toThrow("Invalid project directory name");
   }, 30_000);

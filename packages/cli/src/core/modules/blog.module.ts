@@ -323,6 +323,8 @@ function parsePost(slug: string, raw: string): BlogPost {
   };
 }
 
+export const POSTS_PER_PAGE = 10;
+
 const listPostsCached = withServerCache(
   async () => {
     const entries = await fs.readdir(BLOG_DIR);
@@ -346,6 +348,19 @@ const listPostsCached = withServerCache(
 export const listPosts = cache(async (): Promise<BlogPost[]> => {
   return await listPostsCached();
 });
+
+/** Get a paginated slice of posts. Returns { posts, page, totalPages }. */
+export function getPaginatedPosts(allPosts: BlogPost[], page: number) {
+  const safePage = Math.max(1, Math.floor(page));
+  const start = (safePage - 1) * POSTS_PER_PAGE;
+  const end = start + POSTS_PER_PAGE;
+  const totalPages = Math.max(1, Math.ceil(allPosts.length / POSTS_PER_PAGE));
+  return {
+    posts: allPosts.slice(start, end),
+    page: safePage,
+    totalPages,
+  };
+}
 
 const getPostCached = withServerCache(
   async (slug: string) => {
@@ -386,10 +401,11 @@ export function getPostCanonicalUrl(input: { baseUrl: string; slug: string; cano
       path.join(ctx.projectRoot, "app", "blog", "page.tsx"),
       `import type { Metadata } from "next";
 import Link from "next/link";
-import { listPosts } from "@/lib/loaders/blog.loader";
+import { listPosts, getPaginatedPosts, POSTS_PER_PAGE } from "@/lib/loaders/blog.loader";
 ${blogSeoImport}
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -402,8 +418,13 @@ export const metadata: Metadata = {
   alternates: { canonical: ${blogCanonical} },
 };
 
-export default async function Page() {
-  const posts = await listPosts();
+export default async function Page({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const params = await searchParams;
+  const currentPage = params.page ? parseInt(params.page, 10) : 1;
+
+  const allPosts = await listPosts();
+  const { posts, page, totalPages } = getPaginatedPosts(allPosts, isNaN(currentPage) ? 1 : currentPage);
+
   const featured = posts.find(p => p.tags?.includes("featured")) || posts[0];
   const regular = posts.filter(p => p !== featured);
 
@@ -462,6 +483,34 @@ export default async function Page() {
       {posts.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No posts yet. Check back soon!</p>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-12 flex flex-col items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex items-center gap-3">
+            {page > 1 ? (
+              <Link href={\`/blog?page=\${page - 1}\`} className={buttonVariants({ variant: "outline" })}>
+                Previous
+              </Link>
+            ) : (
+              <span className={buttonVariants({ variant: "outline" }) + " opacity-50 pointer-events-none"}>
+                Previous
+              </span>
+            )}
+            {page < totalPages ? (
+              <Link href={\`/blog?page=\${page + 1}\`} className={buttonVariants({ variant: "outline" })}>
+                Next
+              </Link>
+            ) : (
+              <span className={buttonVariants({ variant: "outline" }) + " opacity-50 pointer-events-none"}>
+                Next
+              </span>
+            )}
+          </div>
         </div>
       )}
     </main>

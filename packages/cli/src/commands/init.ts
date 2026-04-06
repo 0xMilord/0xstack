@@ -32,7 +32,7 @@ function buildPresetFeatures(options: {
   pwa?: boolean;
   jobs?: boolean;
   sentry?: boolean;
-  otel?: boolean;
+  // P0 #11: Removed otel — was phantom feature
   noCache?: boolean;
 }): InitInput["features"] | undefined {
   const hasExplicit =
@@ -44,7 +44,6 @@ function buildPresetFeatures(options: {
     options.pwa ||
     options.jobs ||
     options.sentry ||
-    options.otel ||
     options.noCache;
 
   if (!options.yes && !hasExplicit) return undefined;
@@ -58,7 +57,7 @@ function buildPresetFeatures(options: {
     cache: options.noCache ? false : true,
     pwa: !!options.pwa,
     jobs: { enabled: !!options.jobs, driver: "cron-only" },
-    observability: { sentry: !!options.sentry, otel: !!options.otel },
+    observability: { sentry: !!options.sentry },
   };
 }
 
@@ -78,7 +77,7 @@ export function registerInitCommand(cli: CAC) {
     .option("--pwa", "Enable PWA module")
     .option("--jobs", "Enable jobs module (cron-only stub)")
     .option("--sentry", "Enable Sentry flag in config")
-    .option("--otel", "Enable OpenTelemetry flag in config")
+    // P0 #11: Removed --otel — was phantom feature
     .option("--no-cache", "Disable cache module in config (with --yes)")
     .option("--yes", "Skip prompts (CI-friendly); combine with module flags above")
     .option("--interactive", "Force prompts even in non-TTY")
