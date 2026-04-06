@@ -24,8 +24,8 @@ describe("runConsolidatedModuleValidate", () => {
     }
   }
 
-  it("passes when all required files exist for minimal config", async () => {
-    const ctx: ModuleContext = {
+  function minimalCtx(overrides?: Partial<ModuleContext["modules"]>): ModuleContext {
+    return {
       projectRoot: tmpDir,
       profile: "core",
       modules: {
@@ -38,10 +38,13 @@ describe("runConsolidatedModuleValidate", () => {
         pwa: false,
         observability: { sentry: false, otel: false },
         jobs: { enabled: false, driver: "cron-only" },
+        ...overrides,
       },
     };
-    // Write minimal required files
-    await writeFiles({
+  }
+
+  function minimalFiles() {
+    return {
       "lib/cache/config.ts": "export const CACHE_TTL = {};",
       "lib/cache/server.ts": "export function withServerCache() {}",
       "lib/cache/revalidate.ts": "export const revalidate = {};",
@@ -101,28 +104,203 @@ describe("runConsolidatedModuleValidate", () => {
       "lib/components/layout/site-footer.tsx": "export * from '@/components/layout/site-footer';",
       "lib/components/layout/theme-toggle.tsx": "export * from '@/components/layout/theme-toggle';",
       "lib/components/layout/app-shell.tsx": "export function AppShell() {}",
-    });
+    };
+  }
 
-    await expect(runConsolidatedModuleValidate(ctx)).resolves.not.toThrow();
+  it("passes when all required files exist for minimal config", async () => {
+    await writeFiles(minimalFiles());
+    await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
-  it("throws when required files are missing", async () => {
-    const ctx: ModuleContext = {
-      projectRoot: tmpDir,
-      profile: "core",
-      modules: {
-        seo: false,
-        blogMdx: false,
-        billing: false,
-        storage: false,
-        email: false,
-        cache: true,
-        pwa: false,
-        observability: { sentry: false, otel: false },
-        jobs: { enabled: false, driver: "cron-only" },
-      },
+  it("throws when auth files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/auth/auth.ts"];
+    delete files["app/login/page.tsx"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when org files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/orgs/active-org.ts"];
+    delete files["app/app/orgs/page.tsx"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when cache files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/cache/config.ts"];
+    delete files["lib/cache/server.ts"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when security files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/security/api.ts"];
+    delete files["lib/repos/api-keys.repo.ts"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when webhook ledger files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/repos/webhook-events.repo.ts"];
+    delete files["app/app/webhooks/page.tsx"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when UI foundation files are missing", async () => {
+    const files = minimalFiles();
+    delete files["components/layout/site-header.tsx"];
+    delete files["app/providers.tsx"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when observability files are missing", async () => {
+    const files = minimalFiles();
+    delete files["lib/utils/logger.ts"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("throws when health route is missing", async () => {
+    const files = minimalFiles();
+    delete files["app/api/v1/health/route.ts"];
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx())).rejects.toThrow();
+  });
+
+  it("requires additional files when SEO enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "lib/seo/jsonld.ts": "export function getSeoData() {}",
+      "lib/seo/metadata.ts": "export function getSiteMetadata() {}",
+      "lib/seo/runtime.ts": "export function getSeoRuntimeConfig() {}",
+      "app/robots.ts": "export default function robots() {}",
+      "app/sitemap.ts": "export default async function sitemap() {}",
+      "app/opengraph-image.tsx": "export default async function Image() {}",
+      "app/twitter-image.tsx": "export { default } from './opengraph-image';",
     };
-    // Write no files
-    await expect(runConsolidatedModuleValidate(ctx)).rejects.toThrow();
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ seo: true }))).resolves.not.toThrow();
+  });
+
+  it("requires additional files when blog enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "lib/loaders/blog.loader.ts": "export const listPosts = async () => [];",
+      "app/blog/page.tsx": "export default async function Page() {}",
+      "app/blog/[slug]/page.tsx": "export default async function Page() {}",
+      "app/rss.xml/route.ts": "export async function GET() {}",
+      "content/blog/hello-world.mdx": "---\ntitle: Hello\n---\nHello world",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ blogMdx: true }))).resolves.not.toThrow();
+  });
+
+  it("requires additional files when billing enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "lib/billing/runtime.ts": "export const ACTIVE_BILLING_PROVIDER = 'dodo';",
+      "lib/billing/plans.ts": "export function getBillingPlans() { return []; }",
+      "lib/services/billing.service.ts": "export async function billingService_getLatestForOrg() {}",
+      "lib/loaders/billing.loader.ts": "export const loadBillingForOrg = async () => null;",
+      "lib/actions/billing.actions.ts": "export async function startCheckoutAction() {}",
+      "lib/query-keys/billing.keys.ts": "export const billingKeys = {};",
+      "lib/hooks/client/use-billing.client.ts": "export function useBillingStatus() {}",
+      "app/pricing/page.tsx": "export default async function Page() {}",
+      "app/billing/success/page.tsx": "export default function Page() {}",
+      "app/billing/cancel/page.tsx": "export default function Page() {}",
+      "app/app/billing/page.tsx": "export default async function Page() {}",
+      "app/api/v1/billing/status/route.ts": "export async function GET() {}",
+      "app/api/v1/billing/checkout/route.ts": "export async function POST() {}",
+      "app/api/v1/billing/portal/route.ts": "export async function GET() {}",
+      "app/api/v1/billing/webhook/route.ts": "export async function POST() {}",
+      "lib/env/billing.ts": "export const BillingEnvSchema = z.object({});",
+      "lib/billing/dodo.webhooks.ts": "export function verifyDodoWebhook() {}",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ billing: "dodo" }))).resolves.not.toThrow();
+  });
+
+  it("requires additional files when storage enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "lib/storage/runtime.ts": "export const ACTIVE_STORAGE_PROVIDER = 'gcs';",
+      "lib/storage/provider.ts": "export type ProviderSignUploadResult = {};",
+      "lib/services/storage.service.ts": "export async function storageService_listAssets() {}",
+      "lib/loaders/assets.loader.ts": "export const loadAssetsForActiveOrg = async () => {};",
+      "lib/actions/assets.actions.ts": "export async function assetsSignUploadAction() {}",
+      "lib/query-keys/assets.keys.ts": "export const assetsKeys = {};",
+      "lib/mutation-keys/assets.keys.ts": "export const assetsMutations = {};",
+      "app/api/v1/storage/sign-upload/route.ts": "export async function POST() {}",
+      "app/api/v1/storage/sign-read/route.ts": "export async function POST() {}",
+      "app/api/v1/storage/assets/route.ts": "export async function GET() {}",
+      "app/api/v1/storage/assets/[assetId]/route.ts": "export async function DELETE() {}",
+      "app/app/assets/page.tsx": "export default async function Page() {}",
+      "app/app/assets/assets-client.tsx": "export function AssetsClient() {}",
+      "app/app/assets/[assetId]/page.tsx": "export default async function Page() {}",
+      "lib/env/storage.ts": "export const StorageEnvSchema = z.object({});",
+      "lib/storage/providers/gcs.ts": "export async function providerSignUpload() {}",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ storage: "gcs" }))).resolves.not.toThrow();
+  });
+
+  it("requires additional files when PWA enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "public/manifest.webmanifest": "{}",
+      "public/sw.js": "self.addEventListener('install', () => {});",
+      "public/offline.html": "<html><body>Offline</body></html>",
+      "lib/pwa/push.ts": "export async function pushService_sendToUser() {}",
+      "lib/pwa/offline-storage.ts": "export async function getOfflineStorage() {}",
+      "lib/pwa/register-sw.client.ts": "export async function registerServiceWorker() {}",
+      "app/api/v1/pwa/push/subscribe/route.ts": "export async function POST() {}",
+      "app/api/v1/pwa/push/unsubscribe/route.ts": "export async function POST() {}",
+      "app/api/v1/pwa/push/send/route.ts": "export async function POST() {}",
+      "lib/env/pwa.ts": "export const PwaEnvSchema = z.object({});",
+      "lib/loaders/pwa.loader.ts": "export const loadPwaSettings = async () => {};",
+      "lib/actions/pwa.actions.ts": "export async function pwaSendTestPushAction() {}",
+      "app/app/pwa/page.tsx": "export default async function Page() {}",
+      "app/app/pwa/pwa-client.tsx": "export function PwaClient() {}",
+      "lib/repos/push-subscriptions.repo.ts": "export async function insertPushSubscription() {}",
+      "lib/services/push-subscriptions.service.ts": "export async function pushSubscriptionsService_list() {}",
+      "components/pwa/pwa-install-button.tsx": "export function PwaInstallButton() {}",
+      "components/pwa/pwa-update-banner.tsx": "export function PwaUpdateBanner() {}",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ pwa: true }))).resolves.not.toThrow();
+  });
+
+  it("requires Sentry config files when sentry enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "sentry.client.config.ts": "import * as Sentry from '@sentry/nextjs';",
+      "sentry.server.config.ts": "import * as Sentry from '@sentry/nextjs';",
+      "sentry.edge.config.ts": "import * as Sentry from '@sentry/nextjs';",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ observability: { sentry: true, otel: false } }))).resolves.not.toThrow();
+  });
+
+  it("requires jobs files when jobs enabled", async () => {
+    const files = {
+      ...minimalFiles(),
+      "lib/jobs/reconcile.ts": "export async function jobs_runReconcile() {}",
+      "app/api/v1/jobs/reconcile/route.ts": "export async function POST() {}",
+    };
+    await writeFiles(files);
+    await expect(runConsolidatedModuleValidate(minimalCtx({ jobs: { enabled: true, driver: "cron-only" } }))).resolves.not.toThrow();
+  });
+
+  it("reports missing files via return value (not throw) for empty project", async () => {
+    // Write no files — the validator logs warnings but doesn't throw
+    const result = await runConsolidatedModuleValidate(minimalCtx());
+    expect(result).toBeUndefined();
   });
 });

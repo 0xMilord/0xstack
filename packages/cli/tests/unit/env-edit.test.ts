@@ -17,25 +17,56 @@ describe("ensureEnvSchemaModuleWiring", () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("adds import and .and() for missing module schema", async () => {
+  it("adds BillingEnvSchema import and .and() when missing", async () => {
     await fs.writeFile(
       path.join(tmpDir, "lib", "env", "schema.ts"),
       `import { z } from "zod";
-import { BillingEnvSchema } from "./billing";
 
 export const EnvSchema = z.object({
   DATABASE_URL: z.string(),
-}).and(BillingEnvSchema.partial());
+});
 `,
       "utf8"
     );
     await ensureEnvSchemaModuleWiring(tmpDir);
     const content = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
-    // Should add storage schema import and .and() if not present
     expect(content).toContain("import { BillingEnvSchema }");
+    expect(content).toContain("BillingEnvSchema.partial()");
   });
 
-  it("does not duplicate existing import", async () => {
+  it("adds StorageEnvSchema import and .and() when missing", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "lib", "env", "schema.ts"),
+      `import { z } from "zod";
+import { BillingEnvSchema } from "./billing";
+
+export const EnvSchema = z.object({}).and(BillingEnvSchema.partial());
+`,
+      "utf8"
+    );
+    await ensureEnvSchemaModuleWiring(tmpDir);
+    const content = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
+    expect(content).toContain("import { StorageEnvSchema }");
+    expect(content).toContain("StorageEnvSchema.partial()");
+  });
+
+  it("does not duplicate existing BillingEnvSchema import", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "lib", "env", "schema.ts"),
+      `import { z } from "zod";
+import { BillingEnvSchema } from "./billing";
+
+export const EnvSchema = z.object({}).and(BillingEnvSchema.partial());
+`,
+      "utf8"
+    );
+    await ensureEnvSchemaModuleWiring(tmpDir);
+    const content = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
+    const importCount = (content.match(/import.*BillingEnvSchema/g) || []).length;
+    expect(importCount).toBe(1);
+  });
+
+  it("does not duplicate existing StorageEnvSchema import", async () => {
     await fs.writeFile(
       path.join(tmpDir, "lib", "env", "schema.ts"),
       `import { z } from "zod";
@@ -48,7 +79,45 @@ export const EnvSchema = z.object({}).and(BillingEnvSchema.partial()).and(Storag
     );
     await ensureEnvSchemaModuleWiring(tmpDir);
     const content = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
-    const importCount = (content.match(/import.*BillingEnvSchema/g) || []).length;
-    expect(importCount).toBe(1);
+    const billingImportCount = (content.match(/import.*BillingEnvSchema/g) || []).length;
+    const storageImportCount = (content.match(/import.*StorageEnvSchema/g) || []).length;
+    expect(billingImportCount).toBe(1);
+    expect(storageImportCount).toBe(1);
+  });
+
+  it("handles schema with no .and() calls yet", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "lib", "env", "schema.ts"),
+      `import { z } from "zod";
+
+export const EnvSchema = z.object({
+  DATABASE_URL: z.string(),
+  BETTER_AUTH_SECRET: z.string(),
+});
+`,
+      "utf8"
+    );
+    await ensureEnvSchemaModuleWiring(tmpDir);
+    const content = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
+    expect(content).toContain("BillingEnvSchema");
+    expect(content).toContain("StorageEnvSchema");
+  });
+
+  it("is idempotent (running twice produces same result)", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "lib", "env", "schema.ts"),
+      `import { z } from "zod";
+
+export const EnvSchema = z.object({
+  DATABASE_URL: z.string(),
+});
+`,
+      "utf8"
+    );
+    await ensureEnvSchemaModuleWiring(tmpDir);
+    const content1 = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
+    await ensureEnvSchemaModuleWiring(tmpDir);
+    const content2 = await fs.readFile(path.join(tmpDir, "lib", "env", "schema.ts"), "utf8");
+    expect(content1).toBe(content2);
   });
 });
