@@ -21,9 +21,8 @@ export async function runRelease(input: ReleaseInput) {
 
   if (!hasChangeset) {
     logger.info("No .changeset directory found.");
-    logger.info("For monorepos, add Changesets: https://github.com/changesets/changesets");
-    logger.info("Then: pnpm dlx @changesets/cli init");
-    logger.info("Bump + changelog locally: pnpm changeset version (or npm exec changeset version)");
+    logger.info("Maintainer release from repo root: pnpm release:dry-run → pnpm release");
+    logger.info("Optional Changesets: https://github.com/changesets/changesets — pnpm dlx @changesets/cli init");
     return;
   }
 
@@ -32,6 +31,6 @@ export async function runRelease(input: ReleaseInput) {
     await execCmd("npx", ["--yes", "@changesets/cli", "status"], { cwd: root });
   } catch {
     logger.warn("changeset CLI failed. Install @changesets/cli in this repo or use npx.");
-    logger.info("Docs: RELEASING.md in this repo for the maintainer workflow.");
+    logger.info("Docs: RELEASING.md for the full release pipeline.");
   }
 }

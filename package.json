@@ -14,7 +14,9 @@
     "typecheck": "pnpm -r typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "changeset publish"
+    "publish:changesets": "changeset publish",
+    "release": "node scripts/release.mjs",
+    "release:dry-run": "node scripts/release.mjs --dry-run"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.6",
