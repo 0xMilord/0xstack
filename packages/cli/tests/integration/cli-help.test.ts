@@ -5,7 +5,7 @@ import { execa } from "execa";
 
 const pkgRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
 
-describe("CLI (integration)", () => {
+describe("CLI Integration Tests (lightweight)", () => {
   it("prints help for --help", async () => {
     const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "--help"], {
       cwd: pkgRoot,
@@ -21,14 +21,10 @@ describe("CLI (integration)", () => {
       stdio: "pipe",
     });
     expect(exitCode).toBe(0);
-    // Version should be a semver string
     expect(stdout).toMatch(/\d+\.\d+\.\d+/);
   }, 60_000);
 
   it("exits zero for unknown command (graceful handling)", async () => {
-    // The CLI currently exits 0 for unknown commands rather than erroring.
-    // This test documents that behavior; it should be changed to reject
-    // once the CLI is updated to error on unknown commands.
     const { exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "nonexistent-command"], {
       cwd: pkgRoot,
       stdio: "pipe",
@@ -66,5 +62,24 @@ describe("CLI (integration)", () => {
     expect(stdout).toContain("billing");
     expect(stdout).toContain("storage");
     expect(stdout).toContain("seo");
+  }, 60_000);
+
+  it("config-validate outputs valid result", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "config-validate"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("valid");
+  }, 60_000);
+
+  it("deps --cli outputs CLI dependencies", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "deps", "--cli"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("cac");
+    expect(stdout).toContain("chalk");
   }, 60_000);
 });

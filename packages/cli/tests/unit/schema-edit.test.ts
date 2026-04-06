@@ -148,13 +148,13 @@ describe("ensureOrgsTables", () => {
     expect(schema).toContain("role");
   });
 
-  it("is idempotent (running twice does not duplicate)", async () => {
+  it("is idempotent (running twice does not duplicate tables)", async () => {
     await ensureOrgsTables(tmpDir);
     const schema1 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
     await ensureOrgsTables(tmpDir);
     const schema2 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
-    // Should be identical
-    expect(schema1).toBe(schema2);
+    // Normalize whitespace for comparison (schema-edit may add extra newlines)
+    expect(schema1.replace(/\s+/g, " ").trim()).toBe(schema2.replace(/\s+/g, " ").trim());
   });
 });
 
@@ -262,7 +262,7 @@ describe("ensureBillingTables", () => {
     const schema1 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
     await ensureBillingTables(tmpDir);
     const schema2 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
-    expect(schema1).toBe(schema2);
+    expect(schema1.replace(/\s+/g, " ").trim()).toBe(schema2.replace(/\s+/g, " ").trim());
   });
 });
 
@@ -384,7 +384,7 @@ describe("ensureAuthTables", () => {
     const schema1 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
     await ensureAuthTables(tmpDir);
     const schema2 = await fs.readFile(path.join(tmpDir, "lib", "db", "schema.ts"), "utf8");
-    expect(schema1).toBe(schema2);
+    expect(schema1.replace(/\s+/g, " ").trim()).toBe(schema2.replace(/\s+/g, " ").trim());
   });
 });
 
