@@ -135,7 +135,14 @@ const ConfigSchema = z.object({
   }),
   profiles: z.record(z.string(), z.any()).optional(),
 });
-export function defineConfig(config) { return ConfigSchema.parse(config); }
+export type OxstackConfig = z.infer<typeof ConfigSchema>;
+export function defineConfig(config: z.input<typeof ConfigSchema>) {
+  return ConfigSchema.parse(config);
+}
+export async function getConfig(): Promise<OxstackConfig> {
+  const { default: cfg } = await import("../../../0xstack.config");
+  return cfg as OxstackConfig;
+}
 `, "utf8");
 
     // Core files
@@ -195,9 +202,19 @@ export function defineConfig(config) { return ConfigSchema.parse(config); }
     await fs.writeFile(path.join(tmpDir, "lib/actions/webhook-ledger.actions.ts"), `export async function replayWebhookEventAction() {}`, "utf8");
     await fs.writeFile(path.join(tmpDir, "lib/query-keys/webhook-ledger.keys.ts"), `export const webhookLedgerKeys = {};`, "utf8");
     await fs.writeFile(path.join(tmpDir, "lib/mutation-keys/webhook-ledger.keys.ts"), `export const webhookLedgerMutations = {};`, "utf8");
-    await fs.writeFile(path.join(tmpDir, "app/api/v1/webhooks/ledger/events/route.ts"), `export async function GET() {}`, "utf8");
+    await fs.writeFile(path.join(tmpDir, "app/api/v1/webhooks/ledger/events/route.ts"), `import { guardApiRequest } from "@/lib/security/api";
 
-    await fs.writeFile(path.join(tmpDir, "lib/cache/config.ts"), `export const CACHE_TTL = {}; export const cacheTags = {};`, "utf8");
+export async function GET(req: Request) {
+  await guardApiRequest(req);
+  return new Response("ok");
+}
+`, "utf8");
+
+    await fs.writeFile(path.join(tmpDir, "lib/cache/config.ts"), `export const CACHE_TTL = {} as const;
+export const cacheTags = {
+  domainOrg: (domainPlural: string, orgId: string) => \`\${domainPlural}:org:\${orgId}\`,
+} as const;
+`, "utf8");
     await fs.writeFile(path.join(tmpDir, "lib/cache/server.ts"), `export function withServerCache() {}`, "utf8");
     await fs.writeFile(path.join(tmpDir, "lib/cache/revalidate.ts"), `export const revalidate = {};`, "utf8");
     await fs.writeFile(path.join(tmpDir, "lib/cache/index.ts"), `export * from "./config";`, "utf8");
@@ -232,8 +249,8 @@ export async function getSeoConfig() {}`, "utf8");
     const result = await runDoctor({ projectRoot: tmpDir, profile: "core" });
     expect(result).toBeDefined();
     expect(result.issues).toBeDefined();
-    // Should have minimal issues on clean app
-    expect(result.issues.filter(i => i.severity === "critical").length).toBe(0);
+    expect(result.criticalCount).toBe(0);
+    expect(result.healthScore).toBe(100);
   }, 30_000);
 
   it("doctor detects multiple issues", async () => {

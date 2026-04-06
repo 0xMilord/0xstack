@@ -282,7 +282,13 @@ async function main() {
   let lastErr;
   for (let i = 0; i < 5; i++) {
     try {
-      if (i > 0) {
+      if (i === 0) {
+        const warmup = Number(process.env.RELEASE_VERIFY_WARMUP_MS ?? 5000);
+        if (warmup > 0) {
+          console.log(`   …waiting ${warmup}ms for registry metadata before first install`);
+          await new Promise((r) => setTimeout(r, warmup));
+        }
+      } else {
         const wait = 4000 * i;
         console.log(`   …waiting ${wait}ms before retry ${i + 1}/5`);
         await new Promise((r) => setTimeout(r, wait));

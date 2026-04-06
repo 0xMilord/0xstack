@@ -92,7 +92,7 @@ describe("runConsolidatedModuleValidate", () => {
       "lib/loaders/webhook-ledger.loader.ts": "export const loadWebhookLedger = async () => [];",
       "lib/actions/webhook-ledger.actions.ts": "export async function replayWebhookEventAction() {}",
       "app/app/webhooks/page.tsx": "export default function Page() {}",
-      "app/api/v1/webhooks/ledger/events/route.ts": "export async function GET() {}",
+      "app/api/v1/webhooks/ledger/events/route.ts": "import { guardApiRequest } from \"@/lib/security/api\"; export async function GET(req: Request) { await guardApiRequest(req); }",
       "app/app/api-keys/page.tsx": "export default function Page() {}",
       "lib/actions/api-keys.actions.ts": "export async function createApiKeyAction() {}",
       "lib/loaders/api-keys.loader.ts": "export const loadApiKeysForActiveOrg = async () => {};",
