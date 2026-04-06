@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0
+
+### Major Changes
+
+- Major Release
+
 ## 0.1.7
 
 ### Patch Changes
