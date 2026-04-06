@@ -21,6 +21,9 @@ const CLI_DIR = join(ROOT, "packages", "cli");
 const CLI_PKG_PATH = join(CLI_DIR, "package.json");
 const CLI_CHANGELOG = join(CLI_DIR, "CHANGELOG.md");
 
+/** Always hit npmjs for post-publish verify — a user/CI .npmrc mirror may lag or omit the package (ETARGET). */
+const NPM_PUBLIC_REGISTRY = "https://registry.npmjs.org";
+
 const DRY_RUN = process.argv.includes("--dry-run");
 
 function run(cmd, opts = {}) {
@@ -177,11 +180,20 @@ function assertReleasableWorkingTree() {
 }
 
 function verifyInstall(version) {
+  if (process.env.RELEASE_SKIP_VERIFY === "1") {
+    console.log("⚠️  Skipping post-publish verify (RELEASE_SKIP_VERIFY=1)");
+    return;
+  }
   const dir = mkdtempSync(join(tmpdir(), "0xstack-verify-"));
+  const reg = NPM_PUBLIC_REGISTRY;
   try {
     run(`npm init -y`, { cwd: dir });
-    run(`npm install 0xstack@${version}`, { cwd: dir });
-    run(`npx --yes 0xstack --help`, { cwd: dir });
+    // Quote spec so PowerShell / odd shells do not mangle the package name; prefer-online avoids stale metadata.
+    run(
+      `npm install "0xstack@${version}" --registry=${reg} --prefer-online --fetch-timeout=120000`,
+      { cwd: dir },
+    );
+    run(`npx --yes --registry=${reg} 0xstack --help`, { cwd: dir });
     console.log("✅ Verify install + --help OK");
   } finally {
     rmSync(dir, { recursive: true, force: true });

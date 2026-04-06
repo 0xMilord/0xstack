@@ -9,6 +9,12 @@ describe("Release Command - Full Flow Tests", () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "0xstack-release-flow-"));
+    // Changesets / @manypkg/find-root require a package.json at the project root when .changeset exists
+    await fs.writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({ name: "release-flow-fixture", version: "0.0.0", private: true }),
+      "utf8",
+    );
   });
 
   afterEach(async () => {

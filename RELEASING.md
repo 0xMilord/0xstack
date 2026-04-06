@@ -23,7 +23,7 @@ pnpm release           # interactive bump (patch / minor / major) + summary, the
 8. Writes `packages/cli/package.json` version and prepends `packages/cli/CHANGELOG.md`
 9. `git commit`, then `pnpm --filter 0xstack publish` (before pushing the tag, so tag-triggered CI does not race npm)
 10. `git tag vX.Y.Z`, `git push origin main`, `git push origin vX.Y.Z`
-11. Smoke test: temp directory `npm install 0xstack@X.Y.Z` and `npx 0xstack --help` (retries for registry lag)
+11. Smoke test: temp directory `npm install 0xstack@X.Y.Z` and `npx 0xstack --help` against **https://registry.npmjs.org** (retries for registry lag; avoids mirrors that return ETARGET). Set **`RELEASE_SKIP_VERIFY=1`** to skip this step if you must publish from an offline or restricted network.
 12. If branch `develop` exists, `git checkout develop`
 
 If any step fails, the script stops. **`pnpm release` requires a clean enough tree**: you must not leave uncommitted changes under **`packages/cli`** (or other paths that affect what ships). Uncommitted edits **only** under `scripts/`, `.github/`, `RELEASING.md`, or `.qwen/` (local agent/IDE settings) are ignored so you can iterate on release tooling without a prior commit. For a fully clean tree only, set **`RELEASE_STRICT_CLEAN=1`**. Otherwise: commit, stash, or restore anything else first.
