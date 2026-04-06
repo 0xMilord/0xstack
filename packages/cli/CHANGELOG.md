@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- packages/cli/tests/integration/release-flow.test.ts — a minimal package.json is written in beforeEach so Changesets / @manypkg/find-root don’t throw NoPkgJsonFound when .changeset exists.
+
 ## 1.1.0
 
 ### Minor Changes
