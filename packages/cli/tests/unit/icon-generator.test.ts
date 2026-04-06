@@ -49,8 +49,11 @@ describe("generateFaviconDataUrl", () => {
 
   it("includes first letter of app name in SVG", () => {
     const dataUrl = generateFaviconDataUrl("MyApp", "default");
-    const base64 = dataUrl.split(",")[1];
-    const decoded = Buffer.from(base64, "base64").toString("utf8");
+    const parts = dataUrl.split(",");
+    expect(parts.length).toBeGreaterThan(1);
+    const base64 = parts[1];
+    expect(base64).toBeDefined();
+    const decoded = Buffer.from(base64!, "base64").toString("utf8");
     expect(decoded).toContain(">M<"); // First letter
   });
 

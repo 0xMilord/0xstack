@@ -19,7 +19,45 @@ export type SyncInput = {
   drizzleGenerate?: boolean;
   /** Run package.json `format` script if defined (e.g. Prettier). */
   format?: boolean;
+  /** Skip real `pnpm add` during baseline (used by integration tests). */
+  skipPackageInstall?: boolean;
 };
+
+export type SyncPlanResult = {
+  missingDeps: string[];
+  missingDevDeps: string[];
+  extraDeps: string[];
+  extraDevDeps: string[];
+  /** Files that belong to disabled modules but are still present (removed on `--apply`). */
+  extraFiles: string[];
+  /** Core PRD files expected to exist for a healthy project. */
+  missingFiles: string[];
+};
+
+async function accessFile(projectRoot: string, rel: string) {
+  try {
+    await fs.access(path.join(projectRoot, ...rel.split("/")));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function computeMissingCoreFiles(projectRoot: string): Promise<string[]> {
+  const required = [
+    "proxy.ts",
+    "lib/env/schema.ts",
+    "lib/env/server.ts",
+    "lib/db/index.ts",
+    "lib/db/schema.ts",
+    "lib/orgs/active-org.ts",
+  ];
+  const missing: string[] = [];
+  for (const rel of required) {
+    if (!(await accessFile(projectRoot, rel))) missing.push(rel);
+  }
+  return missing;
+}
 
 function pmCmd(pm: "pnpm" | "npm") {
   return pm === "npm" ? "npm" : "pnpm";

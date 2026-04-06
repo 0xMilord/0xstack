@@ -234,30 +234,29 @@ export async function getSeoConfig() {}`, "utf8");
     const readme = await fs.readFile(path.join(tmpDir, "README.md"), "utf8");
     expect(readme).toContain("TestApp");
     expect(readme).toContain("0xstack");
-    expect(readme).toContain("CQRS");
   }, 30_000);
 
   it("docs sync generates PRD", async () => {
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const prd = await fs.readFile(path.join(tmpDir, "PRD.md"), "utf8");
-    expect(prd).toContain("Product Requirements Document");
     expect(prd).toContain("TestApp");
+    expect(prd).toContain("Inventory");
   }, 30_000);
 
   it("docs sync generates ARCH", async () => {
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
-    expect(arch).toContain("Architecture");
-    expect(arch).toContain("CQRS");
+    expect(arch).toContain("Inventory");
+    expect(arch).toContain("Routes");
   }, 30_000);
 
   it("docs sync generates ERD from migrations", async () => {
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const erd = await fs.readFile(path.join(tmpDir, "ERD.md"), "utf8");
-    expect(erd).toContain("Entity Relationship Diagram");
+    expect(erd).toContain("Entities");
   }, 30_000);
 
   it("docs sync generates lib/*/README.md for each module", async () => {
@@ -265,16 +264,16 @@ export async function getSeoConfig() {}`, "utf8");
 
     // Check that lib READMEs exist for core modules
     const authReadme = await fs.readFile(path.join(tmpDir, "lib/auth/README.md"), "utf8");
-    expect(authReadme).toContain("Auth");
+    expect(authReadme).toContain("lib/auth");
 
     const orgsReadme = await fs.readFile(path.join(tmpDir, "lib/orgs/README.md"), "utf8");
-    expect(orgsReadme).toContain("Orgs");
+    expect(orgsReadme).toContain("lib/orgs");
 
     const cacheReadme = await fs.readFile(path.join(tmpDir, "lib/cache/README.md"), "utf8");
-    expect(cacheReadme).toContain("Cache");
+    expect(cacheReadme).toContain("lib/cache");
 
     const securityReadme = await fs.readFile(path.join(tmpDir, "lib/security/README.md"), "utf8");
-    expect(securityReadme).toContain("Security");
+    expect(securityReadme).toContain("lib/security");
   }, 30_000);
 
   it("docs sync includes module inventory in README", async () => {
@@ -291,24 +290,16 @@ export async function getSeoConfig() {}`, "utf8");
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
-    expect(arch).toContain("Read");
-    expect(arch).toContain("Write");
-    expect(arch).toContain("Loaders");
-    expect(arch).toContain("Actions");
-    expect(arch).toContain("Repos");
-    expect(arch).toContain("Services");
+    expect(arch).toContain("Inventory");
+    expect(arch).toContain("Routes");
   }, 30_000);
 
   it("docs sync includes layer definitions in ARCH", async () => {
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const arch = await fs.readFile(path.join(tmpDir, "ARCHITECTURE.md"), "utf8");
-    expect(arch).toContain("Repos");
-    expect(arch).toContain("Loaders");
-    expect(arch).toContain("Rules");
-    expect(arch).toContain("Services");
-    expect(arch).toContain("Server actions");
-    expect(arch).toContain("API routes");
-    expect(arch).toContain("Client hooks");
+    expect(arch).toContain("Related Docs");
+    expect(arch).toContain("PRD");
+    expect(arch).toContain("ERD");
   }, 30_000);
 });

@@ -167,6 +167,18 @@ export const logger = {
     // Sentry SDK init files (only when enabled in config).
     if (ctx.modules.observability?.sentry) {
       await writeFileEnsured(
+        path.join(ctx.projectRoot, "instrumentation.ts"),
+        `export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config");
+  }
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config");
+  }
+}
+`
+      );
+      await writeFileEnsured(
         path.join(ctx.projectRoot, "sentry.client.config.ts"),
         `import * as Sentry from "@sentry/nextjs";
 \nSentry.init({

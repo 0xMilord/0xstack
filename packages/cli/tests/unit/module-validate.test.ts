@@ -24,6 +24,11 @@ describe("runConsolidatedModuleValidate", () => {
     }
   }
 
+  /** Create a mutable copy of files for deletion tests */
+  function mutableFiles(files: Record<string, string>): Record<string, string> {
+    return { ...files };
+  }
+
   function minimalCtx(overrides?: Partial<ModuleContext["modules"]>): ModuleContext {
     return {
       projectRoot: tmpDir,
@@ -116,63 +121,63 @@ describe("runConsolidatedModuleValidate", () => {
   // It only throws for truly critical issues. Missing files are reported via console output.
   // These tests verify the function completes without throwing.
   it("completes without throwing when auth files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/auth/auth.ts"];
-    delete files["app/login/page.tsx"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/auth/auth.ts"];
+    delete (files as any)["app/login/page.tsx"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when org files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/orgs/active-org.ts"];
-    delete files["app/app/orgs/page.tsx"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/orgs/active-org.ts"];
+    delete (files as any)["app/app/orgs/page.tsx"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when cache files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/cache/config.ts"];
-    delete files["lib/cache/server.ts"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/cache/config.ts"];
+    delete (files as any)["lib/cache/server.ts"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when security files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/security/api.ts"];
-    delete files["lib/repos/api-keys.repo.ts"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/security/api.ts"];
+    delete (files as any)["lib/repos/api-keys.repo.ts"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when webhook ledger files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/repos/webhook-events.repo.ts"];
-    delete files["app/app/webhooks/page.tsx"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/repos/webhook-events.repo.ts"];
+    delete (files as any)["app/app/webhooks/page.tsx"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when UI foundation files are missing", async () => {
-    const files = minimalFiles();
-    delete files["components/layout/site-header.tsx"];
-    delete files["app/providers.tsx"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["components/layout/site-header.tsx"];
+    delete (files as any)["app/providers.tsx"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when observability files are missing", async () => {
-    const files = minimalFiles();
-    delete files["lib/utils/logger.ts"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["lib/utils/logger.ts"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });
 
   it("completes without throwing when health route is missing", async () => {
-    const files = minimalFiles();
-    delete files["app/api/v1/health/route.ts"];
+    const files = mutableFiles(minimalFiles());
+    delete (files as any)["app/api/v1/health/route.ts"];
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx())).resolves.not.toThrow();
   });

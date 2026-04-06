@@ -15,6 +15,8 @@ export type BaselineInput = {
   projectRoot: string;
   profile: string;
   packageManager: PackageManager;
+  /** When true, skip `pnpm add` / `npm install` (e.g. integration tests in temp dirs). */
+  skipPackageInstall?: boolean;
 };
 
 function pmCmd(pm: PackageManager) {
@@ -739,6 +741,10 @@ export async function runBaseline(input: BaselineInput) {
     {
       name: "install module deps (capability-aware)",
       run: async () => {
+        if (input.skipPackageInstall) {
+          logger.info("Skipping package manager install (skipPackageInstall).");
+          return { kind: "ok" };
+        }
         // Single source of truth: use expectedDepsForConfig() to avoid drift.
         const cfg = applyProfile(await loadConfig(root), input.profile);
         const { deps, devDeps } = expectedDepsForConfig(cfg);

@@ -330,7 +330,8 @@ const listPostsCached = withServerCache(
       const raw = await fs.readFile(path.join(BLOG_DIR, file), "utf8");
       posts.push(parsePost(slug, raw));
     }
-    return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
+    // Only return published posts — drafts are never public
+    return posts.filter(p => p.published).sort((a, b) => (a.date < b.date ? 1 : -1));
   },
   {
     key: () => ["blog", "posts"],

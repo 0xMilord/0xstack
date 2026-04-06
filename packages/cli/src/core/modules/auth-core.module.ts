@@ -106,6 +106,34 @@ export async function POST(request: NextRequest) {
 `
     );
 
+    // Server-side auth helpers (requireAuth + getViewer)
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "auth", "server.ts"),
+      `import { auth } from "@/lib/auth/auth";
+import { redirect } from "next/navigation";
+
+/**
+ * Require an authenticated session. Redirects to /login if not authenticated.
+ */
+export async function requireAuth() {
+  const session = await auth.api.getSession({ headers: new Headers() });
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+  return { userId: session.user.id, email: session.user.email ?? "", name: session.user.name ?? "" };
+}
+
+/**
+ * Get the current viewer (returns null if not authenticated).
+ */
+export async function getViewer() {
+  const session = await auth.api.getSession({ headers: new Headers() });
+  if (!session?.user?.id) return null;
+  return { userId: session.user.id, email: session.user.email ?? "", name: session.user.name ?? "" };
+}
+`
+    );
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "query-keys", "auth.keys.ts"),
       `export const authKeys = {
