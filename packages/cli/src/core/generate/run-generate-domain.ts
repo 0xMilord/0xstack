@@ -362,17 +362,25 @@ export async function GET(req: Request) {
     );
   }
 
-  // Test stubs
+  // Test stubs — meaningful enough to catch regressions.
   await ensureDir(path.join(input.projectRoot, "tests", plural));
   await writeFileEnsured(
     path.join(input.projectRoot, "tests", plural, `${plural}.repo.test.ts`),
     `import { describe, it, expect } from "vitest";
 
 describe("${plural} repo", () => {
-  it("has basic exports", async () => {
+  it("has all CRUD exports", async () => {
     const mod = await import("@/lib/repos/${plural}.repo");
-    expect(typeof mod.list${pascal}).toBe("function");
     expect(typeof mod.get${pascal}ById).toBe("function");
+    expect(typeof mod.list${pascal}).toBe("function");
+    expect(typeof mod.insert${pascal}).toBe("function");
+    expect(typeof mod.update${pascal}).toBe("function");
+    expect(typeof mod.delete${pascal}).toBe("function");
+  });
+
+  it("repo imports from schema (not db directly)", async () => {
+    const src = await import("fs").then(fs => fs.promises.readFile(require.resolve("@/lib/repos/${plural}.repo"), "utf8"));
+    expect(src).toMatch(/from ["']@\\/lib\\/db\\/schema["']/);
   });
 });
 `
@@ -380,11 +388,29 @@ describe("${plural} repo", () => {
   await writeFileEnsured(
     path.join(input.projectRoot, "tests", plural, `${plural}.rules.test.ts`),
     `import { describe, it, expect } from "vitest";
-import { create${pascal}Input } from "@/lib/rules/${plural}.rules";
+import { create${pascal}Input, update${pascal}Input, delete${pascal}Input } from "@/lib/rules/${plural}.rules";
 
 describe("${plural} rules", () => {
-  it("validates create input", () => {
+  it("validates create input with valid data", () => {
     expect(create${pascal}Input.parse({ name: "Hello" })).toEqual({ name: "Hello" });
+  });
+
+  it("rejects create input with empty name", () => {
+    expect(() => create${pascal}Input.parse({ name: "" })).toThrow();
+  });
+
+  it("rejects create input with name too long", () => {
+    expect(() => create${pascal}Input.parse({ name: "a".repeat(201) })).toThrow();
+  });
+
+  it("validates update input with optional name", () => {
+    expect(update${pascal}Input.parse({ id: "1" })).toEqual({ id: "1" });
+    expect(update${pascal}Input.parse({ id: "1", name: "Updated" })).toEqual({ id: "1", name: "Updated" });
+  });
+
+  it("validates delete input", () => {
+    expect(delete${pascal}Input.parse({ id: "1" })).toEqual({ id: "1" });
+    expect(() => delete${pascal}Input.parse({ id: "" })).toThrow();
   });
 });
 `
@@ -396,7 +422,29 @@ import { create${pascal}Input } from "@/lib/rules/${plural}.rules";
 
 describe("${plural} actions", () => {
   it("create schema requires name", () => {
+    expect(() => create${pascal}Input.parse({})).toThrow();
     expect(() => create${pascal}Input.parse({ id: "x" })).toThrow();
+  });
+
+  it("create schema accepts valid name", () => {
+    const result = create${pascal}Input.parse({ name: "Test" });
+    expect(result).toEqual({ name: "Test" });
+  });
+
+  it("service has all CRUD methods", async () => {
+    const mod = await import("@/lib/services/${plural}.service");
+    expect(typeof mod.${camel}Service_list).toBe("function");
+    expect(typeof mod.${camel}Service_getById).toBe("function");
+    expect(typeof mod.${camel}Service_create).toBe("function");
+    expect(typeof mod.${camel}Service_update).toBe("function");
+    expect(typeof mod.${camel}Service_delete).toBe("function");
+  });
+
+  it("loader imports from service (not repo)", async () => {
+    const fs = await import("fs");
+    const src = await fs.promises.readFile(require.resolve("@/lib/loaders/${plural}.loader"), "utf8");
+    expect(src).toMatch(/from ["']@\\/lib\\/services\\/${plural}\\.service["']/);
+    expect(src).not.toMatch(/from ["']@\\/lib\\/repos\\/[^"']*\\.repo["']/);
   });
 });
 `

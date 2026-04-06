@@ -347,8 +347,12 @@ export default async function Page() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <Link className={buttonVariants({ variant: "secondary" })} href="/pricing">Pricing</Link>
-            <Link className={buttonVariants({ variant: "secondary" })} href="/app/billing">Billing</Link>
-            <Link className={buttonVariants({ variant: "secondary" })} href="/app/assets">Assets</Link>
+            {cfg.modules.billing ? (
+              <Link className={buttonVariants({ variant: "secondary" })} href="/app/billing">Billing</Link>
+            ) : null}
+            {cfg.modules.storage ? (
+              <Link className={buttonVariants({ variant: "secondary" })} href="/app/assets">Assets</Link>
+            ) : null}
             <Link className={buttonVariants({ variant: "secondary" })} href="/app/api-keys">API keys</Link>
             {cfg.modules.pwa ? (
               <Link className={buttonVariants({ variant: "secondary" })} href="/app/pwa">PWA</Link>

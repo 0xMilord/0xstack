@@ -4,6 +4,7 @@ import { runPipeline } from "../pipeline";
 import { logger } from "../logger";
 import { execCmd } from "../exec";
 import { applyProfile, loadConfig, writeDefaultConfig } from "../config";
+import { expectedDepsForConfig } from "../deps";
 import { runModulesLifecycle } from "../modules/registry";
 import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgsTables } from "../generate/schema-edit";
 import { runDocsSync } from "../docs/run-docs-sync";
@@ -738,47 +739,9 @@ export async function runBaseline(input: BaselineInput) {
     {
       name: "install module deps (capability-aware)",
       run: async () => {
-        // Minimal v1: ensure required deps for enabled modules exist.
-        // Full dependency reconciliation is handled by sync later.
+        // Single source of truth: use expectedDepsForConfig() to avoid drift.
         const cfg = applyProfile(await loadConfig(root), input.profile);
-        const deps: string[] = [];
-        const devDeps: string[] = [];
-
-        // Always-required baseline (most already installed by init, but baseline must be safe).
-        deps.push("zod", "drizzle-orm", "postgres", "better-auth", "@better-auth/drizzle-adapter");
-        deps.push("@tanstack/react-query", "zustand", "next-themes");
-        deps.push("@upstash/redis", "@upstash/ratelimit");
-        // Better Auth CLI is executed via npx/pnpm dlx (no install), but keep drizzle-kit in devDeps.
-        devDeps.push("drizzle-kit", "vitest", "vite");
-
-        if (cfg.modules.blogMdx) {
-          deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "remark-toc", "rehype-slug", "rehype-autolink-headings");
-          devDeps.push("@tailwindcss/typography");
-        }
-        if (cfg.modules.seo) {
-          deps.push("schema-dts");
-        }
-        if (cfg.modules.billing === "dodo") {
-          deps.push("@dodopayments/nextjs", "standardwebhooks");
-        }
-        if (cfg.modules.billing === "stripe") {
-          deps.push("stripe");
-        }
-        if (cfg.modules.storage === "gcs") deps.push("@google-cloud/storage");
-        if (cfg.modules.storage === "s3") deps.push("@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner");
-        if (cfg.modules.storage === "supabase") deps.push("@supabase/supabase-js");
-        if (cfg.modules.email === "resend") {
-          deps.push("resend", "@react-email/components", "@react-email/render");
-        }
-        if (cfg.modules.cache) {
-          deps.push("lru-cache");
-        }
-        if (cfg.modules.pwa) {
-          deps.push("web-push", "idb");
-        }
-        if (cfg.modules.observability?.sentry) {
-          deps.push("@sentry/nextjs");
-        }
+        const { deps, devDeps } = expectedDepsForConfig(cfg);
 
         const cmd = pmCmd(input.packageManager);
         const install = async (pkgs: string[], dev: boolean) => {

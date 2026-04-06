@@ -361,7 +361,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 }
 `;
     const sitemapWithBlog = `import type { MetadataRoute } from "next";
-import { listPosts } from "@/lib/loaders/blog.loader";
 import { env } from "@/lib/env/server";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -377,12 +376,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: new URL("/get-started", baseUrl).toString(), lastModified: new Date() },
   ];
 
-  const posts = await listPosts();
-  for (const p of posts) {
-    if (!p.published) continue;
-    base.push({ url: new URL(\`/blog/\${p.slug}\`, baseUrl).toString(), lastModified: new Date(p.date || Date.now()) });
+  // Dynamic import so sitemap works even if blog loader is missing.
+  try {
+    const { listPosts } = await import("@/lib/loaders/blog.loader");
+    const posts = await listPosts();
+    for (const p of posts) {
+      if (!p.published) continue;
+      base.push({ url: new URL(\`/blog/\${p.slug}\`, baseUrl).toString(), lastModified: new Date(p.date || Date.now()) });
+    }
+    base.push({ url: new URL("/blog", baseUrl).toString(), lastModified: new Date() });
+  } catch {
+    // blog loader missing or error — skip blog entries
   }
-  base.push({ url: new URL("/blog", baseUrl).toString(), lastModified: new Date() });
 
   return base;
 }

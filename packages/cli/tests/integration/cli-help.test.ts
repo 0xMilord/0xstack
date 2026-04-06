@@ -14,4 +14,55 @@ describe("CLI (integration)", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("0xstack");
   }, 60_000);
+
+  it("prints version for --version", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "--version"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    // Version should be a semver string
+    expect(stdout).toMatch(/\d+\.\d+\.\d+/);
+  }, 60_000);
+
+  it("exits non-zero for unknown command", async () => {
+    await expect(
+      execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "nonexistent-command"], {
+        cwd: pkgRoot,
+        stdio: "pipe",
+      })
+    ).rejects.toThrow();
+  }, 60_000);
+
+  it("config-print outputs valid JSON", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "config-print"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("app");
+    expect(parsed).toHaveProperty("modules");
+  }, 60_000);
+
+  it("deps command outputs deps array", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "deps"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("better-auth");
+    expect(stdout).toContain("drizzle-orm");
+  }, 60_000);
+
+  it("modules command lists available modules", async () => {
+    const { stdout, exitCode } = await execa("pnpm", ["exec", "tsx", path.join(pkgRoot, "src/index.ts"), "modules"], {
+      cwd: pkgRoot,
+      stdio: "pipe",
+    });
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("billing");
+    expect(stdout).toContain("storage");
+    expect(stdout).toContain("seo");
+  }, 60_000);
 });
