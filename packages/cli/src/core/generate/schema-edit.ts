@@ -182,6 +182,24 @@ export async function ensureOrgsTables(projectRoot: string) {
   );
 }
 
+export async function ensureOrgInvitesTable(projectRoot: string) {
+  await upsertDomainTable(
+    projectRoot,
+    "orgInvites",
+    `export const orgInvites = pgTable("org_invites", {
+  id: text("id").primaryKey().defaultRandom(),
+  orgId: text("org_id").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  token: text("token").unique().notNull(),
+  invitedBy: text("invited_by").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});`
+  );
+}
+
 export async function ensureAuthTables(projectRoot: string) {
   await upsertDomainTable(
     projectRoot,

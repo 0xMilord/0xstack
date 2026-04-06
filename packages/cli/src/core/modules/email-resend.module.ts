@@ -93,6 +93,8 @@ export const emailResendModule: Module = {
       "lib/email/auth-emails.ts",
       "lib/email/templates/verify-email.tsx",
       "lib/email/templates/reset-password.tsx",
+      "lib/email/templates/welcome-email.tsx",
+      "lib/email/templates/invite-email.tsx",
       "lib/env/email.ts",
       "lib/email/EMAIL_SETUP.md",
     ];
@@ -527,6 +529,113 @@ export function WelcomeEmailTemplate(props: { appName: string; userName: string;
 `
     );
 
+    // Invite email template
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "lib", "email", "templates", "invite-email.tsx"),
+      `import * as React from "react";
+import {
+  Body,
+  Button,
+  Container,
+  Head,
+  Hr,
+  Html,
+  Link,
+  Preview,
+  Section,
+  Text,
+} from "@react-email/components";
+
+const base = {
+  bg: "#ffffff",
+  panel: "#f9fafb",
+  border: "#e5e7eb",
+  text: "#111827",
+  muted: "#6b7280",
+  subtle: "#9ca3af",
+  brand: "#000000",
+  brandText: "#ffffff",
+};
+
+function Shell(props: { appName: string; preview: string; children: React.ReactNode }) {
+  return (
+    <Html>
+      <Head />
+      <Preview>{props.preview}</Preview>
+      <Body style={{ backgroundColor: base.bg, color: base.text, margin: 0, padding: 0, fontFamily: "ui-sans-serif, system-ui" }}>
+        <Container style={{ maxWidth: "560px", padding: "28px 20px" }}>
+          <Section style={{ marginBottom: "14px" }}>
+            <Text style={{ margin: 0, fontSize: "13px", color: base.muted, letterSpacing: "0.2px" }}>
+              {props.appName}
+            </Text>
+          </Section>
+          <Section style={{ backgroundColor: base.panel, border: "1px solid " + base.border, borderRadius: "14px", padding: "22px" }}>
+            {props.children}
+          </Section>
+          <Section style={{ padding: "14px 2px 0" }}>
+            <Hr style={{ borderColor: base.border, margin: "12px 0" }} />
+            <Text style={{ margin: "0 0 8px", fontSize: "11px", color: base.subtle }}>
+              Sent by {props.appName}.
+            </Text>
+            <Text style={{ margin: 0, fontSize: "10px", color: base.subtle }}>
+              &copy; {new Date().getFullYear()} {props.appName} Inc.
+            </Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+export function InviteEmailTemplate(props: { appName: string; userName: string; orgName: string; inviteUrl: string }) {
+  const { appName, userName, orgName, inviteUrl } = props;
+  return (
+    <Shell appName={appName} preview={"You are invited to join " + orgName + " on " + appName}>
+      <Section>
+        <Text style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 650, letterSpacing: "-0.2px" }}>
+          You are invited to join {orgName}
+        </Text>
+        <Text style={{ margin: "0 0 14px", fontSize: "14px", color: base.muted }}>
+          Hi {userName}, you have been invited to join the organization <strong>{orgName}</strong> on {appName}.
+        </Text>
+
+        <Section style={{ margin: "16px 0 10px" }}>
+          <Button
+            href={inviteUrl}
+            style={{
+              backgroundColor: base.brand,
+              color: base.brandText,
+              padding: "12px 16px",
+              borderRadius: "12px",
+              textDecoration: "none",
+              display: "inline-block",
+              fontWeight: 700,
+              fontSize: "14px",
+            }}
+          >
+            Accept invitation
+          </Button>
+        </Section>
+
+        <Text style={{ margin: "14px 0 0", fontSize: "12px", color: base.subtle }}>
+          If the button does not work, open this link:
+        </Text>
+        <Text style={{ margin: "4px 0 0", fontSize: "12px", color: base.muted, wordBreak: "break-all", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+          {inviteUrl}
+        </Text>
+
+        <Hr style={{ borderColor: base.border, margin: "18px 0" }} />
+
+        <Text style={{ margin: 0, fontSize: "12px", color: base.subtle }}>
+          This invitation expires in 7 days. If you did not expect this invite, you can safely ignore it.
+        </Text>
+      </Section>
+    </Shell>
+  );
+}
+`
+    );
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "email", "auth-emails.ts"),
       `import { render } from "@react-email/render";
@@ -534,6 +643,7 @@ import { sendResendEmail } from "@/lib/email/resend";
 import { VerifyEmailTemplate } from "@/lib/email/templates/verify-email";
 import { ResetPasswordTemplate } from "@/lib/email/templates/reset-password";
 import { WelcomeEmailTemplate } from "@/lib/email/templates/welcome-email";
+import { InviteEmailTemplate } from "@/lib/email/templates/invite-email";
 
 function appName() {
   return process.env.NEXT_PUBLIC_APP_NAME ?? "App";
@@ -613,6 +723,33 @@ export async function sendWelcomeEmail(input: { to: string; userName: string; da
   });
   if (!res.success) {
     console.error("[auth-emails] sendWelcomeEmail failed:", res.error);
+  }
+}
+
+export async function sendInviteEmail(input: { to: string; userName: string; orgName: string; inviteUrl: string }) {
+  const text = [
+    \`You are invited to join \${input.orgName} on \${appName()}\`,
+    "",
+    \`Hi \${input.userName},\`,
+    "",
+    \`You have been invited to join the organization "\${input.orgName}" on \${appName()}.\`,
+    "",
+    "Accept invitation:",
+    input.inviteUrl,
+    "",
+    "This invitation expires in 7 days.",
+  ].join("\\n");
+  const html = await render(
+    InviteEmailTemplate({ appName: appName(), userName: input.userName, orgName: input.orgName, inviteUrl: input.inviteUrl })
+  );
+  const res = await sendResendEmail({
+    to: input.to,
+    subject: \`You are invited to join \${input.orgName}\`,
+    html,
+    text,
+  });
+  if (!res.success) {
+    console.error("[auth-emails] sendInviteEmail failed:", res.error);
   }
 }
 `

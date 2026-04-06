@@ -79,6 +79,18 @@ export async function providerDeleteObject(input: { bucket: string; objectKey: s
   const storage = getStorage();
   await storage.bucket(input.bucket).file(input.objectKey).delete({ ignoreNotFound: true });
 }
+
+/**
+ * List all object keys in the given GCS bucket.
+ * Used by the orphan-cleanup mechanism to find objects
+ * that exist in GCS but have no corresponding DB record.
+ */
+export async function listAllGcsObjectKeys(input: { bucket: string }): Promise<string[]> {
+  const storage = getStorage();
+  const bucket = storage.bucket(input.bucket);
+  const [files] = await bucket.getFiles({ autoPaginate: true });
+  return files.map((f) => f.name);
+}
 `
     );
   },

@@ -593,9 +593,7 @@ export async function getSeoConfig() {}`, "utf8");
     expect(env).toContain("DODO_PAYMENTS_ENVIRONMENT");
     expect(env).toContain("DODO_PAYMENTS_RETURN_URL");
 
-    const webhooks = await fs.readFile(path.join(tmpDir, "lib/billing/dodo.webhooks.ts"), "utf8");
-    expect(webhooks).toContain("verifyDodoWebhook");
-    expect(webhooks).toContain("standardwebhooks");
+    // P2: dodo.webhooks.ts removed — dead code (@dodopayments/nextjs Webhooks does its own verification)
 
     const checkout = await fs.readFile(path.join(tmpDir, "app/api/v1/billing/checkout/route.ts"), "utf8");
     expect(checkout).toContain("checkoutUrl");

@@ -388,6 +388,51 @@ export function getPostCanonicalUrl(input: { baseUrl: string; slug: string; cano
     await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]"));
     await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]", "opengraph-image"));
     await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.ts");
+
+    // Reading progress bar — client component using useEffect for scroll tracking
+    await ensureDir(path.join(ctx.projectRoot, "components", "blog"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "blog", "reading-progress.tsx"),
+      `"use client";
+
+import { useEffect, useState } from "react";
+
+/**
+ * Displays a thin progress bar at the top of the viewport that fills
+ * as the user scrolls through a blog post.
+ * Must be rendered inside a Server Component that includes a scrollable article.
+ */
+export function ReadingProgressBar() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    function handleScroll() {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      const total = scrollHeight - clientHeight;
+      if (total > 0) {
+        setProgress((scrollTop / total) * 100);
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // initial calculation
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <div className="sticky top-0 z-50 h-0.5 w-full bg-muted">
+      <div
+        className="h-full bg-primary transition-[width]"
+        style={{ width: \`\${progress}%\` }}
+      />
+    </div>
+  );
+}
+`
+    );
+
     // P0 #3: Conditionally import from SEO module
     const seoEnabled = ctx.modules.seo;
     const blogSeoImport = seoEnabled
@@ -542,6 +587,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { ReadingProgressBar } from "@/components/blog/reading-progress";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -630,9 +676,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   return (
     <>
       {/* Reading Progress Bar */}
-      <div className="sticky top-0 z-50 h-0.5 w-full bg-muted">
-        <div id="reading-progress" className="h-full w-0 bg-primary transition-all" />
-      </div>
+      <ReadingProgressBar />
 
       <article className="mx-auto max-w-4xl px-6 py-12">
         {/* Header */}
@@ -757,24 +801,6 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           </Link>
         </footer>
       </article>
-
-      {/* Reading Progress Script */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: \`
-            (function() {
-              const progress = document.getElementById('reading-progress');
-              if (!progress) return;
-              window.addEventListener('scroll', function() {
-                const winScroll = document.documentElement.scrollTop;
-                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-                const scrolled = (winScroll / height) * 100;
-                progress.style.width = scrolled + '%';
-              });
-            })();
-          \`,
-        }}
-      />
 
       {/* JSON-LD */}
       <script

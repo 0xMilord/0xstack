@@ -229,7 +229,7 @@ describe("runConsolidatedModuleValidate", () => {
       "app/api/v1/billing/portal/route.ts": "export async function GET() {}",
       "app/api/v1/billing/webhook/route.ts": "export async function POST() {}",
       "lib/env/billing.ts": "export const BillingEnvSchema = z.object({});",
-      "lib/billing/dodo.webhooks.ts": "export function verifyDodoWebhook() {}",
+      // dodo.webhooks.ts removed — dead code
     };
     await writeFiles(files);
     await expect(runConsolidatedModuleValidate(minimalCtx({ billing: "dodo" }))).resolves.not.toThrow();

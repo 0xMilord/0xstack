@@ -22,12 +22,18 @@ export const securityApiModule: Module = {
 import { apiKeys } from "@/lib/db/schema";
 import { eq, isNull, and, desc } from "drizzle-orm";
 
-export async function findActiveApiKeysByPrefix(prefix: string) {
+/**
+ * Find active (non-revoked) API keys matching a given prefix.
+ * @param prefix - The hex prefix to match (e.g. "a1b2c3d4").
+ * @param limit - Maximum number of results to return. Defaults to 5.
+ *   Keep this low — the caller only needs enough candidates to find a matching hash.
+ */
+export async function findActiveApiKeysByPrefix(prefix: string, limit = 5) {
   return await db
     .select()
     .from(apiKeys)
     .where(and(eq(apiKeys.prefix, prefix), isNull(apiKeys.revokedAt)))
-    .limit(5);
+    .limit(limit);
 }
 
 export async function listActiveApiKeysForOrg(orgId: string) {

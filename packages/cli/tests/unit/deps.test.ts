@@ -96,9 +96,10 @@ describe("expectedDepsForConfig", () => {
 
   it("removes schema-dts (dead dependency replaced with satori)", () => {
     const cfg = ConfigSchema.parse({ modules: { seo: true } });
-    const { deps } = expectedDepsForConfig(cfg);
+    const { deps, devDeps } = expectedDepsForConfig(cfg);
     expect(deps).not.toContain("schema-dts");
-    expect(deps).toContain("satori");
+    // satori is added as devDep for OG image font rendering
+    expect(devDeps).toContain("satori");
   });
 
   it("does not duplicate deps across module combos", () => {

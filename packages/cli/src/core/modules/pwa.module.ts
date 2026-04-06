@@ -17,14 +17,20 @@ async function patchRootLayoutForPwa(projectRoot: string) {
       `${m}\n// 0xSTACK:PWA\n// NOTE: keep these tags for installability + iOS.\n`
   );
 
-  // Try to inject into <head> via metadata is better, but we keep a small patch for compatibility.
-  // If layout already uses metadata export, the manifest is still discovered from /public and link tags help iOS.
+  // Inject PWA meta tags: prefer inserting inside an existing <head>, fall back to creating one.
   if (!src.includes('rel="manifest"')) {
-    src = src.replace(
-      /<html([^>]*)>\s*/m,
-      (m) =>
-        `${m}<head>\n        {/* 0xSTACK:PWA */}\n        <link rel="manifest" href="/manifest.webmanifest" />\n        <meta name="theme-color" content="#000000" />\n        <meta name="apple-mobile-web-app-capable" content="yes" />\n        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n      </head>\n`
-    );
+    const pwaTags = `\n        {/* 0xSTACK:PWA */}\n        <link rel="manifest" href="/manifest.webmanifest" />\n        <meta name="theme-color" content="#000000" />\n        <meta name="apple-mobile-web-app-capable" content="yes" />\n        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />`;
+
+    if (/<head[\s>]/i.test(src)) {
+      // <head> exists — inject tags right after the opening <head> tag
+      src = src.replace(/(<head[^>]*>)/i, `$1${pwaTags}`);
+    } else {
+      // No <head> — create one after <html>
+      src = src.replace(
+        /(<html[^>]*>)/i,
+        `$1\n      <head>${pwaTags}\n      </head>`
+      );
+    }
   }
 
   // Wrap {children} with PwaProvider for PwaUpdateBanner to work across the app.

@@ -63,7 +63,7 @@ export async function runConsolidatedModuleValidate(ctx: ModuleContext) {
       ],
       errors
     );
-    if (m.billing === "dodo") await requireFiles(root, "billing.dodo", ["lib/billing/dodo.webhooks.ts"], errors);
+    // P2: dodo.webhooks.ts removed — dead code (@dodopayments/nextjs Webhooks does its own verification)
     if (m.billing === "stripe") await requireFiles(root, "billing.stripe", ["lib/billing/stripe.ts"], errors);
   }
 

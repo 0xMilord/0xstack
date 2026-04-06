@@ -262,6 +262,29 @@ export async function storageService_listAssets(input: { ownerUserId?: string | 
   if (input.ownerUserId) return await listAssetsForUser(input.ownerUserId, opts);
   return [];
 }
+
+/**
+ * Find orphaned objects in GCS that exist in the bucket but not in the DB.
+ * This function does NOT delete anything — it only reports orphaned keys.
+ * Callers should review results before deleting.
+ * Only supported when ACTIVE_STORAGE_PROVIDER is "gcs".
+ */
+export async function storageService_cleanupOrphans(): Promise<{ orphans: string[]; provider: string }> {
+  if (ACTIVE_STORAGE_PROVIDER !== "gcs") {
+    throw new Error(\`cleanupOrphans only supports GCS (current: \${ACTIVE_STORAGE_PROVIDER})\`);
+  }
+  const { listAllGcsObjectKeys } = await import("@/lib/storage/providers/gcs");
+  const { listAllAssetObjectKeys } = await import("@/lib/repos/assets.repo");
+
+  const [gcsKeys, dbKeys] = await Promise.all([
+    listAllGcsObjectKeys({ bucket: storageBucket() }),
+    listAllAssetObjectKeys(),
+  ]);
+
+  const dbSet = new Set(dbKeys);
+  const orphans = gcsKeys.filter((k) => !dbSet.has(k));
+  return { orphans, provider: ACTIVE_STORAGE_PROVIDER };
+}
 `
     );
 
@@ -541,6 +564,67 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ assetId: str
     const res = await storageService_deleteAsset({ assetId, userId: session.user.id, activeOrgId: orgId });
     return NextResponse.json({ requestId, ...res }, { headers: { "x-request-id": requestId } });
   } catch (err) {
+    return toApiErrorResponse(err, requestId);
+  }
+}
+`
+    );
+
+    // Cleanup orphan objects API route — requires auth + admin role
+    await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "storage", "cleanup-orphan"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "api", "v1", "storage", "cleanup-orphan", "route.ts"),
+      `import { NextResponse } from "next/server";
+import crypto from "node:crypto";
+import { cookies } from "next/headers";
+import { auth } from "@/lib/auth/auth";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_assertRoleAtLeast } from "@/lib/services/orgs.service";
+import { toApiErrorResponse } from "@/lib/security/api";
+import { storageService_cleanupOrphans } from "@/lib/services/storage.service";
+
+/**
+ * POST /api/v1/storage/cleanup-orphan
+ *
+ * Lists all objects in the GCS bucket and compares them against DB asset records.
+ * Returns objects that exist in GCS but have no corresponding DB record (orphans).
+ * Does NOT delete anything — only reports.
+ * Requires authentication + admin role in the active org.
+ */
+export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
+  try {
+    const session = await auth.api.getSession({ headers: req.headers });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { ok: false, requestId, code: "UNAUTHORIZED", message: "session required" },
+        { status: 401, headers: { "x-request-id": requestId } }
+      );
+    }
+
+    const orgId = getActiveOrgIdFromCookies(await cookies());
+    if (!orgId) {
+      return NextResponse.json(
+        { ok: false, requestId, code: "NO_ACTIVE_ORG", message: "Select an organization first." },
+        { status: 400, headers: { "x-request-id": requestId } }
+      );
+    }
+
+    // Admin/owner role required
+    await orgsService_assertRoleAtLeast({ userId: session.user.id, orgId, atLeast: "admin" });
+
+    const result = await storageService_cleanupOrphans();
+    return NextResponse.json(
+      { ok: true, requestId, orphans: result.orphans, provider: result.provider, count: result.orphans.length },
+      { headers: { "x-request-id": requestId } }
+    );
+  } catch (err: any) {
+    if (err?.message === "role_too_low") {
+      return NextResponse.json(
+        { ok: false, requestId, code: "FORBIDDEN", message: "admin role required" },
+        { status: 403, headers: { "x-request-id": requestId } }
+      );
+    }
     return toApiErrorResponse(err, requestId);
   }
 }

@@ -1,13 +1,14 @@
 import path from "node:path";
 import { backupAndRemove, ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
-import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgsTables } from "../generate/schema-edit";
+import { ensureApiKeysTable, ensureAssetsTable, ensureBillingTables, ensureOrgInvitesTable, ensureOrgsTables } from "../generate/schema-edit";
 
 export const coreDbStateModule: Module = {
   id: "core-db-state",
   install: async () => { },
   activate: async (ctx) => {
     await ensureOrgsTables(ctx.projectRoot);
+    await ensureOrgInvitesTable(ctx.projectRoot);
     await ensureApiKeysTable(ctx.projectRoot);
     await ensureAssetsTable(ctx.projectRoot);
     await ensureBillingTables(ctx.projectRoot);
@@ -179,6 +180,15 @@ export async function deleteAssetById(assetId: string) {
   const rows = await db.delete(assets).where(eq(assets.id, assetId)).returning();
   return rows[0] ?? null;
 }
+
+/**
+ * Return all objectKey values from the assets table.
+ * Used by the orphan-cleanup mechanism to compare against GCS bucket contents.
+ */
+export async function listAllAssetObjectKeys(): Promise<string[]> {
+  const rows = await db.select({ objectKey: assets.objectKey }).from(assets);
+  return rows.map((r) => r.objectKey);
+}
 `
     );
     await writeFileEnsured(
@@ -268,8 +278,8 @@ export async function getStripeCustomerIdForOrg(orgId: string) {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "repos", "orgs.repo.ts"),
       `import { db } from "@/lib/db";
-import { orgs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orgs, orgInvites } from "@/lib/db/schema";
+import { eq, and, gt, isNull } from "drizzle-orm";
 
 export async function insertOrg(input: typeof orgs.$inferInsert) {
   const rows = await db.insert(orgs).values(input).returning();
@@ -278,6 +288,30 @@ export async function insertOrg(input: typeof orgs.$inferInsert) {
 
 export async function getOrgById(id: string) {
   const rows = await db.select().from(orgs).where(eq(orgs.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createInvite(input: typeof orgInvites.$inferInsert) {
+  const rows = await db.insert(orgInvites).values(input).returning();
+  return rows[0] ?? null;
+}
+
+export async function findInviteByToken(token: string) {
+  const rows = await db
+    .select()
+    .from(orgInvites)
+    .where(and(eq(orgInvites.token, token), isNull(orgInvites.usedAt), gt(orgInvites.expiresAt, new Date())))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function acceptInvite(token: string, userId: string) {
+  const now = new Date();
+  const rows = await db
+    .update(orgInvites)
+    .set({ usedAt: now })
+    .where(and(eq(orgInvites.token, token), isNull(orgInvites.usedAt)))
+    .returning();
   return rows[0] ?? null;
 }
 `
@@ -369,8 +403,9 @@ export async function isMember(orgId: string, userId: string) {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "services", "orgs.service.ts"),
       `import crypto from "node:crypto";
-import { insertOrg } from "@/lib/repos/orgs.repo";
+import { insertOrg, createInvite, findInviteByToken, acceptInvite as repoAcceptInvite } from "@/lib/repos/orgs.repo";
 import { addMember, getMembership, isMember, listMembersForOrg, listOrgsForUser, removeMember } from "@/lib/repos/org-members.repo";
+import { getOrgById } from "@/lib/repos/orgs.repo";
 
 export const ORG_ROLES = ["member", "admin", "owner"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -426,6 +461,53 @@ export async function orgsService_removeMember(input: { orgId: string; userId: s
   // Cannot remove yourself
   if (input.removedBy === input.userId) throw new Error("cannot_remove_self");
   return await removeMember({ orgId: input.orgId, userId: input.userId });
+}
+
+export async function orgsService_createInvites(input: {
+  orgId: string;
+  members: Array<{ email: string; role: string }>;
+  invitedByUserId: string;
+}) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const results = [];
+  for (const member of input.members) {
+    const token = crypto.randomBytes(16).toString("hex"); // 32-char hex
+    const invite = await createInvite({
+      orgId: input.orgId,
+      email: member.email.toLowerCase(),
+      role: member.role || "member",
+      token,
+      invitedBy: input.invitedByUserId,
+      expiresAt,
+    });
+    if (invite) results.push({ email: invite.email, token: invite.token, role: invite.role });
+  }
+  return results;
+}
+
+export async function orgsService_acceptInvite(input: { token: string; userId: string; userEmail: string }) {
+  const invite = await findInviteByToken(input.token);
+  if (!invite) throw new Error("invite_not_found");
+
+  // Check that the current user's email matches the invite email
+  if (invite.email.toLowerCase() !== input.userEmail.toLowerCase()) {
+    throw new Error("email_mismatch");
+  }
+
+  const org = await getOrgById(invite.orgId);
+  if (!org) throw new Error("org_not_found");
+
+  // Check if already a member
+  const existing = await getMembership({ orgId: invite.orgId, userId: input.userId });
+  if (existing) throw new Error("already_member");
+
+  // Mark invite as used
+  await repoAcceptInvite(input.token, input.userId);
+
+  // Add user to org members
+  await addMember({ orgId: invite.orgId, userId: input.userId, role: invite.role });
+
+  return { ok: true, orgId: invite.orgId, orgName: org.name };
 }
 `
     );
@@ -496,7 +578,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { revalidate } from "@/lib/cache";
 import { createOrgInput } from "@/lib/rules/orgs.rules";
 import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
-import { orgsService_assertMember, orgsService_createForUser, orgsService_removeMember } from "@/lib/services/orgs.service";
+import { orgsService_assertMember, orgsService_assertRoleAtLeast, orgsService_createForUser, orgsService_removeMember, orgsService_createInvites, orgsService_acceptInvite } from "@/lib/services/orgs.service";
 
 export async function createOrg(input: unknown) {
   const viewer = await requireAuth();
@@ -528,6 +610,49 @@ export async function removeMemberAction(input: { orgId: string; userId: string 
   revalidate.orgs(viewer.userId);
   revalidatePath("/app/orgs");
   return { ok: true as const };
+}
+
+export async function inviteMembers(input: { orgId: string; members: Array<{ email: string; role: string }> }) {
+  const viewer = await requireAuth();
+  await orgsService_assertRoleAtLeast({ userId: viewer.userId, orgId: input.orgId, atLeast: "owner" });
+  const invites = await orgsService_createInvites({
+    orgId: input.orgId,
+    members: input.members,
+    invitedByUserId: viewer.userId,
+  });
+
+  // Fetch org name for email
+  const { getOrgById } = await import("@/lib/repos/orgs.repo");
+  const org = await getOrgById(input.orgId);
+  const orgName = org?.name ?? input.orgId;
+
+  // Try to send emails, gracefully skip if email module not available
+  try {
+    const { sendInviteEmail } = await import("@/lib/email/auth-emails");
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    for (const inv of invites) {
+      await sendInviteEmail({
+        to: inv.email,
+        userName: inv.email,
+        orgName,
+        inviteUrl: \`\${appUrl}/invite/\${inv.token}\`,
+      });
+    }
+  } catch {
+    // Email module not available — skip sending
+  }
+
+  revalidate.orgs(viewer.userId);
+  revalidatePath("/app/orgs");
+  return { invites };
+}
+
+export async function acceptInviteAction(input: { token: string }) {
+  const viewer = await requireAuth();
+  const result = await orgsService_acceptInvite({ token: input.token, userId: viewer.userId, userEmail: viewer.email });
+  revalidate.orgs(viewer.userId);
+  revalidatePath("/app");
+  return result;
 }
 `
     );
@@ -628,6 +753,131 @@ export default async function Page() {
           </div>
         </section>
       )}
+    </main>
+  );
+}
+`
+    );
+
+    // Invite accept page
+    await ensureDir(path.join(ctx.projectRoot, "app", "invite", "[token]"));
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "app", "invite", "[token]", "page.tsx"),
+      `"use client";
+
+import { use, useState } from "react";
+import { useRouter } from "next/navigation";
+import { acceptInviteAction } from "@/lib/actions/orgs.actions";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
+  const router = useRouter();
+  const [status, setStatus] = useState<"idle" | "loading" | "joined" | "error" | "already_member">("idle");
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleAccept() {
+    setStatus("loading");
+    setError(null);
+    try {
+      const result = await acceptInviteAction({ token });
+      if (result.ok) {
+        setOrgName((result as any).orgName ?? null);
+        setStatus("joined");
+        setTimeout(() => router.push("/app"), 1500);
+      }
+    } catch (err: any) {
+      // requireAuth() triggers a redirect to /login via Next.js redirect()
+      if (err?.digest?.includes("NEXT_REDIRECT") || err?.message === "NEXT_REDIRECT") {
+        router.push("/login");
+        return;
+      }
+      const msg = err?.message ?? "Something went wrong";
+      if (msg === "invite_not_found" || msg === "org_not_found") {
+        setError("This invite link is invalid or has expired.");
+      } else if (msg === "already_member") {
+        setStatus("already_member");
+      } else if (msg === "email_mismatch") {
+        setError("This invite was sent to a different email address. Please log in with the correct account.");
+      } else {
+        setError(msg);
+      }
+      setStatus("error");
+    }
+  }
+
+  function handleDecline() {
+    router.push("/login");
+  }
+
+  if (status === "joined") {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-xl">Welcome to {orgName ?? "the organization"}!</CardTitle>
+            <CardDescription>You have been added as a member.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Redirecting to the app...</p>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (status === "already_member") {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-xl">You&apos;re already a member</CardTitle>
+            <CardDescription>You are already part of this organization.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/app")}>Go to App</Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-xl">Invite unavailable</CardTitle>
+            <CardDescription>{error ?? "This invite link is invalid or has expired."}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/login")} variant="secondary">
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-xl">Join the organization?</CardTitle>
+          <CardDescription>You have been invited to join an organization. Accept the invitation to become a member.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-3">
+          <Button onClick={handleAccept} disabled={status === "loading"} className="flex-1">
+            {status === "loading" ? "Accepting..." : "Accept"}
+          </Button>
+          <Button onClick={handleDecline} variant="outline" className="flex-1">
+            Decline
+          </Button>
+        </CardContent>
+      </Card>
     </main>
   );
 }
