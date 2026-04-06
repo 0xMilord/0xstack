@@ -50,12 +50,13 @@ import { signOutAction } from "@/lib/actions/auth.actions";
 import { cn } from "@/lib/utils";
 import { PwaInstallButton } from "@/components/pwa/pwa-install-button";
 import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
+import { getConfig } from "@/lib/0xstack/config";
 
 export async function SiteHeader() {
-  const viewer = await loadViewer();
+  const [viewer, cfg] = await Promise.all([loadViewer(), getConfig()]);
   return (
     <>
-      <PwaUpdateBanner />
+      {cfg.modules.pwa ? <PwaUpdateBanner /> : null}
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="font-semibold">
@@ -63,12 +64,14 @@ export async function SiteHeader() {
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
             <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
-            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
+            {cfg.modules.blogMdx ? (
+              <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
+            ) : null}
             <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/about">About</Link>
             <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/contact">Contact</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <PwaInstallButton />
+            {cfg.modules.pwa ? <PwaInstallButton /> : null}
             <ThemeToggle />
             {viewer ? (
               <>
@@ -310,9 +313,10 @@ import { loadViewer } from "@/lib/loaders/viewer.loader";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOutAction } from "@/lib/actions/auth.actions";
+import { getConfig } from "@/lib/0xstack/config";
 
 export default async function Page() {
-  const viewer = await loadViewer();
+  const [viewer, cfg] = await Promise.all([loadViewer(), getConfig()]);
   return (
     <main className="mx-auto max-w-4xl p-6">
       <header className="space-y-2">
@@ -346,7 +350,9 @@ export default async function Page() {
             <Link className={buttonVariants({ variant: "secondary" })} href="/app/billing">Billing</Link>
             <Link className={buttonVariants({ variant: "secondary" })} href="/app/assets">Assets</Link>
             <Link className={buttonVariants({ variant: "secondary" })} href="/app/api-keys">API keys</Link>
-            <Link className={buttonVariants({ variant: "secondary" })} href="/app/pwa">PWA</Link>
+            {cfg.modules.pwa ? (
+              <Link className={buttonVariants({ variant: "secondary" })} href="/app/pwa">PWA</Link>
+            ) : null}
             <Link className={buttonVariants({ variant: "secondary" })} href="/app/webhooks">Webhooks</Link>
           </CardContent>
         </Card>
@@ -367,15 +373,15 @@ export default async function Page() {
       path.join(ctx.projectRoot, "app", "page.tsx"),
       `import Link from "next/link";
 import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata: Metadata = getPageMetadata({
-  title: "0xstack",
-  description: "Production-ready Next.js starter: auth, orgs, billing, storage, jobs, and enterprise guardrails.",
-  pathname: "/",
-});
+export const metadata: Metadata = {
+  title: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack",
+  description:
+    process.env.NEXT_PUBLIC_APP_DESCRIPTION ??
+    "Production-ready Next.js starter: auth, orgs, billing, storage, jobs, and enterprise guardrails.",
+};
 
 export default function Page() {
   return (
@@ -384,7 +390,8 @@ export default function Page() {
         <div className="space-y-4">
           <h1 className="text-4xl font-semibold tracking-tight">Ship a production app in days.</h1>
           <p className="text-base text-muted-foreground">
-            0xstack gives you auth, orgs, billing, storage, jobs, and enterprise guardrails with a strict CQRS contract.
+            0xstack gives you auth, orgs, and enterprise guardrails with a strict CQRS contract. Enable billing,
+            storage, blog, and more via <code className="text-xs">0xstack.config.ts</code> and baseline.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link className={buttonVariants({ variant: "default" })} href="/get-started">Get started</Link>
@@ -399,8 +406,7 @@ export default function Page() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Better Auth + Drizzle (Postgres)</li>
               <li>Org-scoped workspace with hardened boundaries</li>
-              <li>Storage (GCS) signed URLs + asset index</li>
-              <li>Billing (Dodo) webhook ledger + subscription read model</li>
+              <li>Optional modules: storage (signed URLs), billing + webhook ledger, MDX blog, SEO, PWA</li>
             </ul>
             <div className="pt-2">
               <Link className={buttonVariants({ variant: "outline", size: "sm" })} href="/app/orgs">Open app</Link>

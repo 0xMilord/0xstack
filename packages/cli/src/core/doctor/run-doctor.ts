@@ -116,7 +116,7 @@ export async function runDoctor(input: DoctorInput) {
   const queryKeysDir = path.join(input.projectRoot, "lib", "query-keys");
   if (await exists(queryKeysDir)) {
     const queryKeyFiles = await fs.readdir(queryKeysDir);
-    const expectedDomains = ["auth", "orgs"];
+    const expectedDomains = ["auth", "orgs", "api-keys", "webhook-ledger"];
     if (modules.billing) expectedDomains.push("billing");
     if (modules.storage) expectedDomains.push("assets");
     if (modules.blogMdx) expectedDomains.push("blog");
@@ -170,6 +170,126 @@ export async function runDoctor(input: DoctorInput) {
   ]);
   await checkFiles("foundation.api-keys.ux", ["app/app/api-keys/page.tsx", "lib/actions/api-keys.actions.ts", "lib/loaders/api-keys.loader.ts"]);
 
+  // --- Runtime config helper (module gating: header, settings, factories) ---
+  const oxConfigPath = path.join(input.projectRoot, "lib", "0xstack", "config.ts");
+  if (await exists(oxConfigPath)) {
+    const ox = await fs.readFile(oxConfigPath, "utf8");
+    if (!ox.includes("export async function getConfig(")) {
+      addIssue(
+        "lib/0xstack/config.ts is missing getConfig() — UI module gating and factories may break.",
+        "warning",
+        "Config Runtime",
+        "Run `npx 0xstack baseline` to append getConfig from the current template"
+      );
+    }
+  }
+
+  // --- Cache tag schema (domainOrg / legacy cleanup) ---
+  const cacheCfgPath = path.join(input.projectRoot, "lib", "cache", "config.ts");
+  if (await exists(cacheCfgPath)) {
+    const cc = await fs.readFile(cacheCfgPath, "utf8");
+    if (!cc.includes("domainOrg:")) {
+      addIssue(
+        "lib/cache/config.ts has no domainOrg() tag helper — run baseline to refresh the cache module.",
+        "warning",
+        "Cache",
+        "Run `npx 0xstack baseline --profile " + input.profile + "`"
+      );
+    }
+  }
+
+  // --- Blog: Tailwind typography plugin in globals ---
+  if (modules.blogMdx) {
+    const globalsPath = path.join(input.projectRoot, "app", "globals.css");
+    const g = (await exists(globalsPath)) ? await fs.readFile(globalsPath, "utf8") : "";
+    if (!g.includes("tailwindcss/typography")) {
+      addIssue(
+        "Blog enabled but app/globals.css does not include @tailwindcss/typography — prose MDX styles may be missing.",
+        "warning",
+        "Blog Wiring",
+        "Run `npx 0xstack baseline` or add `@plugin \"@tailwindcss/typography\";` after the tailwind import"
+      );
+    }
+  }
+
+  // --- SEO sitemap vs blog (static import must match modules) ---
+  const sitemapPath = path.join(input.projectRoot, "app", "sitemap.ts");
+  if (modules.seo && (await exists(sitemapPath))) {
+    const sm = await fs.readFile(sitemapPath, "utf8");
+    const importsBlog = /blog\.loader/.test(sm);
+    if (!modules.blogMdx && importsBlog) {
+      addIssue(
+        "app/sitemap.ts references blog.loader but blog module is disabled — builds will fail at module resolution.",
+        "critical",
+        "SEO Wiring",
+        "Run `npx 0xstack baseline` or remove blog imports from sitemap"
+      );
+    }
+    if (modules.blogMdx && !importsBlog) {
+      addIssue(
+        "Blog enabled but app/sitemap.ts does not import blog.loader — blog URLs may be missing from the sitemap.",
+        "warning",
+        "SEO Wiring",
+        "Run `npx 0xstack baseline` to regenerate sitemap"
+      );
+    }
+  }
+
+  // --- Resend: auth.ts should wire send hooks (merge, not full-file overwrite) ---
+  if (modules.email === "resend") {
+    const authPath = path.join(input.projectRoot, "lib", "auth", "auth.ts");
+    const authSrc = (await exists(authPath)) ? await fs.readFile(authPath, "utf8") : "";
+    if (!authSrc.includes("sendVerifyEmail") || !authSrc.includes("sendResetPasswordEmail")) {
+      addIssue(
+        "Email (Resend) enabled but lib/auth/auth.ts does not import or use sendVerifyEmail / sendResetPasswordEmail.",
+        "warning",
+        "Auth Email",
+        "Run `npx 0xstack baseline` with email module or merge Resend handlers into betterAuth config"
+      );
+    }
+  }
+
+  // --- API v1 routes: expect guardApiRequest or explicit webhook/session auth surface ---
+  async function listApiRouteFiles(dir: string): Promise<string[]> {
+    const out: string[] = [];
+    if (!(await exists(dir))) return out;
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) out.push(...(await listApiRouteFiles(full)));
+      else if (e.isFile() && e.name === "route.ts") out.push(full);
+    }
+    return out;
+  }
+
+  const apiV1Root = path.join(input.projectRoot, "app", "api", "v1");
+  const apiV1Routes = await listApiRouteFiles(apiV1Root);
+  const guardExemptSubpaths = [
+    "app/api/v1/health/",
+    "app/api/v1/billing/webhook/",
+    "app/api/v1/auth/",
+  ];
+  for (const f of apiV1Routes) {
+    const rel = path.relative(input.projectRoot, f).replaceAll("\\", "/");
+    if (guardExemptSubpaths.some((p) => rel.includes(p))) continue;
+    const rsrc = await fs.readFile(f, "utf8");
+    const looksLikeSignedWebhook =
+      /constructEvent|standardwebhooks|Webhook\.verify|Webhooks\s*\(/.test(rsrc) &&
+      /signature|webhook-key|webhookKey/i.test(rsrc);
+    if (looksLikeSignedWebhook) continue;
+    const sessionBacked =
+      /\bauth\.api\.getSession\s*\(/.test(rsrc) || /\bgetSession\s*\(\s*\{\s*headers:\s*req\.headers/.test(rsrc);
+    if (sessionBacked) continue;
+    if (!rsrc.includes("guardApiRequest")) {
+      addIssue(
+        `API route ${rel} does not call guardApiRequest() — confirm auth/rate limits for external callers.`,
+        "warning",
+        "Security API",
+        "Prefer guardApiRequest(req) or guardApiRequest(req, limit, { requireApiKey: false }) after session checks"
+      );
+    }
+  }
+
   const billingApis = [
     "app/api/v1/billing/checkout/route.ts",
     "app/api/v1/billing/portal/route.ts",
@@ -195,7 +315,13 @@ export async function runDoctor(input: DoctorInput) {
     const billingEnvPath = path.join(input.projectRoot, "lib/env/billing.ts");
     if (!(await exists(billingEnvPath))) addIssue("Billing (Dodo) enabled but missing lib/env/billing.ts");
     const billingEnv = (await exists(billingEnvPath)) ? await fs.readFile(billingEnvPath, "utf8") : "";
-    for (const key of ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY", "DODO_PAYMENTS_ENVIRONMENT", "DODO_PAYMENTS_RETURN_URL"]) {
+    for (const key of [
+      "DODO_PAYMENTS_API_KEY",
+      "DODO_PAYMENTS_WEBHOOK_KEY",
+      "DODO_PAYMENTS_ENVIRONMENT",
+      "DODO_PAYMENTS_RETURN_URL",
+      "DODO_PAYMENTS_STARTER_PRICE_ID",
+    ]) {
       if (!billingEnv.includes(key)) addIssue(`Billing env schema missing key: ${key}`);
     }
     await checkFiles("billing.dodo.vendor", ["lib/billing/dodo.webhooks.ts"]);

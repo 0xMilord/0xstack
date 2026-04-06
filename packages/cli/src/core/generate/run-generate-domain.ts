@@ -140,7 +140,7 @@ const load${pascal}ListCached = withServerCache(
   async (orgId: string) => await ${camel}Service_list({ orgId }),
   {
     key: (orgId: string) => ["${plural}", "org", orgId],
-    tags: (orgId: string) => [cacheTags.billingOrg(orgId)],
+    tags: (orgId: string) => [cacheTags.domainOrg("${plural}", orgId)],
     revalidate: CACHE_TTL.DASHBOARD,
   }
 );
@@ -206,6 +206,7 @@ export async function create${pascal}(input: unknown) {
     createdByUserId: session.userId,
   });
   revalidate.orgs(session.userId);
+  revalidate.domainOrg("${plural}", orgId);
   return { ok: true, data: created };
 }
 
@@ -217,6 +218,7 @@ export async function update${pascal}(input: unknown) {
   const data = update${pascal}Input.parse(input);
   const updated = await ${camel}Service_update({ id: data.id, orgId, patch: { name: data.name } });
   revalidate.orgs(session.userId);
+  revalidate.domainOrg("${plural}", orgId);
   return { ok: true, data: updated };
 }
 
@@ -228,6 +230,7 @@ export async function delete${pascal}(input: unknown) {
   const data = delete${pascal}Input.parse(input);
   const deleted = await ${camel}Service_delete({ id: data.id, orgId });
   revalidate.orgs(session.userId);
+  revalidate.domainOrg("${plural}", orgId);
   return { ok: true, data: deleted };
 }
 `

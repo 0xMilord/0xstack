@@ -259,6 +259,18 @@ export async function ensureConfigRuntimeSchemaUpToDate(projectRoot: string) {
   }
 
   if (next !== src) await fs.writeFile(p, next, "utf8");
+
+  // Older templates: ensure runtime getConfig exists for progressive module gating in UI.
+  let upgraded = await fs.readFile(p, "utf8");
+  if (!upgraded.includes("export async function getConfig()")) {
+    let add = "";
+    if (!upgraded.includes("export type OxstackConfig")) {
+      add += `\nexport type OxstackConfig = z.infer<typeof ConfigSchema>;\n`;
+    }
+    add += `\nexport async function getConfig(): Promise<OxstackConfig> {\n  const { default: cfg } = await import("../../../0xstack.config");\n  return cfg as OxstackConfig;\n}\n`;
+    upgraded = upgraded.trimEnd() + add;
+    await fs.writeFile(p, upgraded, "utf8");
+  }
 }
 
 export async function ensureConfigFileKeysUpToDate(projectRoot: string) {
@@ -734,13 +746,14 @@ export async function runBaseline(input: BaselineInput) {
 
         // Always-required baseline (most already installed by init, but baseline must be safe).
         deps.push("zod", "drizzle-orm", "postgres", "better-auth", "@better-auth/drizzle-adapter");
-        deps.push("@tanstack/react-query", "zustand");
+        deps.push("@tanstack/react-query", "zustand", "next-themes");
         deps.push("@upstash/redis", "@upstash/ratelimit");
         // Better Auth CLI is executed via npx/pnpm dlx (no install), but keep drizzle-kit in devDeps.
         devDeps.push("drizzle-kit", "vitest", "vite");
 
         if (cfg.modules.blogMdx) {
-          deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "rehype-slug", "rehype-autolink-headings");
+          deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "remark-toc", "rehype-slug", "rehype-autolink-headings");
+          devDeps.push("@tailwindcss/typography");
         }
         if (cfg.modules.seo) {
           deps.push("schema-dts");
@@ -855,32 +868,6 @@ export async function runBaseline(input: BaselineInput) {
       },
     },
     {
-      name: "generate Drizzle migration (drizzle-kit generate)",
-      run: async () => {
-        const cmd = pmCmd(input.packageManager);
-        const args =
-          input.packageManager === "npm"
-            ? ["exec", "--", "drizzle-kit", "generate"]
-            : ["exec", "drizzle-kit", "generate"];
-        await execCmd(cmd, args, { cwd: root });
-        return { kind: "ok" };
-      },
-    },
-    {
-      name: "apply migrations (drizzle-kit migrate) if DATABASE_URL set",
-      run: async () => {
-        const hasDbUrl = !!process.env.DATABASE_URL;
-        if (!hasDbUrl) return { kind: "skip", reason: "DATABASE_URL not set in environment" };
-        const cmd = pmCmd(input.packageManager);
-        const args =
-          input.packageManager === "npm"
-            ? ["exec", "--", "drizzle-kit", "migrate"]
-            : ["exec", "drizzle-kit", "migrate"];
-        await execCmd(cmd, args, { cwd: root, env: { DATABASE_URL: process.env.DATABASE_URL } });
-        return { kind: "ok" };
-      },
-    },
-    {
       name: "activate modules (routes + lib wiring)",
       run: async () => {
         const cfg = applyProfile(await loadConfig(root), input.profile);
@@ -910,6 +897,34 @@ export async function runBaseline(input: BaselineInput) {
             jobs: cfg.modules.jobs,
           },
         });
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "generate Drizzle migration (drizzle-kit generate)",
+      run: async () => {
+        const cmd = pmCmd(input.packageManager);
+        // Drizzle prefixes folders with a timestamp; --name avoids random slug suffix (see drizzle-kit generate --name).
+        const migrationLabel = "0xstack_baseline";
+        const args =
+          input.packageManager === "npm"
+            ? ["exec", "--", "drizzle-kit", "generate", "--name", migrationLabel]
+            : ["exec", "drizzle-kit", "generate", "--name", migrationLabel];
+        await execCmd(cmd, args, { cwd: root });
+        return { kind: "ok" };
+      },
+    },
+    {
+      name: "apply migrations (drizzle-kit migrate) if DATABASE_URL set",
+      run: async () => {
+        const hasDbUrl = !!process.env.DATABASE_URL;
+        if (!hasDbUrl) return { kind: "skip", reason: "DATABASE_URL not set in environment" };
+        const cmd = pmCmd(input.packageManager);
+        const args =
+          input.packageManager === "npm"
+            ? ["exec", "--", "drizzle-kit", "migrate"]
+            : ["exec", "drizzle-kit", "migrate"];
+        await execCmd(cmd, args, { cwd: root, env: { DATABASE_URL: process.env.DATABASE_URL } });
         return { kind: "ok" };
       },
     },

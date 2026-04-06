@@ -76,7 +76,11 @@ const handler = Checkout({
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers as any });
-  if (!session?.user?.id) await guardApiRequest(req);
+  if (!session?.user?.id) {
+    await guardApiRequest(req);
+  } else {
+    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+  }
   return handler(req as any);
 }
 
@@ -89,7 +93,11 @@ const getHandler = Checkout({
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers as any });
-  if (!session?.user?.id) await guardApiRequest(req);
+  if (!session?.user?.id) {
+    await guardApiRequest(req);
+  } else {
+    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+  }
   return getHandler(req as any);
 }
 `
@@ -109,7 +117,11 @@ const handler = CustomerPortal({
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers as any });
-  if (!session?.user?.id) await guardApiRequest(req);
+  if (!session?.user?.id) {
+    await guardApiRequest(req);
+  } else {
+    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+  }
   return handler(req as any);
 }
 `

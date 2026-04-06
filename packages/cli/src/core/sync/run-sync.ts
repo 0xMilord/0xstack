@@ -187,7 +187,9 @@ export async function runSync(input: SyncInput) {
       logger.info("Running drizzle-kit generate (sync --drizzle-generate)…");
       const cmd = pmCmd(pm);
       const args =
-        pm === "npm" ? ["exec", "--", "drizzle-kit", "generate"] : ["exec", "drizzle-kit", "generate"];
+        pm === "npm"
+          ? ["exec", "--", "drizzle-kit", "generate", "--name", "0xstack_sync"]
+          : ["exec", "drizzle-kit", "generate", "--name", "0xstack_sync"];
       await execCmd(cmd, args, { cwd: input.projectRoot });
     } catch (e) {
       logger.warn(`sync --drizzle-generate failed: ${e instanceof Error ? e.message : String(e)}`);

@@ -97,7 +97,11 @@ import { env } from "@/lib/env/server";
   const requestId = crypto.randomUUID();
   try {
     const session = await auth.api.getSession({ headers: req.headers });
-    if (!session?.user?.id) await guardApiRequest(req);
+    if (!session?.user?.id) {
+      await guardApiRequest(req);
+    } else {
+      await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+    }
     const body = (await req.json().catch(() => null)) as null | { priceId?: string; quantity?: number; orgId?: string };
     const priceId = body?.priceId ?? env.STRIPE_STARTER_PRICE_ID!;
     const orgId = body?.orgId ?? "";
@@ -128,7 +132,11 @@ import { stripeCreateBillingPortalUrl } from "@/lib/billing/stripe";
   const requestId = crypto.randomUUID();
   try {
     const session = await auth.api.getSession({ headers: req.headers });
-    if (!session?.user?.id) await guardApiRequest(req);
+    if (!session?.user?.id) {
+      await guardApiRequest(req);
+    } else {
+      await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+    }
     const url = new URL(req.url);
     const asJson = url.searchParams.get("format") === "json";
     const portalUrl = await stripeCreateBillingPortalUrl({ userId: session.user.id });

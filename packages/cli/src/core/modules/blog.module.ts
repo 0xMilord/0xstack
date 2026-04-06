@@ -1,6 +1,17 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { backupAndRemove, ensureDir, writeFileEnsured } from "./fs-utils";
 import type { Module } from "./types";
+
+async function ensureTypographyPlugin(projectRoot: string) {
+  const p = path.join(projectRoot, "app", "globals.css");
+  let s = await fs.readFile(p, "utf8").catch(() => "");
+  if (!s) return;
+  if (s.includes('@plugin "@tailwindcss/typography"') || s.includes("@plugin '@tailwindcss/typography'")) return;
+  if (!s.includes('@import "tailwindcss"')) return;
+  s = s.replace(/^@import "tailwindcss";\n/m, `@import "tailwindcss";\n@plugin "@tailwindcss/typography";\n`);
+  await fs.writeFile(p, s, "utf8");
+}
 
 export const blogMdxModule: Module = {
   id: "blogMdx",
@@ -16,6 +27,8 @@ export const blogMdxModule: Module = {
       await backupAndRemove(ctx.projectRoot, "content/blog/hello-world.mdx");
       return;
     }
+
+    await ensureTypographyPlugin(ctx.projectRoot);
 
     await ensureDir(path.join(ctx.projectRoot, "content", "blog"));
     await ensureDir(path.join(ctx.projectRoot, "lib", "loaders"));

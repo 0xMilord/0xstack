@@ -117,15 +117,27 @@ function keyFromRequest(req: Request) {
   return crypto.createHash("sha256").update(ip + "|" + apiKey).digest("hex");
 }
 
-export async function guardApiRequest(req: Request, limit: RateLimit = DEFAULT_LIMIT) {
-  // API-key auth (enterprise baseline)
-  const header = req.headers.get("x-api-key") ?? req.headers.get("authorization");
-  const key = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : header;
-  if (!key || key.length < 10) throw apiError("UNAUTHORIZED", "Missing API key", 401);
-  const ok =
-    (env.API_KEY && key === env.API_KEY) ||
-    (await verifyApiKey(key).catch(() => false));
-  if (!ok) throw apiError("UNAUTHORIZED", "Invalid API key", 401);
+export type GuardApiOptions = {
+  /** When true (default), require API key or env API_KEY. When false, only apply rate limiting (session-auth routes). */
+  requireApiKey?: boolean;
+};
+
+export async function guardApiRequest(
+  req: Request,
+  limit: RateLimit = DEFAULT_LIMIT,
+  options?: GuardApiOptions
+) {
+  const requireApiKey = options?.requireApiKey !== false;
+
+  if (requireApiKey) {
+    const header = req.headers.get("x-api-key") ?? req.headers.get("authorization");
+    const key = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : header;
+    if (!key || key.length < 10) throw apiError("UNAUTHORIZED", "Missing API key", 401);
+    const ok =
+      (env.API_KEY && key === env.API_KEY) ||
+      (await verifyApiKey(key).catch(() => false));
+    if (!ok) throw apiError("UNAUTHORIZED", "Invalid API key", 401);
+  }
 
   // Rate limiting (durable when Upstash env is present; safe fallback for dev)
   if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
@@ -187,12 +199,12 @@ export function toApiErrorResponse(err: unknown, requestId: string) {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "loaders", "api-keys.loader.ts"),
-      `import { cache } from \"react\";\nimport { cookies } from \"next/headers\";\nimport { withServerCache, CACHE_TTL, cacheTags } from \"@/lib/cache\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { apiKeysService_listForOrg } from \"@/lib/services/api-keys.service\";\n\nconst loadApiKeysOrgCached = withServerCache(\n  async (orgId: string) => await apiKeysService_listForOrg(orgId),\n  {\n    key: (orgId: string) => [\"api-keys\", \"org\", orgId],\n    tags: (orgId: string) => [cacheTags.billingOrg(orgId)],\n    revalidate: CACHE_TTL.DASHBOARD,\n  }\n);\n\nexport const loadApiKeysForActiveOrg = cache(async () => {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) return { orgId: null, keys: [] as any[] };\n  // membership is enforced by the workspace layout guard; this is read-model only.\n  return { orgId, keys: await loadApiKeysOrgCached(orgId), viewer };\n});\n`
+      `import { cache } from \"react\";\nimport { cookies } from \"next/headers\";\nimport { withServerCache, CACHE_TTL, cacheTags } from \"@/lib/cache\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { apiKeysService_listForOrg } from \"@/lib/services/api-keys.service\";\n\nconst loadApiKeysOrgCached = withServerCache(\n  async (orgId: string) => await apiKeysService_listForOrg(orgId),\n  {\n    key: (orgId: string) => [\"api-keys\", \"org\", orgId],\n    tags: (orgId: string) => [cacheTags.apiKeysOrg(orgId)],\n    revalidate: CACHE_TTL.DASHBOARD,\n  }\n);\n\nexport const loadApiKeysForActiveOrg = cache(async () => {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) return { orgId: null, keys: [] as any[] };\n  // membership is enforced by the workspace layout guard; this is read-model only.\n  return { orgId, keys: await loadApiKeysOrgCached(orgId), viewer };\n});\n`
     );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "actions", "api-keys.actions.ts"),
-      `"use server";\n\nimport { cookies } from \"next/headers\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { orgsService_assertMember } from \"@/lib/services/orgs.service\";\nimport { revalidate } from \"@/lib/cache\";\nimport { createApiKeyInput, revokeApiKeyInput } from \"@/lib/rules/api-keys.rules\";\nimport { apiKeysService_createForOrg, apiKeysService_revokeForOrg } from \"@/lib/services/api-keys.service\";\n\nexport async function createApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = createApiKeyInput.parse(input);\n  const created = await apiKeysService_createForOrg({ orgId, name: data.name });\n  revalidate.dashboard(viewer.userId);\n  return { ok: true as const, created };\n}\n\nexport async function revokeApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = revokeApiKeyInput.parse(input);\n  await apiKeysService_revokeForOrg({ orgId, id: data.id });\n  revalidate.dashboard(viewer.userId);\n  return { ok: true as const };\n}\n`
+      `"use server";\n\nimport { cookies } from \"next/headers\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { orgsService_assertMember } from \"@/lib/services/orgs.service\";\nimport { revalidate } from \"@/lib/cache\";\nimport { createApiKeyInput, revokeApiKeyInput } from \"@/lib/rules/api-keys.rules\";\nimport { apiKeysService_createForOrg, apiKeysService_revokeForOrg } from \"@/lib/services/api-keys.service\";\n\nexport async function createApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = createApiKeyInput.parse(input);\n  const created = await apiKeysService_createForOrg({ orgId, name: data.name });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const, created };\n}\n\nexport async function revokeApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = revokeApiKeyInput.parse(input);\n  await apiKeysService_revokeForOrg({ orgId, id: data.id });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const };\n}\n`
     );
 
     await writeFileEnsured(

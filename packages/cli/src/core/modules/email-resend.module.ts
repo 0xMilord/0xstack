@@ -6,21 +6,20 @@ import { ensureEnvSchemaModuleWiring } from "./env-edit";
 
 async function patchAuthForEmail(projectRoot: string) {
   const authPath = path.join(projectRoot, "lib", "auth", "auth.ts");
-  const prev = await fs.readFile(authPath, "utf8");
-  if (!prev.includes("betterAuth({")) return;
+  let src = await fs.readFile(authPath, "utf8");
+  if (!src.includes("betterAuth({")) return;
+  if (src.includes("sendVerifyEmail") && src.includes("sendResetPasswordEmail")) return;
 
-  // Keep this deterministic to avoid malformed brace insertions.
-  const next = `import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "@/lib/db";
-import { env } from "@/lib/env/server";
-import { sendResetPasswordEmail, sendVerifyEmail } from "@/lib/email/auth-emails";
+  if (!src.includes('from "@/lib/email/auth-emails"')) {
+    src = src.replace(
+      /import \{ env \} from ["']@\/lib\/env\/server["'];\s*/,
+      `import { env } from "@/lib/env/server";\nimport { sendResetPasswordEmail, sendVerifyEmail } from "@/lib/email/auth-emails";\n`
+    );
+  }
 
-export const auth = betterAuth({
-  secret: env.BETTER_AUTH_SECRET,
-  baseURL: env.BETTER_AUTH_URL,
-  database: drizzleAdapter(db, { provider: "pg" }),
-  emailAndPassword: {
+  src = src.replace(
+    /emailAndPassword:\s*\{\s*\n\s*enabled:\s*true,\s*\n\s*\},/m,
+    `emailAndPassword: {
     enabled: true,
     async sendResetPassword({ user, url }) {
       await sendResetPasswordEmail({
@@ -29,8 +28,12 @@ export const auth = betterAuth({
         resetLink: url,
       });
     },
-  },
-  emailVerification: {
+  },`
+  );
+
+  src = src.replace(
+    /emailVerification:\s*\{\s*\n\s*sendOnSignUp:\s*true,\s*\n\s*\},/m,
+    `emailVerification: {
     sendOnSignUp: true,
     async sendVerificationEmail({ user, url }) {
       await sendVerifyEmail({
@@ -39,11 +42,10 @@ export const auth = betterAuth({
         verificationUrl: url,
       });
     },
-  },
-});
-`;
+  },`
+  );
 
-  await fs.writeFile(authPath, next, "utf8");
+  await fs.writeFile(authPath, src, "utf8");
 }
 
 export const emailResendModule: Module = {

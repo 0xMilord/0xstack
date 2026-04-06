@@ -18,24 +18,19 @@ export const cacheModule: Module = {
 } as const;
 
 export const cacheTags = {
-  // collections
-  projects: "projects",
-  companies: "companies",
-  jobs: "jobs",
   posts: "posts",
-  trending: "trending",
   dashboard: "dashboard",
   viewer: "viewer",
 
-  // entity helpers
-  project: (slug: string) => \`project-slug:\${slug}\`,
-  company: (slug: string) => \`company:\${slug}\`,
-  user: (username: string) => \`user:\${username}\`,
   dashboardUser: (userId: string) => \`dashboard:\${userId}\`,
   viewerUser: (userId: string) => \`viewer:\${userId}\`,
   orgsForUser: (userId: string) => \`orgs:user:\${userId}\`,
+  /** Use for billing/subscription reads for an org. */
   billingOrg: (orgId: string) => \`billing:org:\${orgId}\`,
   assetsOrg: (orgId: string) => \`assets:org:\${orgId}\`,
+  /** Domain list/detail cache for generated modules, e.g. domainOrg("materials", orgId). */
+  domainOrg: (domainPlural: string, orgId: string) => \`\${domainPlural}:org:\${orgId}\`,
+  apiKeysOrg: (orgId: string) => \`api-keys:org:\${orgId}\`,
   pushSubsUser: (userId: string) => \`pwa:push:user:\${userId}\`,
   webhookLedger: "webhooks:ledger",
 } as const;
@@ -115,17 +110,8 @@ import { cacheTags } from "@/lib/cache/config";
 
 export const revalidate = {
   tag: (tag: string) => revalidateTag(tag, "page"),
-  project: (slug: string) => {
-    revalidateTag(cacheTags.projects, "page");
-    revalidateTag(cacheTags.project(slug), "page");
-  },
-  company: (slug: string) => {
-    revalidateTag(cacheTags.companies, "page");
-    revalidateTag(cacheTags.company(slug), "page");
-  },
   posts: () => {
     revalidateTag(cacheTags.posts, "page");
-    revalidateTag(cacheTags.trending, "page");
   },
   dashboard: (userId: string) => {
     revalidateTag(cacheTags.dashboard, "page");
@@ -140,6 +126,12 @@ export const revalidate = {
   },
   assetsForOrg: (orgId: string) => {
     revalidateTag(cacheTags.assetsOrg(orgId), "page");
+  },
+  domainOrg: (domainPlural: string, orgId: string) => {
+    revalidateTag(cacheTags.domainOrg(domainPlural, orgId), "page");
+  },
+  apiKeysForOrg: (orgId: string) => {
+    revalidateTag(cacheTags.apiKeysOrg(orgId), "page");
   },
   pwaForUser: (userId: string) => {
     revalidateTag(cacheTags.pushSubsUser(userId), "page");

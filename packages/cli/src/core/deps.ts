@@ -4,13 +4,16 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
   const deps: string[] = [];
   const devDeps: string[] = [];
 
-  // Always-required baseline.
+  // Always-required baseline (keep in sync with baseline `install module deps`).
   deps.push("zod", "drizzle-orm", "postgres", "better-auth", "@better-auth/drizzle-adapter");
-  deps.push("@tanstack/react-query", "zustand");
+  deps.push("@tanstack/react-query", "zustand", "next-themes");
   deps.push("@upstash/redis", "@upstash/ratelimit");
-  devDeps.push("drizzle-kit");
+  devDeps.push("drizzle-kit", "vitest", "vite");
 
-  if (cfg.modules.blogMdx) deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "rehype-slug", "rehype-autolink-headings");
+  if (cfg.modules.blogMdx) {
+    deps.push("gray-matter", "next-mdx-remote", "remark-gfm", "remark-toc", "rehype-slug", "rehype-autolink-headings");
+    devDeps.push("@tailwindcss/typography");
+  }
   if (cfg.modules.seo) deps.push("schema-dts");
   if (cfg.modules.billing === "dodo") deps.push("@dodopayments/nextjs", "standardwebhooks");
   if (cfg.modules.billing === "stripe") deps.push("stripe");

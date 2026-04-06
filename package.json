@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm -r dev",
     "build": "pnpm -r build",
+    "test": "pnpm --filter ./packages/cli test",
+    "test:coverage": "pnpm --filter ./packages/cli test:coverage",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "changeset": "changeset",

@@ -192,6 +192,7 @@ export async function runInit(input: InitInput) {
           "@better-auth/drizzle-adapter",
           "@tanstack/react-query",
           "zustand",
+          "next-themes",
         ]);
         await addDeps(projectRoot, input.packageManager, ["drizzle-kit"], true);
         return { kind: "ok" };
@@ -591,8 +592,14 @@ export default async function Layout({ children }: { children: React.ReactNode }
   }),
   profiles: z.record(z.string(), z.any()).optional(),
 });
+\nexport type OxstackConfig = z.infer<typeof ConfigSchema>;
 \nexport function defineConfig<T extends z.input<typeof ConfigSchema>>(config: T) {
   return ConfigSchema.parse(config);
+}
+\n/** Resolved app config from \`0xstack.config.ts\` (dynamic import avoids circular init with \`defineConfig\`). */
+export async function getConfig(): Promise<OxstackConfig> {
+  const { default: cfg } = await import("../../../0xstack.config");
+  return cfg as OxstackConfig;
 }
 `
         );
