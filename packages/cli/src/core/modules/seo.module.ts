@@ -163,16 +163,13 @@ export function softwareApplicationJsonLd(input?: {
     url: seo.url,
     applicationCategory: input?.applicationCategory ?? "DeveloperApplication",
     operatingSystem: input?.operatingSystem ?? "Web",
-    offers: input?.offers?.map((o) => ({
-      "@type": "Offer",
-      price: o.price,
-      priceCurrency: o.priceCurrency,
-    })),
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "5.0",
-      ratingCount: "1",
-    },
+    ...(input?.offers?.length
+      ? { offers: input.offers.map((o) => ({
+          "@type": "Offer",
+          price: o.price,
+          priceCurrency: o.priceCurrency,
+        })) }
+      : {}),
   } as const;
 }
 

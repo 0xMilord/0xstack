@@ -283,6 +283,7 @@ export type BlogPost = {
   canonicalPath?: string;
   ogImage?: string;
   tags?: string[];
+  author?: string;
   content: string;
 };
 
@@ -296,6 +297,7 @@ const FrontmatterSchema = z.object({
   canonicalPath: z.string().min(1).optional(),
   ogImage: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).optional(),
+  author: z.string().min(1).optional(),
 });
 
 function parsePost(slug: string, raw: string): BlogPost {
@@ -316,6 +318,7 @@ function parsePost(slug: string, raw: string): BlogPost {
     canonicalPath: fm.data.canonicalPath,
     ogImage: fm.data.ogImage,
     tags: fm.data.tags,
+    author: fm.data.author,
     content: parsed.content,
   };
 }
@@ -372,14 +375,23 @@ export function getPostCanonicalUrl(input: { baseUrl: string; slug: string; cano
     await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.ts");
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "blog", "page.tsx"),
-      `import Link from "next/link";
+      `import type { Metadata } from "next";
+import Link from "next/link";
 import { listPosts } from "@/lib/loaders/blog.loader";
+import { getSiteUrl } from "@/lib/seo/metadata";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
+
+export const metadata: Metadata = {
+  title: "Blog",
+  description: "Insights on building with 0xstack — architecture, best practices, and vibecoding.",
+  openGraph: { title: "Blog", description: "Insights on building with 0xstack." },
+  alternates: { canonical: getSiteUrl("/blog") },
+};
 
 export default async function Page() {
   const posts = await listPosts();
@@ -457,7 +469,7 @@ import remarkGfm from "remark-gfm";
 import remarkToc from "remark-toc";
 import { env } from "@/lib/env/server";
 import { getPost, getPostCanonicalUrl, listPosts } from "@/lib/loaders/blog.loader";
-import { safeJsonLd } from "@/lib/seo/jsonld";
+import { safeJsonLd, articleJsonLd } from "@/lib/seo/jsonld";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -680,16 +692,14 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: safeJsonLd({
-            "@context": "https://schema.org",
-            "@type": "BlogPosting",
+          __html: safeJsonLd(articleJsonLd({
             headline: post.title,
             description: post.description,
             datePublished: post.date,
             dateModified: post.date,
-            mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-            author: { "@type": "Organization", name: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack" },
-          }),
+            url: canonical,
+            author: post.author ?? (process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack") + " Team",
+          })),
         }}
       />
     </>

@@ -61,6 +61,9 @@ export async function ensureWebhookEventsTable(projectRoot: string) {
   eventType: text("event_type").notNull(),
   payloadJson: text("payload_json").notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  replayedAt: timestamp("replayed_at", { withTimezone: true }),
+  replayCount: integer("replay_count").default(0).notNull(),
 }, (t) => ({
   uniq: uniqueIndex("webhook_events_provider_event_id").on(t.provider, t.eventId),
 }));`

@@ -204,14 +204,18 @@ export async function upsertBillingSubscription(input: {
   status: string;
   planId?: string | null;
   orgId?: string | null;
+  currentPeriodEnd?: Date | null;
+  cancelAtPeriodEnd?: boolean | null;
 }) {
   await db.execute(sql\`
-    insert into billing_subscriptions (provider, provider_subscription_id, status, plan_id, org_id, updated_at)
-    values (\${input.provider}, \${input.providerSubscriptionId}, \${input.status}, \${input.planId ?? null}, \${input.orgId ?? null}, now())
+    insert into billing_subscriptions (provider, provider_subscription_id, status, plan_id, org_id, current_period_end, cancel_at_period_end, updated_at)
+    values (\${input.provider}, \${input.providerSubscriptionId}, \${input.status}, \${input.planId ?? null}, \${input.orgId ?? null}, \${input.currentPeriodEnd ?? null}, \${input.cancelAtPeriodEnd ?? null}, now())
       on conflict (provider_subscription_id) do update set
       status = excluded.status,
       plan_id = excluded.plan_id,
       org_id = excluded.org_id,
+      current_period_end = excluded.current_period_end,
+      cancel_at_period_end = excluded.cancel_at_period_end,
       updated_at = now()
   \`);
 }

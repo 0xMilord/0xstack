@@ -75,6 +75,8 @@ export async function getWebhookEvent(input: { provider: string; eventId: string
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "services", "webhook-ledger.service.ts"),
       `import { getWebhookEvent, listWebhookEvents } from "@/lib/repos/webhook-events.repo";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { revalidate } from "@/lib/cache";
 
 function parsePayload(payloadJson: string) {
@@ -102,6 +104,18 @@ export async function webhookLedgerService_replay(input: { provider: string; eve
   if (input.provider === "dodo") {
     const { reconcileBillingEvent } = await import("@/lib/services/billing.service");
     await reconcileBillingEvent(payload);
+    // Mark as replayed
+    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1 WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
+    revalidate.webhookLedger();
+    return { ok: true as const, replayed: true as const };
+  }
+
+  if (input.provider === "stripe") {
+    const { reconcileBillingEvent } = await import("@/lib/services/billing.service");
+    // Stripe payloads come wrapped in an event envelope
+    const stripeEvent = { provider: "stripe", type: (row as any).eventType, data: payload };
+    await reconcileBillingEvent(stripeEvent);
+    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1 WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
     revalidate.webhookLedger();
     return { ok: true as const, replayed: true as const };
   }

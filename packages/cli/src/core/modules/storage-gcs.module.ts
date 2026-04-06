@@ -38,8 +38,17 @@ export const storageGcsModule: Module = {
 import { env } from "@/lib/env/server";
 import type { ProviderSignReadResult, ProviderSignUploadResult } from "@/lib/storage/provider";
 
+// Singleton — reuse the same Storage instance across calls.
+let _gcsStorage: Storage | null = null;
+function getStorage() {
+  if (!_gcsStorage) {
+    _gcsStorage = new Storage({ projectId: env.GCS_PROJECT_ID! });
+  }
+  return _gcsStorage;
+}
+
 export async function providerSignUpload(input: { objectKey: string; contentType: string }): Promise<ProviderSignUploadResult> {
-  const storage = new Storage({ projectId: env.GCS_PROJECT_ID! });
+  const storage = getStorage();
   const bucket = storage.bucket(env.GCS_BUCKET!);
   const file = bucket.file(input.objectKey);
   const [uploadUrl] = await file.getSignedUrl({
@@ -52,7 +61,7 @@ export async function providerSignUpload(input: { objectKey: string; contentType
 }
 
 export async function providerSignRead(input: { bucket: string; objectKey: string }): Promise<ProviderSignReadResult> {
-  const storage = new Storage({ projectId: env.GCS_PROJECT_ID! });
+  const storage = getStorage();
   const bucket = storage.bucket(input.bucket);
   const [url] = await bucket.file(input.objectKey).getSignedUrl({
     version: "v4",
@@ -63,7 +72,7 @@ export async function providerSignRead(input: { bucket: string; objectKey: strin
 }
 
 export async function providerDeleteObject(input: { bucket: string; objectKey: string }) {
-  const storage = new Storage({ projectId: env.GCS_PROJECT_ID! });
+  const storage = getStorage();
   await storage.bucket(input.bucket).file(input.objectKey).delete({ ignoreNotFound: true });
 }
 `

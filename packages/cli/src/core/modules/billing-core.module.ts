@@ -184,12 +184,20 @@ async function reconcileDodoPayload(e: AnyObj) {
   }
 
   if (subscriptionId) {
+    // Extract period fields if available
+    const currentPeriodEndRaw = pick(e.data ?? {}, ["current_period_end"]) ?? pick(e, ["current_period_end"]);
+    const cancelAtPeriodEndRaw = pick(e.data ?? {}, ["cancel_at_period_end"]) ?? pick(e, ["cancel_at_period_end"]);
+    const currentPeriodEnd = currentPeriodEndRaw ? new Date(Number(currentPeriodEndRaw) * 1000) : null;
+    const cancelAtPeriodEnd = cancelAtPeriodEndRaw === true || cancelAtPeriodEndRaw === "true" ? true : null;
+
     await upsertBillingSubscription({
       provider: "dodo",
       providerSubscriptionId: subscriptionId,
       status,
       planId,
       orgId,
+      currentPeriodEnd: Number.isNaN(currentPeriodEnd?.getTime()) ? null : currentPeriodEnd,
+      cancelAtPeriodEnd,
     });
   }
 
@@ -219,6 +227,8 @@ async function reconcileStripePayload(e: AnyObj) {
     const status = sub.status ? String(sub.status) : "unknown";
     const orgId = sub.metadata?.orgId ? String(sub.metadata.orgId) : null;
     const planId = sub.items?.data?.[0]?.price?.id ? String(sub.items.data[0].price.id) : null;
+    const currentPeriodEnd = sub.current_period_end ? new Date(Number(sub.current_period_end) * 1000) : null;
+    const cancelAtPeriodEnd = sub.cancel_at_period_end === true ? true : null;
     if (subId) {
       await upsertBillingSubscription({
         provider: "stripe",
@@ -226,6 +236,8 @@ async function reconcileStripePayload(e: AnyObj) {
         status,
         planId,
         orgId,
+        currentPeriodEnd: Number.isNaN(currentPeriodEnd?.getTime()) ? null : currentPeriodEnd,
+        cancelAtPeriodEnd,
       });
     }
     if (orgId) revalidate.billingForOrg(orgId);
@@ -363,16 +375,29 @@ export function useInvalidateBilling() {
       path.join(ctx.projectRoot, "app", "api", "v1", "billing", "status", "route.ts"),
       `import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { guardApiRequest } from "@/lib/security/api";
+import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_assertMember } from "@/lib/services/orgs.service";
+import { cookies } from "next/headers";
 import { billingService_getLatestForOrg } from "@/lib/services/billing.service";
 import { getBillingPlans } from "@/lib/billing/plans";
 import { ACTIVE_BILLING_PROVIDER } from "@/lib/billing/runtime";
 
 export async function GET(req: NextRequest) {
-  await guardApiRequest(req);
+  const viewer = await requireAuth();
+  const cookieStore = await cookies();
+  const cookieOrgId = getActiveOrgIdFromCookies(cookieStore);
   const url = new URL(req.url);
-  const orgId = url.searchParams.get("orgId");
+  const orgId = url.searchParams.get("orgId") ?? cookieOrgId;
+
   if (!orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
+
+  // Verify caller is a member of the requested org
+  try {
+    await orgsService_assertMember({ userId: viewer.userId, orgId });
+  } catch {
+    return NextResponse.json({ error: "not_org_member" }, { status: 403 });
+  }
 
   const sub = await billingService_getLatestForOrg(orgId);
   const plan = sub?.planId ? getBillingPlans().find((p) => p.priceId === sub.planId || p.id === sub.planId) : null;
@@ -384,6 +409,7 @@ export async function GET(req: NextRequest) {
     provider: ACTIVE_BILLING_PROVIDER,
     status: sub?.status ?? null,
     planName: plan?.name ?? null,
+    orgId,
   });
 }
 `
