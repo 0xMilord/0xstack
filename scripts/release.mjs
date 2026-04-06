@@ -148,6 +148,8 @@ function isAllowedReleaseToolingPath(p) {
   if (p === "RELEASING.md") return true;
   if (p.startsWith("scripts/")) return true;
   if (p.startsWith(".github/")) return true;
+  // Local agent / IDE prefs — never part of the published CLI
+  if (p.startsWith(".qwen/")) return true;
   return false;
 }
 
@@ -169,7 +171,7 @@ function assertReleasableWorkingTree() {
     console.error(`   ${p}`);
   }
   console.error(
-    "\nCommit, restore, or stash these paths. (Uncommitted files only under scripts/, .github/, or RELEASING.md are ignored; set RELEASE_STRICT_CLEAN=1 to forbid any dirty file.)\n",
+    "\nCommit, restore, or stash these paths. (Dirty files only under scripts/, .github/, RELEASING.md, or .qwen/ are ignored; set RELEASE_STRICT_CLEAN=1 to forbid any dirty file.)\n",
   );
   process.exit(1);
 }

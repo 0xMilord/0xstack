@@ -8,7 +8,8 @@
       "Bash(\")\nset-content -path `$file -value `$content -nonewline\n\"@)",
       "Bash(rm *)",
       "Bash(select-object *)",
-      "Bash(findstr *)"
+      "Bash(findstr *)",
+      "Bash(type *)"
     ]
   },
   "mcpServers": {
