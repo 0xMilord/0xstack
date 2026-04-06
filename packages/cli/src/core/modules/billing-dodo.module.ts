@@ -15,7 +15,6 @@ export const billingDodoModule: Module = {
     ];
 
     if (!enabled) {
-      await backupAndRemove(ctx.projectRoot, "lib/billing/dodo.webhooks.ts");
       if (ctx.modules.billing === false) {
         for (const r of routes) await backupAndRemove(ctx.projectRoot, r);
         await backupAndRemove(ctx.projectRoot, "lib/env/billing.ts");
@@ -43,21 +42,6 @@ export const billingDodoModule: Module = {
 `
     );
     await ensureEnvSchemaModuleWiring(ctx.projectRoot);
-
-    await writeFileEnsured(
-      path.join(ctx.projectRoot, "lib", "billing", "dodo.webhooks.ts"),
-      `import { Webhook } from "standardwebhooks";
-
-export function verifyDodoWebhook(rawBody: string, headers: Record<string, string | null | undefined>, webhookKey: string) {
-  const hook = new Webhook(webhookKey);
-  return hook.verify(rawBody, {
-    "webhook-id": headers["webhook-id"] ?? "",
-    "webhook-signature": headers["webhook-signature"] ?? "",
-    "webhook-timestamp": headers["webhook-timestamp"] ?? "",
-  });
-}
-`
-    );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "api", "v1", "billing", "checkout", "route.ts"),

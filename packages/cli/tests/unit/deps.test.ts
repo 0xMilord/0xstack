@@ -94,10 +94,11 @@ describe("expectedDepsForConfig", () => {
     expect(deps).toContain("@sentry/nextjs");
   });
 
-  it("adds schema-dts when SEO is enabled", () => {
+  it("removes schema-dts (dead dependency replaced with satori)", () => {
     const cfg = ConfigSchema.parse({ modules: { seo: true } });
     const { deps } = expectedDepsForConfig(cfg);
-    expect(deps).toContain("schema-dts");
+    expect(deps).not.toContain("schema-dts");
+    expect(deps).toContain("satori");
   });
 
   it("does not duplicate deps across module combos", () => {

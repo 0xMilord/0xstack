@@ -333,7 +333,15 @@ export async function openPortalAction() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "hooks", "client", "use-billing.client.ts"),
-      `import { useQuery } from "@tanstack/react-query";
+      `/**
+ * Utility hooks for custom client-side billing UIs.
+ *
+ * NOTE: This file is not imported by any generated page.
+ * It is provided as a reference for building custom billing
+ * interfaces when the default server-rendered billing page
+ * does not meet your needs.
+ */
+import { useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { billingKeys } from "@/lib/query-keys/billing.keys";
 

@@ -944,12 +944,19 @@ export async function POST(req: Request) {
 import crypto from "node:crypto";
 import { auth } from "@/lib/auth/auth";
 import { pushService_sendToUser } from "@/lib/services/push.service";
+import { guardApiRequest, toApiErrorResponse } from "@/lib/security/api";
 
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session?.user?.id) {
     return NextResponse.json({ ok: false, error: "unauthorized", requestId }, { status: 401 });
+  }
+  // Rate-limit this endpoint to prevent abuse
+  try {
+    await guardApiRequest(req, { max: 30, windowMs: 60_000 }, { requireApiKey: false });
+  } catch (e: any) {
+    return toApiErrorResponse(e);
   }
   const body = await req.json().catch(() => ({}));
   const title = typeof body?.title === "string" ? body.title : "Notification";

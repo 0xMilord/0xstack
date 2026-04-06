@@ -533,6 +533,8 @@ function articleJsonLd(input: { headline: string; description: string; datePubli
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import remarkToc from "remark-toc";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { env } from "@/lib/env/server";
 import { getPost, getPostCanonicalUrl, listPosts } from "@/lib/loaders/blog.loader";
 ${blogPostSeoImport}
@@ -646,7 +648,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             <span>•</span>
             <span>{readTime} min read</span>
             <span>•</span>
-            <span>{process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"} Team</span>
+            <span>{post.author ?? (process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack") + " Team"}</span>
           </div>
         </header>
 
@@ -671,14 +673,15 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
 
         {/* Content */}
         <div className="prose prose-neutral dark:prose-invert max-w-none">
-          <MDXRemote 
-            source={post.content} 
-            options={{ 
-              mdxOptions: { 
+          <MDXRemote
+            source={post.content}
+            options={{
+              mdxOptions: {
                 remarkPlugins: [remarkGfm, remarkToc],
+                rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
                 development: false,
-              } 
-            }} 
+              }
+            }}
           />
         </div>
 
@@ -717,10 +720,10 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           <div className="mb-8 rounded-lg border bg-muted/50 p-6">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">
-                {(process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack").charAt(0).toUpperCase()}
+                {(post.author ?? (process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack") + " Team").charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="font-medium">{process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"} Team</p>
+                <p className="font-medium">{post.author ?? (process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack") + " Team"}</p>
                 <p className="text-sm text-muted-foreground">Building production-ready architecture for vibecoders</p>
               </div>
             </div>

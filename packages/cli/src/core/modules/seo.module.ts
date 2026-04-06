@@ -330,22 +330,31 @@ export function getPageMetadata(input: { title: string; description?: string; pa
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "robots.ts"),
       `import type { MetadataRoute } from "next";
+import { NextResponse } from "next/server";
 import { env } from "@/lib/env/server";
 
-export default function robots(): MetadataRoute.Robots {
-  return {
+export default async function robots() {
+  const robots: MetadataRoute.Robots = {
     rules: [{ userAgent: "*", allow: "/" }],
     sitemap: \`\${env.NEXT_PUBLIC_APP_URL}/sitemap.xml\`,
   };
+  return new NextResponse(JSON.stringify(robots), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400",
+    },
+  });
 }
 `
     );
     const sitemapNoBlog = `import type { MetadataRoute } from "next";
+import { NextResponse } from "next/server";
 import { env } from "@/lib/env/server";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+export default async function sitemap() {
   const baseUrl = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return [
+  const sitemap: MetadataRoute.Sitemap = [
     { url: new URL("/", baseUrl).toString(), lastModified: new Date() },
     { url: new URL("/about", baseUrl).toString(), lastModified: new Date() },
     { url: new URL("/contact", baseUrl).toString(), lastModified: new Date() },
@@ -355,12 +364,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: new URL("/login", baseUrl).toString(), lastModified: new Date() },
     { url: new URL("/get-started", baseUrl).toString(), lastModified: new Date() },
   ];
+  return new NextResponse(JSON.stringify(sitemap), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400",
+    },
+  });
 }
 `;
     const sitemapWithBlog = `import type { MetadataRoute } from "next";
+import { NextResponse } from "next/server";
 import { env } from "@/lib/env/server";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+export default async function sitemap() {
   const baseUrl = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const base: MetadataRoute.Sitemap = [
     { url: new URL("/", baseUrl).toString(), lastModified: new Date() },
@@ -386,7 +403,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // blog loader missing or error — skip blog entries
   }
 
-  return base;
+  return new NextResponse(JSON.stringify(base), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400",
+    },
+  });
 }
 `;
     await writeFileEnsured(
@@ -407,7 +430,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const title = url.searchParams.get("title") || "0xstack";
   const description = url.searchParams.get("description") || "Production-ready Next.js starter";
-  const icon = url.searchParams.get("icon") || "zap";
 
   const seo = getSeoData();
 
