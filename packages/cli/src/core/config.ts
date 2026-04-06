@@ -1,7 +1,21 @@
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
+
+const requireCli = createRequire(import.meta.url);
+
+/** Resolve zod from the CLI install so temp-project configs can import it without node_modules. */
+function jitiZodAlias(): Record<string, string> | undefined {
+  try {
+    // jiti resolves more reliably with POSIX-style paths on Windows
+    const resolved = requireCli.resolve("zod");
+    return { zod: resolved.replace(/\\/g, "/") };
+  } catch {
+    return undefined;
+  }
+}
 
 export const ConfigSchema = z.object({
   app: z
@@ -187,7 +201,11 @@ export async function loadConfig(projectRoot: string): Promise<MilordConfig> {
 
   if (configPath.endsWith(".ts")) {
     const { default: jitiFactory } = await import("jiti");
-    const jiti = jitiFactory(projectRoot, { interopDefault: true });
+    const zodAlias = jitiZodAlias();
+    const jiti = jitiFactory(projectRoot, {
+      interopDefault: true,
+      ...(zodAlias ? { alias: zodAlias } : {}),
+    });
     const mod = jiti(configPath);
     const raw = (mod as any)?.default ?? mod;
     return ConfigSchema.parse(raw);

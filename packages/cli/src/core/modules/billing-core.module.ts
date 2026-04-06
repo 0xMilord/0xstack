@@ -151,6 +151,11 @@ async function reconcileDodoPayload(e: AnyObj) {
   const dodoCustomerId =
     pick(e.data ?? {}, ["customer_id"]) ?? pick(e, ["customer_id"]) ?? pick(e.data ?? {}, ["customerId"]);
   const userId = pick(e.data ?? {}, ["user_id", "userId"]) ?? pick(e, ["user_id", "userId"]);
+
+  // Try to extract orgId from return_url metadata (encoded during checkout creation)
+  let orgId: string | null =
+    pick(e.data ?? {}, ["org_id", "orgId"]) ?? pick(e, ["org_id", "orgId"]) ?? null;
+
   if (dodoCustomerId && userId) {
     await upsertBillingCustomer({ userId, dodoCustomerId });
   }
@@ -162,7 +167,21 @@ async function reconcileDodoPayload(e: AnyObj) {
     pick(e, ["id"]);
   const status = pick(e.data ?? {}, ["status"]) ?? pick(e, ["status"]) ?? "unknown";
   const planId = pick(e.data ?? {}, ["plan_id", "price_id", "product_id"]) ?? pick(e, ["plan_id"]);
-  const orgId = pick(e.data ?? {}, ["org_id", "orgId"]) ?? pick(e, ["org_id", "orgId"]);
+
+  // If no orgId in payload, try to resolve via user → org membership
+  if (!orgId && dodoCustomerId && userId) {
+    try {
+      const { getBillingCustomerByDodoId } = await import("@/lib/repos/billing.repo");
+      const { listOrgsForUser } = await import("@/lib/repos/org-members.repo");
+      const customer = await getBillingCustomerByDodoId(dodoCustomerId);
+      if (customer) {
+        const rows = await listOrgsForUser(String(customer.userId));
+        if (rows.length) orgId = rows[0].org.id;
+      }
+    } catch {
+      // Fall back to storing without orgId
+    }
+  }
 
   if (subscriptionId) {
     await upsertBillingSubscription({

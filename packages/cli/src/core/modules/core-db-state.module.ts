@@ -225,6 +225,26 @@ export async function getLatestBillingSubscriptionForOrg(orgId: string) {
     .limit(1);
   return rows[0] ?? null;
 }
+
+export async function getBillingCustomerByDodoId(dodoCustomerId: string) {
+  const rows = await db
+    .select()
+    .from(billingCustomers)
+    .where(eq(billingCustomers.dodoCustomerId, dodoCustomerId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getStripeCustomerIdForOrg(orgId: string) {
+  const rows = await db
+    .select({ stripeCustomerId: billingCustomers.stripeCustomerId })
+    .from(billingSubscriptions)
+    .leftJoin(billingCustomers, eq(billingSubscriptions.orgId, billingCustomers.userId))
+    .where(eq(billingSubscriptions.orgId, orgId))
+    .limit(1);
+  const id = rows[0]?.stripeCustomerId;
+  return id && id.length ? id : null;
+}
 `
     );
 
@@ -356,9 +376,9 @@ export async function orgsService_resolveActiveOrg(input: { userId: string; cook
   if (!rows.length) return { ok: false as const, reason: "no_orgs" as const };
   const id = input.cookieOrgId;
   if (!id) return { ok: false as const, reason: "no_cookie" as const };
-  const member = rows.some((r) => r.org.id === id);
-  if (!member) return { ok: false as const, reason: "not_member" as const };
-  return { ok: true as const, orgId: id };
+  const match = rows.find((r) => r.org.id === id);
+  if (!match) return { ok: false as const, reason: "not_member" as const };
+  return { ok: true as const, orgId: id, org: match.org, membership: match.membership };
 }
 `
     );

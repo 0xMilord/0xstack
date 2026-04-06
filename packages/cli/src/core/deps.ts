@@ -6,7 +6,7 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
 
   // Always-required baseline (keep in sync with baseline `install module deps`).
   deps.push("zod", "drizzle-orm", "postgres", "better-auth", "@better-auth/drizzle-adapter");
-  deps.push("@tanstack/react-query", "zustand", "next-themes");
+  deps.push("@tanstack/react-query", "zustand", "next-themes", "lucide-react");
   deps.push("@upstash/redis", "@upstash/ratelimit");
   devDeps.push("drizzle-kit", "vitest", "vite");
 
@@ -22,7 +22,10 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
   if (cfg.modules.storage === "supabase") deps.push("@supabase/supabase-js");
   if (cfg.modules.email === "resend") deps.push("resend", "@react-email/components", "@react-email/render");
   if (cfg.modules.cache) deps.push("lru-cache");
-  if (cfg.modules.pwa) deps.push("web-push", "idb");
+  if (cfg.modules.pwa) {
+    deps.push("web-push", "idb");
+    devDeps.push("@types/web-push");
+  }
   if (cfg.modules.observability?.sentry) deps.push("@sentry/nextjs");
 
   return {

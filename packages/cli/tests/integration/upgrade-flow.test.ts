@@ -54,6 +54,9 @@ describe("Upgrade Command - Full Flow Tests", () => {
         "next-themes": "1.0.0",
         "@upstash/redis": "1.0.0",
         "@upstash/ratelimit": "1.0.0",
+        "@better-auth/drizzle-adapter": "1.0.0",
+        "lucide-react": "1.0.0",
+        "lru-cache": "1.0.0",
       },
       devDependencies: {
         "drizzle-kit": "1.0.0",
@@ -224,7 +227,7 @@ export async function getSeoConfig() {}`, "utf8");
   });
 
   it("upgrade runs env schema stubs", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     // Check env schema stubs exist
     const billingEnv = await fs.readFile(path.join(tmpDir, "lib/env/billing.ts"), "utf8");
@@ -235,7 +238,7 @@ export async function getSeoConfig() {}`, "utf8");
   }, 30_000);
 
   it("upgrade runs config key updates", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     // Config should still be valid
     const config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
@@ -244,7 +247,7 @@ export async function getSeoConfig() {}`, "utf8");
   }, 30_000);
 
   it("upgrade runs runtime schema upgrades", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     // Runtime schema should exist and be valid
     const runtimeSchema = await fs.readFile(path.join(tmpDir, "lib/0xstack/config.ts"), "utf8");
@@ -253,7 +256,7 @@ export async function getSeoConfig() {}`, "utf8");
   }, 30_000);
 
   it("upgrade runs PRD tooling (ESLint boundaries, module factories, vitest)", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     // ESLint boundaries should exist
     const eslintBoundaries = await fs.readFile(path.join(tmpDir, "eslint.0xstack-boundaries.mjs"), "utf8");
@@ -273,7 +276,7 @@ export async function getSeoConfig() {}`, "utf8");
 
   it("upgrade does not break existing config", async () => {
     const configBefore = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
     const configAfter = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
 
     // Config should still contain original values
@@ -282,12 +285,12 @@ export async function getSeoConfig() {}`, "utf8");
   }, 30_000);
 
   it("upgrade is idempotent (can run twice)", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
-    await expect(runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" })).resolves.not.toThrow();
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
+    await expect(runUpgrade({ projectRoot: tmpDir, apply: true })).resolves.not.toThrow();
   }, 60_000);
 
   it("upgrade adds vitest test script to package.json", async () => {
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     const pkg = JSON.parse(await fs.readFile(path.join(tmpDir, "package.json"), "utf8"));
     expect(pkg.scripts).toHaveProperty("test");
@@ -301,7 +304,7 @@ export async function getSeoConfig() {}`, "utf8");
     pkg.scripts = { ...pkg.scripts, custom: "echo hello" };
     await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2), "utf8");
 
-    await runUpgrade({ projectRoot: tmpDir, profile: "core", packageManager: "pnpm" });
+    await runUpgrade({ projectRoot: tmpDir, apply: true });
 
     const updatedPkg = JSON.parse(await fs.readFile(pkgPath, "utf8"));
     expect(updatedPkg.scripts).toHaveProperty("custom", "echo hello");

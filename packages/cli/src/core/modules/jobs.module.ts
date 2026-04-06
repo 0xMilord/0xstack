@@ -42,12 +42,20 @@ import { jobs_runReconcile } from "@/lib/jobs/reconcile";
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
   try {
-    // Prefer server-to-server auth:
-    // - API key (standard external surface)
-    // - or job secret header (simple cron)
+    // Auth: prefer job secret header, fall back to API key guard.
+    // The secret must match JOB_SECRET env var for server-to-server calls.
     const h = await headers();
     const secret = h.get("x-job-secret");
-    if (!secret) await guardApiRequest(req);
+    const expectedSecret = process.env.JOB_SECRET;
+    if (secret) {
+      // Validate the secret against the expected value
+      if (!expectedSecret || secret !== expectedSecret) {
+        return NextResponse.json({ error: "invalid_job_secret" }, { status: 401, headers: { "x-request-id": requestId } });
+      }
+    } else {
+      // No secret header — require API key authentication
+      await guardApiRequest(req);
+    }
     const res = await jobs_runReconcile();
     return NextResponse.json({ ok: true, requestId, ...res }, { headers: { "x-request-id": requestId } });
   } catch (err) {

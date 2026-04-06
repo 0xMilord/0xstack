@@ -26,7 +26,9 @@ pnpm release           # interactive bump (patch / minor / major) + summary, the
 11. Smoke test: temp directory `npm install 0xstack@X.Y.Z` and `npx 0xstack --help` (retries for registry lag)
 12. If branch `develop` exists, `git checkout develop`
 
-If any step fails, the script stops. Fix forward from a clean `main` working tree.
+If any step fails, the script stops. **`pnpm release` requires a clean enough tree**: you must not leave uncommitted changes under **`packages/cli`** (or other paths that affect what ships). Uncommitted edits **only** under `scripts/`, `.github/`, or `RELEASING.md` are ignored so you can iterate on release tooling without a prior commit. For a fully clean tree only, set **`RELEASE_STRICT_CLEAN=1`**. Otherwise: commit, stash, or restore anything else first.
+
+If `git pull` used to fail with *cannot pull with rebase: You have unstaged changes*, that was Git refusing to rebase-pull with a dirty tree — not the release script deleting files. Fix the tree, then re-run.
 
 ### Non-interactive (CI or scripts)
 

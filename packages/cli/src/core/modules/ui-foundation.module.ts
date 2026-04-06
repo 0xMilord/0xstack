@@ -48,22 +48,37 @@ import { buttonVariants } from "@/components/ui/button";
 import { loadViewer } from "@/lib/loaders/viewer.loader";
 import { signOutAction } from "@/lib/actions/auth.actions";
 import { cn } from "@/lib/utils";
-import { PwaInstallButton } from "@/components/pwa/pwa-install-button";
-import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
 import { getConfig } from "@/lib/0xstack/config";
+
+// Dynamic imports for PWA components — only exist when PWA module is enabled.
+// Using dynamic import() avoids build errors when PWA is disabled.
+async function loadPwaComponents() {
+  try {
+    const [PwaUpdateBanner, PwaInstallButton] = await Promise.all([
+      import("@/components/pwa/pwa-update-banner"),
+      import("@/components/pwa/pwa-install-button"),
+    ]);
+    return { PwaUpdateBanner: PwaUpdateBanner.PwaUpdateBanner, PwaInstallButton: PwaInstallButton.PwaInstallButton };
+  } catch {
+    return { PwaUpdateBanner: null, PwaInstallButton: null };
+  }
+}
 
 export async function SiteHeader() {
   const [viewer, cfg] = await Promise.all([loadViewer(), getConfig()]);
+  const pwa = cfg.modules.pwa ? await loadPwaComponents() : null;
   return (
     <>
-      {cfg.modules.pwa ? <PwaUpdateBanner /> : null}
+      {pwa?.PwaUpdateBanner ? <pwa.PwaUpdateBanner /> : null}
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="font-semibold">
             {process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack"}
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
-            <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
+            {cfg.modules.billing ? (
+              <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/pricing">Pricing</Link>
+            ) : null}
             {cfg.modules.blogMdx ? (
               <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/blog">Blog</Link>
             ) : null}
@@ -71,7 +86,7 @@ export async function SiteHeader() {
             <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/contact">Contact</Link>
           </nav>
           <div className="flex items-center gap-2">
-            {cfg.modules.pwa ? <PwaInstallButton /> : null}
+            {pwa?.PwaInstallButton ? <pwa.PwaInstallButton /> : null}
             <ThemeToggle />
             {viewer ? (
               <>
@@ -120,10 +135,12 @@ export function SiteFooter() {
 `
     );
 
-    // PWA components
-    await ensureDir(path.join(ctx.projectRoot, "components", "pwa"));
-    await writeFileEnsured(
-      path.join(ctx.projectRoot, "components", "pwa", "pwa-install-button.tsx"),
+    // PWA components — only generate when PWA module is NOT enabled.
+    // When PWA module IS enabled, it generates its own (more complete) versions.
+    if (!ctx.modules.pwa) {
+      await ensureDir(path.join(ctx.projectRoot, "components", "pwa"));
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "components", "pwa", "pwa-install-button.tsx"),
       `"use client";
 
 import { useEffect, useState } from "react";
@@ -213,6 +230,7 @@ export function PwaUpdateBanner() {
 }
 `
     );
+    } // end if (!ctx.modules.pwa)
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "components", "layout", "theme-toggle.tsx"),

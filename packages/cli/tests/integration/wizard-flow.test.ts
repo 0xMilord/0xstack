@@ -54,6 +54,9 @@ describe("Wizard Command - Full Flow Tests", () => {
         "next-themes": "1.0.0",
         "@upstash/redis": "1.0.0",
         "@upstash/ratelimit": "1.0.0",
+        "@better-auth/drizzle-adapter": "1.0.0",
+        "lucide-react": "1.0.0",
+        "lru-cache": "1.0.0",
       },
       devDependencies: {
         "drizzle-kit": "1.0.0",
@@ -103,7 +106,7 @@ export const StorageEnvSchema = z.object({
     // Config
     await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), `import { defineConfig } from "./lib/0xstack/config";
 export default defineConfig({
-  app: { name: "TestApp", baseUrl: "http://localhost:3000" },
+  app: { name: "TestApp", description: "A test app", baseUrl: "http://localhost:3000" },
   modules: {
     orgs: true, billing: false, storage: false, email: false, cache: true, pwa: false, seo: false, blogMdx: false,
     observability: { sentry: false, otel: false },
@@ -383,12 +386,14 @@ export async function getSeoConfig() {}`, "utf8");
 
   it("wizard can add new profile", async () => {
     let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
-    // Add a new profile
     config = config.replace(
-      "profiles: z.record(z.string(), z.any()).optional(),",
-      `profiles: {
-      staging: { modules: { billing: "dodo", seo: true } },
-    },`
+      /jobs:\s*\{\s*enabled:\s*false,\s*driver:\s*"cron-only"\s*\},\s*\n\s*\},\s*\n\}\);/,
+      `jobs: { enabled: false, driver: "cron-only" },
+  },
+  profiles: {
+    staging: { modules: { billing: "dodo", seo: true } },
+  },
+});`
     );
     await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
 
@@ -399,12 +404,14 @@ export async function getSeoConfig() {}`, "utf8");
 
   it("wizard can update existing profile", async () => {
     let config = await fs.readFile(path.join(tmpDir, "0xstack.config.ts"), "utf8");
-    // Add profiles section
     config = config.replace(
-      "profiles: z.record(z.string(), z.any()).optional(),",
-      `profiles: {
-      full: { modules: { seo: true, blogMdx: true, billing: "dodo" } },
-    },`
+      /jobs:\s*\{\s*enabled:\s*false,\s*driver:\s*"cron-only"\s*\},\s*\n\s*\},\s*\n\}\);/,
+      `jobs: { enabled: false, driver: "cron-only" },
+  },
+  profiles: {
+    full: { modules: { seo: true, blogMdx: true, billing: "dodo" } },
+  },
+});`
     );
     await fs.writeFile(path.join(tmpDir, "0xstack.config.ts"), config, "utf8");
 

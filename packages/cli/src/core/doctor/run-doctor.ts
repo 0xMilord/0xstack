@@ -37,19 +37,28 @@ export type DoctorInput = { projectRoot: string; profile: string; strict?: boole
 
 type IssueSeverity = "critical" | "warning" | "info";
 
-type Issue = {
+export type DoctorIssue = {
   message: string;
   severity: IssueSeverity;
   category: string;
   fix?: string | undefined;
 };
 
-export async function runDoctor(input: DoctorInput) {
+export type DoctorResult = {
+  issues: DoctorIssue[];
+  strictOnly: DoctorIssue[];
+  healthScore: number;
+  criticalCount: number;
+  warningCount: number;
+  infoCount: number;
+};
+
+export async function runDoctor(input: DoctorInput): Promise<DoctorResult> {
   const state = await computeProjectState(input.projectRoot, input.profile);
   const modules = state.modules as any;
 
-  const issues: Issue[] = [];
-  const strictOnly: Issue[] = [];
+  const issues: DoctorIssue[] = [];
+  const strictOnly: DoctorIssue[] = [];
 
   const addIssue = (message: string, severity: "critical" | "warning" | "info" = "critical", category: string = "General", fix?: string) => {
     issues.push({ message, severity, category, fix: fix ?? undefined });
@@ -770,13 +779,18 @@ export async function runDoctor(input: DoctorInput) {
     logger.info("");
   }
 
-  // Exit with appropriate status
-  if (criticalCount > 0 || (!!input.strict && (issues.length + strictOnly.length) > 0)) {
-    const allIssues = [...issues, ...(input.strict ? strictOnly : [])];
-    throw new Error(`doctor failed (${input.profile}): ${criticalCount} critical, ${warningCount} warnings, ${infoCount} info`);
+  if (criticalCount === 0 && (!input.strict || issues.length + strictOnly.length === 0)) {
+    logger.success(chalk.green(`✓ All checks passed (${input.profile}) — Health: ${healthScore}/100`));
+    logger.info("");
   }
 
-  logger.success(chalk.green(`✓ All checks passed (${input.profile}) — Health: ${healthScore}/100`));
-  logger.info("");
+  return {
+    issues,
+    strictOnly,
+    healthScore,
+    criticalCount,
+    warningCount,
+    infoCount,
+  };
 }
 

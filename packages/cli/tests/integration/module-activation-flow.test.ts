@@ -58,6 +58,9 @@ describe("Module Activation Tests - All 19 Modules Full Flow", () => {
         "next-themes": "1.0.0",
         "@upstash/redis": "1.0.0",
         "@upstash/ratelimit": "1.0.0",
+        "@better-auth/drizzle-adapter": "1.0.0",
+        "lucide-react": "1.0.0",
+        "lru-cache": "1.0.0",
       },
       devDependencies: {
         "drizzle-kit": "1.0.0",

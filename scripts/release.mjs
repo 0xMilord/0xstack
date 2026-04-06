@@ -115,28 +115,62 @@ function branchExists(name) {
   }
 }
 
-function workingTreePorcelain() {
-  return execSync("git status --porcelain", {
-    cwd: ROOT,
-    encoding: "utf8",
-  }).trim();
+function normalizeRepoPath(p) {
+  return p.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
-/** Real release mutates git + npm; require a clean tree so pull/commit/tag stay predictable. */
-function assertCleanWorkingTree() {
-  const lines = workingTreePorcelain();
-  if (!lines) return;
-  console.error("\n❌ Refusing to release: working tree is not clean.\n");
-  for (const line of lines.split("\n")) {
-    console.error(`   ${line}`);
+/** Every path different from HEAD (modified, staged, or untracked). */
+function getDirtyPaths() {
+  const tracked = execSync("git diff --name-only HEAD", {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map(normalizeRepoPath);
+  const untracked = execSync(
+    "git ls-files --others --exclude-standard",
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map(normalizeRepoPath);
+  return [...new Set([...tracked, ...untracked])];
+}
+
+/**
+ * Dirty paths that don't affect the shipped CLI tarball may be OK (e.g. uncommitted release docs/script tweaks).
+ * Set RELEASE_STRICT_CLEAN=1 to require a fully clean tree instead.
+ */
+function isAllowedReleaseToolingPath(p) {
+  if (p === "RELEASING.md") return true;
+  if (p.startsWith("scripts/")) return true;
+  if (p.startsWith(".github/")) return true;
+  return false;
+}
+
+function getBlockingDirtyPaths() {
+  if (process.env.RELEASE_STRICT_CLEAN === "1") {
+    return getDirtyPaths();
+  }
+  return getDirtyPaths().filter((p) => !isAllowedReleaseToolingPath(p));
+}
+
+/** Block if product / publish paths are dirty; allow tooling-only dirty paths. */
+function assertReleasableWorkingTree() {
+  const blocking = getBlockingDirtyPaths();
+  if (blocking.length === 0) return;
+  console.error(
+    "\n❌ Refusing to release: working tree has uncommitted changes that affect the release.\n",
+  );
+  for (const p of blocking) {
+    console.error(`   ${p}`);
   }
   console.error(
-    "\nThese paths are already changed locally — the release script did not create this state.",
+    "\nCommit, restore, or stash these paths. (Uncommitted files only under scripts/, .github/, or RELEASING.md are ignored; set RELEASE_STRICT_CLEAN=1 to forbid any dirty file.)\n",
   );
-  console.error(
-    "Fix: commit, restore, or stash (e.g. git stash push -u -m pre-release), then run pnpm release again.",
-  );
-  console.error("To see what changed: git status\n");
   process.exit(1);
 }
 
@@ -155,20 +189,21 @@ function verifyInstall(version) {
 async function main() {
   console.log(`\n0xstack CLI release${DRY_RUN ? " (dry run)" : ""}\n`);
 
-  const dirty = workingTreePorcelain();
-  if (dirty && DRY_RUN) {
+  const blocking = getBlockingDirtyPaths();
+  if (blocking.length && DRY_RUN) {
     console.warn(
-      "⚠️  Working tree has local changes. A real `pnpm release` will stop until the tree is clean.\n",
+      "⚠️  A real `pnpm release` will stop until these paths are committed, restored, or stashed:\n",
     );
+    for (const p of blocking) console.warn(`   ${p}`);
+    console.warn("");
   }
 
   if (!DRY_RUN) {
-    assertCleanWorkingTree();
+    assertReleasableWorkingTree();
     console.log("[0] Switching to main…");
     run("git checkout main");
-    // --no-rebase avoids "cannot pull with rebase: You have unstaged changes" when pull.rebase is set
-    run("git fetch origin main");
-    run("git merge --ff-only FETCH_HEAD");
+    // Avoid pull.rebase=true failures; merge-style pull is fine once the tree is clean
+    run("git pull --no-rebase origin main");
   }
 
   console.log("[1] Install (workspace)…");

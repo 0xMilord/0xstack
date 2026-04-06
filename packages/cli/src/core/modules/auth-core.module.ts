@@ -62,11 +62,14 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          // This will be patched or used by the welcome email logic
-          // @ts-ignore - dynamic hook for welcome email
-          if (global.sendWelcomeEmail) {
-            // @ts-ignore
-            await global.sendWelcomeEmail(user.email, user.name);
+          // Send welcome email if email module is enabled
+          try {
+            const { sendWelcomeEmail } = await import("@/lib/email/auth-emails");
+            if (sendWelcomeEmail) {
+              await sendWelcomeEmail(user.email, user.name);
+            }
+          } catch {
+            // Email module not enabled — no welcome email
           }
         }
       }

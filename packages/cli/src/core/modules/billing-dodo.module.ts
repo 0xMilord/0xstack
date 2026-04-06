@@ -62,67 +62,111 @@ export function verifyDodoWebhook(rawBody: string, headers: Record<string, strin
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "api", "v1", "billing", "checkout", "route.ts"),
       `import type { NextRequest } from "next/server";
-import { Checkout } from "@dodopayments/nextjs";
 import { env } from "@/lib/env/server";
-import { guardApiRequest } from "@/lib/security/api";
 import { auth } from "@/lib/auth/auth";
+import { requireActiveOrg } from "@/lib/orgs/active-org";
+import { getBillingPlans } from "@/lib/billing/plans";
 
-const handler = Checkout({
-  bearerToken: env.DODO_PAYMENTS_API_KEY,
-  returnUrl: env.DODO_PAYMENTS_RETURN_URL,
-  environment: env.DODO_PAYMENTS_ENVIRONMENT,
-  type: "session",
-});
-
+/**
+ * Create a Dodo checkout session with org + userId metadata encoded in the return URL.
+ * Dodo does not support custom metadata in the hosted checkout, so we encode context
+ * in the returnUrl and extract it during webhook reconciliation.
+ */
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers as any });
   if (!session?.user?.id) {
-    await guardApiRequest(req);
-  } else {
-    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+    return new Response(JSON.stringify({ error: "unauthenticated" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
   }
-  return handler(req as any);
+
+  // Resolve active org — checkout belongs to the active org
+  const orgGate = await requireActiveOrg();
+  const orgId = orgGate.org.id;
+  const userId = session.user.id;
+
+  const body = await req.json().catch(() => ({}));
+  const priceId = body.price_id ?? env.DODO_PAYMENTS_STARTER_PRICE_ID;
+  const plans = getBillingPlans();
+  const plan = plans.find((p: any) => p.priceId === priceId) ?? plans[0];
+
+  // Encode org + user context in the return URL for webhook reconciliation
+  const returnUrl = new URL(env.DODO_PAYMENTS_RETURN_URL);
+  returnUrl.searchParams.set("orgId", orgId);
+  returnUrl.searchParams.set("userId", userId);
+  returnUrl.searchParams.set("planId", plan?.id ?? "");
+
+  // Dodo hosted checkout — metadata is carried through the return URL
+  const checkoutUrl = \`https://checkout.dodopayments.com/v1/checkout?price_id=\${encodeURIComponent(priceId)}&return_url=\${encodeURIComponent(returnUrl.toString())}&api_key=\${encodeURIComponent(env.DODO_PAYMENTS_API_KEY)}\`;
+
+  return Response.json({ url: checkoutUrl, orgId, userId, planId: plan?.id });
 }
 
-const getHandler = Checkout({
-  bearerToken: env.DODO_PAYMENTS_API_KEY,
-  returnUrl: env.DODO_PAYMENTS_RETURN_URL,
-  environment: env.DODO_PAYMENTS_ENVIRONMENT,
-  type: "static",
-});
-
+/** Static link mode — redirect to Dodo checkout with org context in return URL. */
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers as any });
   if (!session?.user?.id) {
-    await guardApiRequest(req);
-  } else {
-    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+    return new Response(JSON.stringify({ error: "unauthenticated" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
   }
-  return getHandler(req as any);
+
+  const orgGate = await requireActiveOrg();
+  const orgId = orgGate.org.id;
+  const userId = session.user.id;
+
+  const url = new URL(req.url);
+  const priceId = url.searchParams.get("price_id") ?? env.DODO_PAYMENTS_STARTER_PRICE_ID;
+
+  const returnUrl = new URL(env.DODO_PAYMENTS_RETURN_URL);
+  returnUrl.searchParams.set("orgId", orgId);
+  returnUrl.searchParams.set("userId", userId);
+
+  const checkoutUrl = \`https://checkout.dodopayments.com/v1/checkout?price_id=\${encodeURIComponent(priceId)}&return_url=\${encodeURIComponent(returnUrl.toString())}&api_key=\${encodeURIComponent(env.DODO_PAYMENTS_API_KEY)}\`;
+  return Response.redirect(checkoutUrl, 302);
 }
 `
     );
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "api", "v1", "billing", "portal", "route.ts"),
       `import type { NextRequest } from "next/server";
-import { CustomerPortal } from "@dodopayments/nextjs";
+import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { cookies } from "next/headers";
+import { getStripeCustomerIdForOrg } from "@/lib/repos/billing.repo";
 import { env } from "@/lib/env/server";
-import { guardApiRequest } from "@/lib/security/api";
-import { auth } from "@/lib/auth/auth";
+import { redirect } from "next/navigation";
 
-const handler = CustomerPortal({
-  bearerToken: env.DODO_PAYMENTS_API_KEY,
-  environment: env.DODO_PAYMENTS_ENVIRONMENT,
-});
-
+/**
+ * Redirect to Dodo customer portal for the active org.
+ * Requires authenticated session + active org context.
+ */
 export async function GET(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers as any });
-  if (!session?.user?.id) {
-    await guardApiRequest(req);
-  } else {
-    await guardApiRequest(req, { max: 60, windowMs: 60_000 }, { requireApiKey: false });
+  const viewer = await requireAuth();
+  const cookieStore = await cookies();
+  const orgId = getActiveOrgIdFromCookies(cookieStore);
+
+  if (!orgId) {
+    return new Response(JSON.stringify({ error: "no_active_org" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
   }
-  return handler(req as any);
+
+  // Look up the customer ID for this org
+  const customerId = await getStripeCustomerIdForOrg(orgId);
+  if (!customerId) {
+    return new Response(JSON.stringify({ error: "no_customer", message: "No subscription found for this org. Start a subscription first." }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // Dodo customer portal URL with customer ID
+  const portalUrl = \`https://portal.dodopayments.com/v1/portal?customer_id=\${encodeURIComponent(customerId)}&api_key=\${encodeURIComponent(env.DODO_PAYMENTS_API_KEY)}\`;
+  return Response.redirect(portalUrl, 302);
 }
 `
     );

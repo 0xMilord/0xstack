@@ -10,5 +10,18 @@
       "Bash(select-object *)"
     ]
   },
+  "mcpServers": {
+    "dodo-knowledge": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote@latest", "https://knowledge.dodopayments.com/mcp"]
+    },
+    "dodopayments": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote@latest", "https://mcp.dodopayments.com/sse"]
+    },
+    "stripe": {
+      "url": "https://mcp.stripe.com"
+    }
+  },
   "$version": 3
 }

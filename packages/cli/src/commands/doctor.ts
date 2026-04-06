@@ -11,7 +11,14 @@ export function registerDoctorCommand(cli: CAC) {
     .action(async (options) => {
       const dir = path.resolve(process.cwd(), options.dir ?? ".");
       const profile = options.profile ?? "core";
-      await runDoctor({ projectRoot: dir, profile, strict: !!options.strict });
+      const strict = !!options.strict;
+      const result = await runDoctor({ projectRoot: dir, profile, strict });
+      const failStrict = strict && result.issues.length + result.strictOnly.length > 0;
+      if (result.criticalCount > 0 || failStrict) {
+        throw new Error(
+          `doctor failed (${profile}): ${result.criticalCount} critical, ${result.warningCount} warnings, ${result.infoCount} info`
+        );
+      }
     });
 }
 

@@ -72,8 +72,11 @@ function safeEqual(a: string, b: string) {
 }
 
 export async function verifyApiKey(key: string): Promise<boolean> {
-  // Expected format: any string >= 10 chars. We use prefix for lookup.
-  const prefix = key.slice(0, 8);
+  // Expected format: 0xstack_<prefix>.<secret>
+  // Extract the 8-char hex prefix after "0xstack_"
+  const dotIdx = key.indexOf(".");
+  if (dotIdx < 10) return false; // "0xstack_" (8) + prefix (8) + "." = at least 17
+  const prefix = key.slice(8, dotIdx);
   if (!prefix || prefix.length < 4) return false;
   const candidates = await findActiveApiKeysByPrefix(prefix);
   const hash = sha256Hex(key);
