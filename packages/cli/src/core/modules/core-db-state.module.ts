@@ -324,12 +324,29 @@ export async function addMember(input: typeof orgMembers.$inferInsert) {
   return rows[0] ?? null;
 }
 
+export async function removeMember(input: { orgId: string; userId: string }) {
+  const rows = await db
+    .delete(orgMembers)
+    .where(and(eq(orgMembers.orgId, input.orgId), eq(orgMembers.userId, input.userId)))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function listOrgsForUser(userId: string) {
   const rows = await db
     .select({ org: orgs, membership: orgMembers })
     .from(orgMembers)
     .innerJoin(orgs, eq(orgs.id, orgMembers.orgId))
     .where(eq(orgMembers.userId, userId))
+    .limit(200);
+  return rows;
+}
+
+export async function listMembersForOrg(orgId: string) {
+  const rows = await db
+    .select({ member: orgMembers })
+    .from(orgMembers)
+    .where(eq(orgMembers.orgId, orgId))
     .limit(200);
   return rows;
 }
@@ -353,7 +370,7 @@ export async function isMember(orgId: string, userId: string) {
       path.join(ctx.projectRoot, "lib", "services", "orgs.service.ts"),
       `import crypto from "node:crypto";
 import { insertOrg } from "@/lib/repos/orgs.repo";
-import { addMember, getMembership, isMember, listOrgsForUser } from "@/lib/repos/org-members.repo";
+import { addMember, getMembership, isMember, listMembersForOrg, listOrgsForUser, removeMember } from "@/lib/repos/org-members.repo";
 
 export const ORG_ROLES = ["member", "admin", "owner"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -396,6 +413,19 @@ export async function orgsService_resolveActiveOrg(input: { userId: string; cook
   const match = rows.find((r) => r.org.id === id);
   if (!match) return { ok: false as const, reason: "not_member" as const };
   return { ok: true as const, orgId: id, org: match.org, membership: match.membership };
+}
+
+export async function orgsService_listMembersForOrg(orgId: string) {
+  return await listMembersForOrg(orgId);
+}
+
+export async function orgsService_removeMember(input: { orgId: string; userId: string; removedBy: string }) {
+  // The remover must be an owner
+  const m = await getMembership({ orgId: input.orgId, userId: input.removedBy });
+  if (!m || (m as any).role !== "owner") throw new Error("insufficient_role");
+  // Cannot remove yourself
+  if (input.removedBy === input.userId) throw new Error("cannot_remove_self");
+  return await removeMember({ orgId: input.orgId, userId: input.userId });
 }
 `
     );
@@ -465,7 +495,8 @@ import { ACTIVE_ORG_COOKIE } from "@/lib/orgs/active-org";
 import { requireAuth } from "@/lib/auth/server";
 import { revalidate } from "@/lib/cache";
 import { createOrgInput } from "@/lib/rules/orgs.rules";
-import { orgsService_assertMember, orgsService_createForUser } from "@/lib/services/orgs.service";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { orgsService_assertMember, orgsService_createForUser, orgsService_removeMember } from "@/lib/services/orgs.service";
 
 export async function createOrg(input: unknown) {
   const viewer = await requireAuth();
@@ -490,6 +521,14 @@ export async function setActiveOrg(input: { orgId: string }) {
   revalidatePath("/app");
   return { ok: true, userId: viewer.userId };
 }
+
+export async function removeMemberAction(input: { orgId: string; userId: string }) {
+  const viewer = await requireAuth();
+  await orgsService_removeMember({ orgId: input.orgId, userId: input.userId, removedBy: viewer.userId });
+  revalidate.orgs(viewer.userId);
+  revalidatePath("/app/orgs");
+  return { ok: true as const };
+}
 `
     );
 
@@ -497,13 +536,29 @@ export async function setActiveOrg(input: { orgId: string }) {
       path.join(ctx.projectRoot, "app", "app", "orgs", "page.tsx"),
       `import { loadMyOrgs } from "@/lib/loaders/orgs.loader";
 import { createOrg } from "@/lib/actions/orgs.actions";
-import { setActiveOrg } from "@/lib/actions/orgs.actions";
+import { setActiveOrg, removeMemberAction } from "@/lib/actions/orgs.actions";
+import { getActiveOrgId } from "@/lib/orgs/active-org";
+import { orgsService_listMembersForOrg } from "@/lib/services/orgs.service";
+import { requireAuth } from "@/lib/auth/server";
+import { getMembership } from "@/lib/repos/org-members.repo";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function Page() {
   const rows = await loadMyOrgs();
+  const activeOrgId = await getActiveOrgId();
+
+  const activeMembers = activeOrgId
+    ? await orgsService_listMembersForOrg(activeOrgId).catch(() => [])
+    : [];
+
+  const viewer = await requireAuth();
+  const viewerMembership = activeOrgId && viewer.userId
+    ? await getMembership({ orgId: activeOrgId, userId: viewer.userId }).catch(() => null)
+    : null;
+  const isOwner = viewerMembership?.role === "owner";
+
   return (
     <main className="mx-auto max-w-4xl p-6">
       <h1 className="text-2xl font-semibold">Organizations</h1>
@@ -542,6 +597,37 @@ export default async function Page() {
           </Card>
         ))}
       </div>
+
+      {activeOrgId && activeMembers.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-xl font-semibold mb-4">Members of active org</h2>
+          <div className="space-y-3">
+            {activeMembers.map((m: any) => (
+              <div
+                key={m.member.userId}
+                className="flex items-center justify-between gap-3 rounded-md border p-3"
+              >
+                <div>
+                  <p className="font-mono text-sm">{m.member.userId}</p>
+                  <p className="text-xs text-muted-foreground">Role: {m.member.role}</p>
+                </div>
+                {isOwner && m.member.role !== "owner" && (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await removeMemberAction({ orgId: activeOrgId, userId: m.member.userId });
+                    }}
+                  >
+                    <Button type="submit" variant="destructive" size="sm">
+                      Remove
+                    </Button>
+                  </form>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
