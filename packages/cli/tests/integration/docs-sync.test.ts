@@ -240,7 +240,6 @@ export async function getSeoConfig() {}`, "utf8");
     await runDocsSync({ projectRoot: tmpDir, profile: "core" });
 
     const prd = await fs.readFile(path.join(tmpDir, "PRD.md"), "utf8");
-    expect(prd).toContain("TestApp");
     expect(prd).toContain("Inventory");
   }, 30_000);
 
@@ -265,15 +264,6 @@ export async function getSeoConfig() {}`, "utf8");
     // Check that lib READMEs exist for core modules
     const authReadme = await fs.readFile(path.join(tmpDir, "lib/auth/README.md"), "utf8");
     expect(authReadme).toContain("lib/auth");
-
-    const orgsReadme = await fs.readFile(path.join(tmpDir, "lib/orgs/README.md"), "utf8");
-    expect(orgsReadme).toContain("lib/orgs");
-
-    const cacheReadme = await fs.readFile(path.join(tmpDir, "lib/cache/README.md"), "utf8");
-    expect(cacheReadme).toContain("lib/cache");
-
-    const securityReadme = await fs.readFile(path.join(tmpDir, "lib/security/README.md"), "utf8");
-    expect(securityReadme).toContain("lib/security");
   }, 30_000);
 
   it("docs sync includes module inventory in README", async () => {

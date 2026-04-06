@@ -534,7 +534,7 @@ export async function getSeoConfig() {}`, "utf8");
 
     const rss = await fs.readFile(path.join(tmpDir, "app/rss.xml/route.ts"), "utf8");
     expect(rss).toContain("listPosts");
-    expect(rss).toContain("application/xml");
+    expect(rss).toContain("application/rss+xml");
 
     // Check MDX content exists
     const mdxContent = await fs.readFile(path.join(tmpDir, "content/blog/what-is-0xstack.mdx"), "utf8");
@@ -721,7 +721,8 @@ export async function getSeoConfig() {}`, "utf8");
     expect(registerSw).toContain("registerServiceWorker");
 
     const offlineStorage = await fs.readFile(path.join(tmpDir, "lib/pwa/offline-storage.ts"), "utf8");
-    expect(offlineStorage).toContain("getOfflineStorage");
+    expect(offlineStorage).toContain("openDB");
+    expect(offlineStorage).toContain("savePendingRequest");
 
     const subscribeRoute = await fs.readFile(path.join(tmpDir, "app/api/v1/pwa/push/subscribe/route.ts"), "utf8");
     expect(subscribeRoute).toContain("pushSubscriptionsService_subscribe");

@@ -7,17 +7,26 @@
       "Bash(`n  },`n *)",
       "Bash(\")\nset-content -path `$file -value `$content -nonewline\n\"@)",
       "Bash(rm *)",
-      "Bash(select-object *)"
+      "Bash(select-object *)",
+      "Bash(findstr *)"
     ]
   },
   "mcpServers": {
     "dodo-knowledge": {
       "command": "npx",
-      "args": ["-y", "mcp-remote@latest", "https://knowledge.dodopayments.com/mcp"]
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://knowledge.dodopayments.com/mcp"
+      ]
     },
     "dodopayments": {
       "command": "npx",
-      "args": ["-y", "mcp-remote@latest", "https://mcp.dodopayments.com/sse"]
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.dodopayments.com/sse"
+      ]
     },
     "stripe": {
       "url": "https://mcp.stripe.com"
