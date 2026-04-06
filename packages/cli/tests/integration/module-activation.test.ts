@@ -579,7 +579,8 @@ export async function getSeoConfig() {}`, "utf8");
     expect(billingPage).toContain("openPortalAction");
 
     const statusApi = await fs.readFile(path.join(tmpDir, "app/api/v1/billing/status/route.ts"), "utf8");
-    expect(statusApi).toContain("guardApiRequest");
+    expect(statusApi).toContain("requireAuth");
+    expect(statusApi).toContain("orgsService_assertMember");
     expect(statusApi).toContain("billingService_getLatestForOrg");
   }, 30_000);
 
