@@ -84,8 +84,10 @@ import {
   listAssetsForUser,
 } from "@/lib/repos/assets.repo";
 import type { assets } from "@/lib/db/schema";
-import { isMember } from "@/lib/repos/org-members.repo";
+import { orgsService_assertMember } from "@/lib/services/orgs.service";
 import type { ProviderSignUploadResult } from "@/lib/storage/provider";
+
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB server-side limit
 
 function storageBucket(): string {
   switch (ACTIVE_STORAGE_PROVIDER) {
@@ -102,7 +104,7 @@ function storageBucket(): string {
   }
 }
 
-async function providerSignUpload(input: { objectKey: string; contentType: string }): Promise<ProviderSignUploadResult> {
+async function providerSignUpload(input: { objectKey: string; contentType: string; maxBytes?: number }): Promise<ProviderSignUploadResult> {
   switch (ACTIVE_STORAGE_PROVIDER) {
     case "gcs":
       return (await import("@/lib/storage/providers/gcs")).providerSignUpload(input);
@@ -163,8 +165,7 @@ export async function storageService_assertCanAccessAsset(input: {
   const a = input.asset;
   if (a.orgId) {
     if (!input.activeOrgId || a.orgId !== input.activeOrgId) throw new Error("forbidden");
-    const ok = await isMember(a.orgId, input.userId);
-    if (!ok) throw new Error("forbidden");
+    await orgsService_assertMember({ userId: input.userId, orgId: a.orgId });
     return;
   }
   if (a.ownerUserId !== input.userId) throw new Error("forbidden");
@@ -177,7 +178,7 @@ export async function storageService_createSignedUpload(input: {
   orgId: string | null;
 }) {
   const bucket = storageBucket();
-  const signed = await providerSignUpload({ objectKey: input.objectKey, contentType: input.contentType });
+  const signed = await providerSignUpload({ objectKey: input.objectKey, contentType: input.contentType, maxBytes: MAX_UPLOAD_BYTES });
   const headers: Record<string, string> = {
     ...(signed.headers ?? {}),
   };

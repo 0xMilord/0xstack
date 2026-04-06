@@ -442,19 +442,32 @@ export default function Page() {
 `
     );
 
+    // P0 #3: Conditionally generate SEO pages based on ctx.modules.seo
+    const seoEnabled = ctx.modules.seo;
+
+    const metadataImport = seoEnabled
+      ? `import { getPageMetadata } from "@/lib/seo/metadata";`
+      : `// SEO module disabled — using inline metadata`;
+
+    const metadataFn = seoEnabled
+      ? `export const metadata: Metadata = getPageMetadata({`
+      : `export const metadata: Metadata = {`;
+
+    const metadataClose = seoEnabled ? `});` : `};`;
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "about", "page.tsx"),
       `import Link from "next/link";
 import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 
-export const metadata: Metadata = getPageMetadata({
+${metadataFn}
   title: "About",
   description: "Learn what 0xstack generates and the architectural conventions it enforces.",
-  pathname: "/about",
-});
+  ${seoEnabled ? `pathname: "/about",` : ``}
+${metadataClose}
 
 export default function Page() {
   return (
@@ -477,7 +490,7 @@ export default function Page() {
             <CardTitle className="text-base">Enterprise guardrails</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            ` + "`doctor`" + ` enforces boundaries and required surfaces so teams don’t accidentally break architecture.
+            ` + "`doctor`" + ` enforces boundaries and required surfaces so teams don't accidentally break architecture.
           </CardContent>
         </Card>
       </div>
@@ -494,14 +507,14 @@ export default function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "contact", "page.tsx"),
       `import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata: Metadata = getPageMetadata({
+${metadataFn}
   title: "Contact",
   description: "Contact the team behind this app.",
-  pathname: "/contact",
-});
+  ${seoEnabled ? `pathname: "/contact",` : ``}
+${metadataClose}
 
 export default function Page() {
   return (
@@ -527,13 +540,13 @@ export default function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "terms", "page.tsx"),
       `import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 
-export const metadata: Metadata = getPageMetadata({
+${metadataFn}
   title: "Terms",
   description: "Terms of service for this app.",
-  pathname: "/terms",
-});
+  ${seoEnabled ? `pathname: "/terms",` : ``}
+${metadataClose}
 
 export default function Page() {
   return (
@@ -551,13 +564,13 @@ export default function Page() {
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "privacy", "page.tsx"),
       `import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 
-export const metadata: Metadata = getPageMetadata({
+${metadataFn}
   title: "Privacy",
   description: "Privacy policy for this app.",
-  pathname: "/privacy",
-});
+  ${seoEnabled ? `pathname: "/privacy",` : ``}
+${metadataClose}
 
 export default function Page() {
   return (

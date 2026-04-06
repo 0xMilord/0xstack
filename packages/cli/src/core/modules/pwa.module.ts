@@ -27,6 +27,21 @@ async function patchRootLayoutForPwa(projectRoot: string) {
     );
   }
 
+  // Wrap {children} with PwaProvider for PwaUpdateBanner to work across the app.
+  // Only if not already wrapped.
+  if (!src.includes("PwaProvider")) {
+    // Add import
+    src = src.replace(
+      /(import\s+"\.\/*globals\.css";)/,
+      `$1\nimport { PwaProvider } from "@/components/pwa/pwa-provider";`
+    );
+    // Wrap children - handle both `{children}` and `{ children }` patterns
+    src = src.replace(
+      /(<\/html[^>]*>)\s*\n(\s*)({children})/,
+      `$1\n$2<PwaProvider>\n$2  $3\n$2</PwaProvider>`
+    );
+  }
+
   await fs.writeFile(layoutPath, src, "utf8");
 }
 
@@ -64,6 +79,51 @@ export const pwaModule: Module = {
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "unsubscribe"));
     await ensureDir(path.join(ctx.projectRoot, "app", "api", "v1", "pwa", "push", "send"));
     await ensureDir(path.join(ctx.projectRoot, "components", "pwa"));
+
+    // PWA Provider component that wraps the app layout
+    await writeFileEnsured(
+      path.join(ctx.projectRoot, "components", "pwa", "pwa-provider.tsx"),
+      `"use client";
+
+import { useEffect, type ReactNode } from "react";
+import { registerServiceWorker } from "@/lib/pwa/register-sw.client";
+import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
+
+/**
+ * Registers the service worker on mount and renders the PWA update banner.
+ * Place this in the root layout to activate PWA features site-wide.
+ */
+export function PwaProvider({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    void registerServiceWorker();
+  }, []);
+
+  return (
+    <>
+      {children}
+      <PwaUpdateBanner />
+    </>
+  );
+}
+`
+    );
+
+    // Patch site-header to include PWA install button
+    const siteHeaderPath = path.join(ctx.projectRoot, "components", "site-header.tsx");
+    let headerSrc = await fs.readFile(siteHeaderPath, "utf8").catch(() => "");
+    if (headerSrc && !headerSrc.includes("PwaInstallButton")) {
+      // Add import
+      headerSrc = headerSrc.replace(
+        /^(import\s+\{.+\}\s+from\s+["']@\/components\/ui\/button["'];)/m,
+        `$1\nimport { PwaInstallButton } from "@/components/pwa/pwa-install-button";`
+      );
+      // Add PwaInstallButton near the end of the header content, before the closing </header>
+      headerSrc = headerSrc.replace(
+        /(<\/header>)/,
+        `<PwaInstallButton variant="ghost" size="sm" className="ml-2" />\n$1`
+      );
+      await fs.writeFile(siteHeaderPath, headerSrc, "utf8");
+    }
 
     await ensurePushTables(ctx.projectRoot);
 
@@ -268,15 +328,24 @@ export default async function Page() {
 `
     );
 
+    // P0 #3: Conditionally import from SEO module for manifest
+    const pwaSeoEnabled = ctx.modules.seo;
+    const pwaManifestImport = pwaSeoEnabled
+      ? `import { getSeoData } from "@/lib/seo/jsonld";`
+      : `// SEO disabled — use env vars directly`;
+    const pwaManifestData = pwaSeoEnabled
+      ? `const seo = getSeoData();`
+      : `const seo = { name: process.env.NEXT_PUBLIC_APP_NAME ?? "0xstack", description: process.env.NEXT_PUBLIC_APP_DESC ?? "A modern SaaS stack" };`;
+
     // Dynamic manifest that reads from env vars
     await ensureDir(path.join(ctx.projectRoot, "app", "manifest"));
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "manifest", "route.ts"),
       `import { NextResponse } from "next/server";
-import { getSeoData } from "@/lib/seo/jsonld";
+${pwaManifestImport}
 
 export async function GET() {
-  const seo = getSeoData();
+  ${pwaManifestData}
   const shortName = seo.name.substring(0, 12);
   
   return NextResponse.json({
@@ -413,7 +482,14 @@ export async function GET() {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "public", "sw.js"),
-      `const SW_VERSION = "1.0.0";
+      `// SW_VERSION is baked at build time from git commit hash or timestamp.
+// If NEXT_PUBLIC_GIT_HASH or BUILD_TIMESTAMP env vars are set, they take precedence.
+const SW_VERSION = (() => {
+  if (typeof process !== "undefined" && process.env) {
+    return process.env.NEXT_PUBLIC_GIT_HASH || process.env.BUILD_TIMESTAMP || "dev";
+  }
+  return "client";
+})();
 const CACHE_NAME = \`0xstack-v\${SW_VERSION}\`;
 const PRECACHE_ASSETS = ["/", "/manifest.webmanifest", "/offline.html"];
 
@@ -703,23 +779,24 @@ export type PushSubscriptionInput = {
 };
 
 export async function upsertPushSubscription(userId: string, sub: PushSubscriptionInput) {
-  // Drizzle doesn't have cross-db upsert helpers consistently; do a simple best-effort:
-  // delete then insert (unique on user+endpoint).
-  await db
-    .delete(pushSubscriptions)
-    .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, sub.endpoint)));
+  // Wrap DELETE+INSERT in a transaction for atomicity
+  return await db.transaction(async (tx) => {
+    await tx
+      .delete(pushSubscriptions)
+      .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, sub.endpoint)));
 
-  const rows = await db
-    .insert(pushSubscriptions)
-    .values({
-      id: crypto.randomUUID(),
-      userId,
-      endpoint: sub.endpoint,
-      p256dh: sub.keys.p256dh,
-      auth: sub.keys.auth,
-    })
-    .returning();
-  return rows[0] ?? null;
+    const rows = await tx
+      .insert(pushSubscriptions)
+      .values({
+        id: crypto.randomUUID(),
+        userId,
+        endpoint: sub.endpoint,
+        p256dh: sub.keys.p256dh,
+        auth: sub.keys.auth,
+      })
+      .returning();
+    return rows[0] ?? null;
+  });
 }
 
 export async function deletePushSubscription(userId: string, endpoint: string) {

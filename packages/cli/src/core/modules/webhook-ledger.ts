@@ -23,6 +23,7 @@ export const webhookLedgerModule: Module = {
       `import { db } from "@/lib/db";
 import { webhookEvents } from "@/lib/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { revalidate } from "@/lib/cache";
 
 export async function upsertWebhookEvent(input: {
   provider: string;
@@ -32,11 +33,19 @@ export async function upsertWebhookEvent(input: {
 }) {
   if (!input.eventId) return { inserted: false, reason: "missing_event_id" as const };
   try {
-    await db.execute(sql\`
-      insert into webhook_events (provider, event_id, event_type, payload_json)
-      values (\${input.provider}, \${input.eventId}, \${input.eventType}, \${JSON.stringify(input.payloadJson)})
-      on conflict (provider, event_id) do nothing
-    \`);
+    // Use Drizzle insert with ON CONFLICT for parameterized query
+    await db
+      .insert(webhookEvents)
+      .values({
+        provider: input.provider,
+        eventId: input.eventId,
+        eventType: input.eventType,
+        payloadJson: input.payloadJson,
+      })
+      .onConflictDoNothing();
+
+    // P2: Invalidate cache so new events appear immediately in the ledger UI
+    revalidate.webhookLedger();
     return { inserted: true as const };
   } catch {
     return { inserted: false as const, reason: "db_error" as const };
@@ -98,14 +107,20 @@ export async function webhookLedgerService_get(input: { provider: string; eventI
 export async function webhookLedgerService_replay(input: { provider: string; eventId: string }) {
   const row = await getWebhookEvent({ provider: input.provider, eventId: input.eventId });
   if (!row) return { ok: false as const, code: "not_found" as const };
+
+  // P0: Idempotency guard — skip if already replayed
+  const replayedAt = (row as any)?.replayedAt;
+  if (replayedAt) {
+    return { ok: true as const, alreadyReplayed: true as const, replayedAt };
+  }
+
   const payload = parsePayload((row as any).payloadJson);
   if (!payload) return { ok: false as const, code: "invalid_payload" as const };
 
   if (input.provider === "dodo") {
     const { reconcileBillingEvent } = await import("@/lib/services/billing.service");
     await reconcileBillingEvent(payload);
-    // Mark as replayed
-    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1 WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
+    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1, processed_at = now() WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
     revalidate.webhookLedger();
     return { ok: true as const, replayed: true as const };
   }
@@ -115,7 +130,7 @@ export async function webhookLedgerService_replay(input: { provider: string; eve
     // Stripe payloads come wrapped in an event envelope
     const stripeEvent = { provider: "stripe", type: (row as any).eventType, data: payload };
     await reconcileBillingEvent(stripeEvent);
-    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1 WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
+    await db.execute(sql\`UPDATE webhook_events SET replayed_at = now(), replay_count = replay_count + 1, processed_at = now() WHERE provider = \${input.provider} AND event_id = \${input.eventId}\`);
     revalidate.webhookLedger();
     return { ok: true as const, replayed: true as const };
   }
@@ -244,8 +259,17 @@ import { replayWebhookEventAction } from "@/lib/actions/webhook-ledger.actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 
-export default async function Page() {
-  const rows = await loadWebhookLedger({ limit: 50 });
+function formatDate(d: Date | string | null) {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export default async function Page(props: { searchParams: Promise<{ provider?: string }> }) {
+  const searchParams = await props.searchParams;
+  const provider = searchParams.provider;
+  const rows = await loadWebhookLedger({ provider, limit: 100 });
+
   return (
     <main className="mx-auto max-w-5xl space-y-6">
       <header className="space-y-2">
@@ -254,29 +278,46 @@ export default async function Page() {
       </header>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Recent events</CardTitle>
+          <div className="flex gap-2">
+            <a className={buttonVariants({ variant: provider ? "outline" : "default" }) + " text-xs"} href="/app/webhooks">All</a>
+            <a className={buttonVariants({ variant: provider === "dodo" ? "default" : "outline" }) + " text-xs"} href="/app/webhooks?provider=dodo">Dodo</a>
+            <a className={buttonVariants({ variant: provider === "stripe" ? "default" : "outline" }) + " text-xs"} href="/app/webhooks?provider=stripe">Stripe</a>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {rows.length ? (
             rows.map((r: any) => (
               <div key={r.provider + ":" + r.eventId} className="flex items-center justify-between gap-3 rounded-md border p-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium truncate">{r.provider} · {r.eventType}</p>
                   <p className="text-xs text-muted-foreground font-mono truncate">{r.eventId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Received: {formatDate(r.receivedAt)}
+                    {r.processedAt ? " · Processed: " + formatDate(r.processedAt) : ""}
+                    {r.replayedAt ? " · Replayed: " + formatDate(r.replayedAt) : ""}
+                    {r.replayCount ? " (x" + r.replayCount + ")" : ""}
+                  </p>
                 </div>
                 <form
-                  action={async () => {
+                  action={async (formData) => {
                     "use server";
                     await replayWebhookEventAction({ provider: String(r.provider), eventId: String(r.eventId) });
                   }}
                 >
-                  <button className={buttonVariants({ variant: "outline" })} type="submit">Replay</button>
+                  <button
+                    className={buttonVariants({ variant: "outline" })}
+                    type="submit"
+                    disabled={!!r.replayedAt}
+                  >
+                    {r.replayedAt ? "✓ Replayed" : "Replay"}
+                  </button>
                 </form>
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground">No events yet.</p>
+            <p className="text-muted-foreground">No events yet.{provider ? " Try a different provider filter." : ""}</p>
           )}
         </CardContent>
       </Card>

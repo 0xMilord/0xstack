@@ -80,6 +80,16 @@ export type CacheOptions<A extends any[]> = {
   revalidate: number;
 };
 
+/**
+ * Two-tier caching wrapper:
+ * - L1: In-memory LRU cache (fast, per-instance)
+ * - L2: Next.js unstable_cache (shared across requests, tag-based invalidation)
+ *
+ * Each unique key combination gets its own unstable_cache instance, memoized
+ * in a Map so that repeated calls with the same args hit the Next.js cache.
+ */
+const cacheRegistry = new Map<string, (...args: any[]) => Promise<any>>();
+
 export function withServerCache<A extends any[], T>(
   fn: (...args: A) => MaybePromise<T>,
   opt: CacheOptions<A>
@@ -89,15 +99,24 @@ export function withServerCache<A extends any[], T>(
       return await fn(...args);
     }
     const keyParts = opt.key(...args);
-    const key = stableKey(keyParts);
+    const stable = stableKey(keyParts);
 
-    const cached = unstable_cache(
-      async () => await fn(...args),
-      keyParts.map((x) => (typeof x === "string" ? x : JSON.stringify(x))),
-      { tags: opt.tags(...args), revalidate: opt.revalidate }
-    );
-
-    return await l1GetOrSet(key, cached);
+    return await l1GetOrSet(stable, async () => {
+      // Get or create a memoized unstable_cache for this specific key combination
+      let cachedFn = cacheRegistry.get(stable);
+      if (!cachedFn) {
+        const tagKey = stableKey(keyParts);
+        const tags = opt.tags(...args);
+        const revalidate = opt.revalidate;
+        cachedFn = unstable_cache(
+          async (...a: A) => fn(...a),
+          [tagKey],
+          { tags, revalidate }
+        );
+        cacheRegistry.set(stable, cachedFn);
+      }
+      return (cachedFn as (...a: A) => Promise<T>)(...args);
+    });
   };
 }
 `
@@ -105,39 +124,51 @@ export function withServerCache<A extends any[], T>(
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "cache", "revalidate.ts"),
-      `import { revalidateTag } from "next/cache";
+      `import { revalidatePath, revalidateTag } from "next/cache";
 import { cacheTags } from "@/lib/cache/config";
 
 export const revalidate = {
-  tag: (tag: string) => revalidateTag(tag, "page"),
+  tag: (tag: string) => revalidateTag(tag),
+  path: (path: string, type?: "page" | "layout") => revalidatePath(path, type),
   posts: () => {
-    revalidateTag(cacheTags.posts, "page");
+    revalidateTag(cacheTags.posts);
   },
   dashboard: (userId: string) => {
-    revalidateTag(cacheTags.dashboard, "page");
-    revalidateTag(cacheTags.dashboardUser(userId), "page");
+    revalidateTag(cacheTags.dashboard);
+    revalidateTag(cacheTags.dashboardUser(userId));
   },
   orgs: (userId: string) => {
-    revalidateTag(cacheTags.orgsForUser(userId), "page");
-    revalidateTag(cacheTags.dashboard, "page");
+    revalidateTag(cacheTags.orgsForUser(userId));
+    revalidateTag(cacheTags.dashboard);
   },
   billingForOrg: (orgId: string) => {
-    revalidateTag(cacheTags.billingOrg(orgId), "page");
+    revalidateTag(cacheTags.billingOrg(orgId));
   },
   assetsForOrg: (orgId: string) => {
-    revalidateTag(cacheTags.assetsOrg(orgId), "page");
+    revalidateTag(cacheTags.assetsOrg(orgId));
   },
   domainOrg: (domainPlural: string, orgId: string) => {
-    revalidateTag(cacheTags.domainOrg(domainPlural, orgId), "page");
+    revalidateTag(cacheTags.domainOrg(domainPlural, orgId));
   },
   apiKeysForOrg: (orgId: string) => {
-    revalidateTag(cacheTags.apiKeysOrg(orgId), "page");
+    revalidateTag(cacheTags.apiKeysOrg(orgId));
   },
   pwaForUser: (userId: string) => {
-    revalidateTag(cacheTags.pushSubsUser(userId), "page");
+    revalidateTag(cacheTags.pushSubsUser(userId));
   },
   webhookLedger: () => {
-    revalidateTag(cacheTags.webhookLedger, "page");
+    revalidateTag(cacheTags.webhookLedger);
+  },
+  /** Invalidate all org-scoped caches at once. */
+  allForOrg: (orgId: string) => {
+    revalidate.billingForOrg(orgId);
+    revalidate.assetsForOrg(orgId);
+    revalidate.apiKeysForOrg(orgId);
+    // Domain caches use the orgId tag pattern; revalidate the dashboard too
+    revalidateTag(cacheTags.dashboard);
+  },
+  viewer: () => {
+    revalidateTag(cacheTags.viewer);
   },
 } as const;
 `

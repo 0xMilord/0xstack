@@ -373,12 +373,21 @@ export function getPostCanonicalUrl(input: { baseUrl: string; slug: string; cano
     await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]"));
     await ensureDir(path.join(ctx.projectRoot, "app", "blog", "[slug]", "opengraph-image"));
     await backupAndRemove(ctx.projectRoot, "app/blog/[slug]/opengraph-image/route.ts");
+    // P0 #3: Conditionally import from SEO module
+    const seoEnabled = ctx.modules.seo;
+    const blogSeoImport = seoEnabled
+      ? `import { getSiteUrl } from "@/lib/seo/metadata";`
+      : `// SEO disabled — inline fallback`;
+    const blogCanonical = seoEnabled
+      ? `getSiteUrl("/blog")`
+      : `\`(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") + "/blog"\``;
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "blog", "page.tsx"),
       `import type { Metadata } from "next";
 import Link from "next/link";
 import { listPosts } from "@/lib/loaders/blog.loader";
-import { getSiteUrl } from "@/lib/seo/metadata";
+${blogSeoImport}
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -390,7 +399,7 @@ export const metadata: Metadata = {
   title: "Blog",
   description: "Insights on building with 0xstack — architecture, best practices, and vibecoding.",
   openGraph: { title: "Blog", description: "Insights on building with 0xstack." },
-  alternates: { canonical: getSiteUrl("/blog") },
+  alternates: { canonical: ${blogCanonical} },
 };
 
 export default async function Page() {
@@ -461,6 +470,14 @@ export default async function Page() {
 `
     );
 
+    const blogPostSeoImport = seoEnabled
+      ? `import { safeJsonLd, articleJsonLd } from "@/lib/seo/jsonld";`
+      : `// SEO disabled — inline JSON-LD fallback
+function safeJsonLd(obj: any) { return JSON.stringify(obj); }
+function articleJsonLd(input: { headline: string; description: string; datePublished: string; dateModified: string; url: string; author: string }) {
+  return { "@context": "https://schema.org", "@type": "Article", headline: input.headline, description: input.description, datePublished: input.datePublished, dateModified: input.dateModified, url: input.url, author: { "@type": "Person", name: input.author } };
+}`;
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "blog", "[slug]", "page.tsx"),
       `import { notFound } from "next/navigation";
@@ -469,7 +486,7 @@ import remarkGfm from "remark-gfm";
 import remarkToc from "remark-toc";
 import { env } from "@/lib/env/server";
 import { getPost, getPostCanonicalUrl, listPosts } from "@/lib/loaders/blog.loader";
-import { safeJsonLd, articleJsonLd } from "@/lib/seo/jsonld";
+${blogPostSeoImport}
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -487,15 +504,34 @@ function readingTime(content: string) {
 
 function extractHeadings(content: string) {
   const headings: { level: number; text: string; id: string }[] = [];
-  const regex = /^#{1,6}\\s+(.+)$/gm;
-  let match;
-  while ((match = regex.exec(content)) !== null) {
-    const level = match[0].indexOf(" ");
-    const text = match[1];
-    const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    headings.push({ level, text, id });
+  const lines = content.split("\\n");
+  let inFence = false;
+  const headingRegex = /^(#{1,6})\\s+(.+)$/;
+
+  for (const line of lines) {
+    // Track fence state (\`\`\` or ~~~ blocks)
+    if (/^(\`\`\`|~~~)/.test(line.trim())) {
+      inFence = !inFence;
+      continue;
+    }
+    // Skip headings inside fenced code blocks
+    if (inFence) continue;
+
+    const match = headingRegex.exec(line);
+    if (match) {
+      const level = match[1].length;
+      const text = match[2];
+      const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      headings.push({ level, text, id });
+    }
   }
   return headings.slice(0, 10); // Limit to 10 headings
+}
+
+/** Read MDX files at build time and generate static paths for all published posts. */
+export async function generateStaticParams() {
+  const posts = await listPosts();
+  return posts.map((post) => ({ slug: post.slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {

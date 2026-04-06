@@ -31,7 +31,8 @@ export type ModuleContext = {
     email: false | "resend";
     cache: boolean;
     pwa: boolean;
-    observability: { sentry: boolean; otel: boolean };
+    // P0 #11: Removed otel — was phantom feature (zero implementation)
+    observability: { sentry: boolean };
     jobs: { enabled: boolean; driver: "inngest" | "cron-only" };
   };
 };

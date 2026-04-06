@@ -415,6 +415,16 @@ export async function GET(req: NextRequest) {
 `
     );
 
+    // P0 #3: Conditionally generate SEO-dependent pages
+    const seoEnabled = ctx.modules.seo;
+    const metadataImport = seoEnabled
+      ? `import { getPageMetadata } from "@/lib/seo/metadata";`
+      : `// SEO module disabled`;
+    const metadataFn = seoEnabled
+      ? `getPageMetadata({`
+      : `{`;
+    const metadataClose = seoEnabled ? `});` : `};`;
+
     await writeFileEnsured(
       path.join(ctx.projectRoot, "app", "pricing", "page.tsx"),
       `import Link from "next/link";
@@ -423,15 +433,15 @@ import { cookies } from "next/headers";
 import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
 import { getBillingPlans } from "@/lib/billing/plans";
 import { startCheckoutAction } from "@/lib/actions/billing.actions";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata: Metadata = getPageMetadata({
+export const metadata: Metadata = ${metadataFn}
   title: "Pricing",
   description: "Plans and pricing. Start a subscription and manage billing from your dashboard.",
-  pathname: "/pricing",
-});
+  ${seoEnabled ? `pathname: "/pricing",` : ``}
+${metadataClose}
 
 export default async function Page() {
   const orgId = getActiveOrgIdFromCookies(await cookies());
@@ -484,16 +494,85 @@ export default async function Page() {
       path.join(ctx.projectRoot, "app", "billing", "success", "page.tsx"),
       `import Link from "next/link";
 import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 import { buttonVariants } from "@/components/ui/button";
+import { upsertBillingCustomer, upsertBillingSubscription } from "@/lib/repos/billing.repo";
+import { requireAuth } from "@/lib/auth/server";
+import { getActiveOrgIdFromCookies } from "@/lib/orgs/active-org";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = getPageMetadata({
+export const metadata: Metadata = ${metadataFn}
   title: "Billing success",
   description: "Your checkout completed successfully.",
-  pathname: "/billing/success",
-});
+  ${seoEnabled ? `pathname: "/billing/success",` : ``}
+${metadataClose}
 
-export default function Page() {
+/**
+ * After Dodo checkout, the returnUrl contains orgId and userId query params.
+ * We capture these here and store them in the DB so the billing record is
+ * linked even if the webhook arrives before reconciliation can resolve the org.
+ */
+async function captureCheckoutResult(searchParams: { orgId?: string; userId?: string; planId?: string }) {
+  const viewer = await requireAuth();
+  const orgId = searchParams.orgId ?? getActiveOrgIdFromCookies(await cookies());
+  const userId = searchParams.userId ?? viewer.userId;
+
+  if (!orgId) return { ok: false as const, reason: "no_org" };
+
+  // Verify the current user matches the userId in the returnUrl
+  if (orgId && userId && userId !== viewer.userId) {
+    return { ok: false as const, reason: "user_mismatch" };
+  }
+
+  try {
+    const { getActiveOrgIdFromCookies } = await import("@/lib/orgs/active-org");
+    const { requireAuth } = await import("@/lib/auth/server");
+
+    // If orgId was passed in the URL, store it directly
+    // This ensures the subscription is linked even before webhook reconciliation
+    if (searchParams.planId) {
+      const plansModule = await import("@/lib/billing/plans");
+      const plans = plansModule.getBillingPlans();
+      const plan = plans.find((p: any) => p.id === searchParams.planId);
+      if (plan) {
+        // Create a placeholder subscription row so billing page shows something
+        await upsertBillingSubscription({
+          provider: "dodo",
+          providerSubscriptionId: "pending_webhook_" + Date.now(),
+          status: "pending",
+          planId: plan.priceId,
+          orgId,
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: null,
+        });
+      }
+    }
+  } catch {
+    // Best-effort — webhook reconciliation will fill in the real data
+  }
+
+  return { ok: true as const, orgId };
+}
+
+export default async function Page(props: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const searchParams = await props.searchParams;
+  const result = await captureCheckoutResult(searchParams);
+
+  if (!result.ok) {
+    return (
+      <main className="mx-auto max-w-3xl p-6 space-y-4">
+        <h1 className="text-2xl font-semibold text-destructive">Could not confirm org context</h1>
+        <p className="text-sm text-muted-foreground">
+          Your subscription will activate once the webhook is reconciled. Go to billing to check status.
+        </p>
+        <div className="flex gap-2">
+          <Link className={buttonVariants({ variant: "default" })} href="/app/billing">Go to billing</Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Payment successful</h1>
@@ -512,14 +591,14 @@ export default function Page() {
       path.join(ctx.projectRoot, "app", "billing", "cancel", "page.tsx"),
       `import Link from "next/link";
 import type { Metadata } from "next";
-import { getPageMetadata } from "@/lib/seo/metadata";
+${metadataImport}
 import { buttonVariants } from "@/components/ui/button";
 
-export const metadata: Metadata = getPageMetadata({
+export const metadata: Metadata = ${metadataFn}
   title: "Billing canceled",
   description: "Checkout was canceled. You can restart it any time.",
-  pathname: "/billing/cancel",
-});
+  ${seoEnabled ? `pathname: "/billing/cancel",` : ``}
+${metadataClose}
 
 export default function Page() {
   return (

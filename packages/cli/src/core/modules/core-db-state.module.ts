@@ -47,7 +47,7 @@ export function getActiveOrgIdFromCookies(cookieStore: { get: (name: string) => 
  * Set active org cookie on response. Use in server actions after org selection.
  */
 export function setActiveOrgCookie(response: Response, orgId: string) {
-  response.headers.set("Set-Cookie", \`\${ACTIVE_ORG_COOKIE}=\${orgId}; HttpOnly; SameSite=Lax; Path=/\`);
+  response.headers.set("Set-Cookie", \`\${ACTIVE_ORG_COOKIE}=\${orgId}; HttpOnly; Secure; SameSite=Lax; Path=/\`);
 }
 
 /**
@@ -459,7 +459,7 @@ export async function createOrg(input: unknown) {
   const data = createOrgInput.parse(input);
   const org = await orgsService_createForUser({ userId: viewer.userId, name: data.name });
   const c = await cookies();
-  c.set(ACTIVE_ORG_COOKIE, String(org?.id ?? ""), { httpOnly: true, sameSite: "lax", path: "/" });
+  c.set(ACTIVE_ORG_COOKIE, String(org?.id ?? ""), { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
   revalidate.orgs(viewer.userId);
   revalidatePath("/app/orgs");
   revalidatePath("/app");
@@ -470,7 +470,7 @@ export async function setActiveOrg(input: { orgId: string }) {
   const viewer = await requireAuth();
   await orgsService_assertMember({ userId: viewer.userId, orgId: input.orgId });
   const c = await cookies();
-  c.set(ACTIVE_ORG_COOKIE, String(input.orgId), { httpOnly: true, sameSite: "lax", path: "/" });
+  c.set(ACTIVE_ORG_COOKIE, String(input.orgId), { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
   revalidate.orgs(viewer.userId);
   revalidate.billingForOrg(input.orgId);
   revalidate.assetsForOrg(input.orgId);

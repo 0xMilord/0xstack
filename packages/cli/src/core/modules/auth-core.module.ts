@@ -66,7 +66,12 @@ export const auth = betterAuth({
           try {
             const { sendWelcomeEmail } = await import("@/lib/email/auth-emails");
             if (sendWelcomeEmail) {
-              await sendWelcomeEmail(user.email, user.name);
+              const { env } = await import("@/lib/env/server");
+              await sendWelcomeEmail({
+                to: user.email,
+                userName: user.name ?? "there",
+                dashboardUrl: env.NEXT_PUBLIC_APP_URL + "/app",
+              });
             }
           } catch {
             // Email module not enabled — no welcome email

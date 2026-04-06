@@ -20,7 +20,7 @@ export const securityApiModule: Module = {
       path.join(ctx.projectRoot, "lib", "repos", "api-keys.repo.ts"),
       `import { db } from "@/lib/db";
 import { apiKeys } from "@/lib/db/schema";
-import { eq, isNull, and, desc, sql } from "drizzle-orm";
+import { eq, isNull, and, desc } from "drizzle-orm";
 
 export async function findActiveApiKeysByPrefix(prefix: string) {
   return await db
@@ -39,25 +39,30 @@ export async function listActiveApiKeysForOrg(orgId: string) {
     .limit(200);
 }
 
-export async function insertApiKey(input: { id: string; orgId: string; name: string; prefix: string; hash: string }) {
+export async function insertApiKey(input: { id: string; orgId: string; name: string; prefix: string; hash: string; createdBy?: string }) {
   const rows = await db
     .insert(apiKeys)
-    .values({ id: input.id, orgId: input.orgId, name: input.name, prefix: input.prefix, hash: input.hash })
+    .values({ id: input.id, orgId: input.orgId, name: input.name, prefix: input.prefix, hash: input.hash, createdBy: input.createdBy })
     .returning();
   return rows[0] ?? null;
 }
 
-export async function revokeApiKey(input: { id: string; orgId: string }) {
-  await db.execute(sql\`
-    update api_keys set revoked_at = now()
-    where id = \${input.id} and org_id = \${input.orgId} and revoked_at is null
-  \`);
+export async function revokeApiKey(input: { id: string; orgId: string; revokedBy?: string }) {
+  const rows = await db
+    .update(apiKeys)
+    .set({ revokedAt: new Date(), revokedBy: input.revokedBy })
+    .where(and(eq(apiKeys.id, input.id), eq(apiKeys.orgId, input.orgId), isNull(apiKeys.revokedAt)))
+    .returning();
+  return rows[0] ?? null;
 }
 `
     );
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "services", "api-keys.service.ts"),
       `import crypto from "node:crypto";
+import { db } from "@/lib/db";
+import { apiKeys } from "@/lib/db/schema";
+import { eq, isNull, and } from "drizzle-orm";
 import { findActiveApiKeysByPrefix, insertApiKey, listActiveApiKeysForOrg, revokeApiKey } from "@/lib/repos/api-keys.repo";
 
 function sha256Hex(input: string) {
@@ -80,26 +85,31 @@ export async function verifyApiKey(key: string): Promise<boolean> {
   if (!prefix || prefix.length < 4) return false;
   const candidates = await findActiveApiKeysByPrefix(prefix);
   const hash = sha256Hex(key);
-  return candidates.some((c: any) => typeof c.hash === "string" && safeEqual(c.hash, hash));
+  const match = candidates.find((c: any) => typeof c.hash === "string" && safeEqual(c.hash, hash));
+  if (match) {
+    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(and(eq(apiKeys.id, match.id), isNull(apiKeys.revokedAt)));
+    return true;
+  }
+  return false;
 }
 
 export async function apiKeysService_listForOrg(orgId: string) {
   return await listActiveApiKeysForOrg(orgId);
 }
 
-export async function apiKeysService_createForOrg(input: { orgId: string; name: string }) {
+export async function apiKeysService_createForOrg(input: { orgId: string; name: string; createdBy?: string }) {
   const id = crypto.randomUUID();
   // 0xstack_<prefix>.<secret>
   const secret = crypto.randomBytes(24).toString("base64url");
   const prefix = crypto.randomBytes(4).toString("hex"); // 8 chars
   const key = \`0xstack_\${prefix}.\${secret}\`;
   const hash = sha256Hex(key);
-  const row = await insertApiKey({ id, orgId: input.orgId, name: input.name, prefix, hash });
+  const row = await insertApiKey({ id, orgId: input.orgId, name: input.name, prefix, hash, createdBy: input.createdBy });
   return { row, key };
 }
 
-export async function apiKeysService_revokeForOrg(input: { orgId: string; id: string }) {
-  await revokeApiKey({ orgId: input.orgId, id: input.id });
+export async function apiKeysService_revokeForOrg(input: { orgId: string; id: string; revokedBy?: string }) {
+  await revokeApiKey({ orgId: input.orgId, id: input.id, revokedBy: input.revokedBy });
 }
 `
     );
@@ -159,6 +169,10 @@ export async function guardApiRequest(
     return;
   }
 
+  // WARNING: In-memory rate limiter is not shared across instances and resets on redeploy.
+  // Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for durable, cross-instance rate limiting.
+  console.warn("[rate-limit] Falling back to in-memory rate limiter (not shared across instances; resets on redeploy). Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for durable rate limiting.");
+
   const bucketKey = keyFromRequest(req);
   const now = Date.now();
   const b = buckets.get(bucketKey);
@@ -202,12 +216,12 @@ export function toApiErrorResponse(err: unknown, requestId: string) {
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "loaders", "api-keys.loader.ts"),
-      `import { cache } from \"react\";\nimport { cookies } from \"next/headers\";\nimport { withServerCache, CACHE_TTL, cacheTags } from \"@/lib/cache\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { apiKeysService_listForOrg } from \"@/lib/services/api-keys.service\";\n\nconst loadApiKeysOrgCached = withServerCache(\n  async (orgId: string) => await apiKeysService_listForOrg(orgId),\n  {\n    key: (orgId: string) => [\"api-keys\", \"org\", orgId],\n    tags: (orgId: string) => [cacheTags.apiKeysOrg(orgId)],\n    revalidate: CACHE_TTL.DASHBOARD,\n  }\n);\n\nexport const loadApiKeysForActiveOrg = cache(async () => {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) return { orgId: null, keys: [] as any[] };\n  // membership is enforced by the workspace layout guard; this is read-model only.\n  return { orgId, keys: await loadApiKeysOrgCached(orgId), viewer };\n});\n`
+      `import { cache } from \"react\";\nimport { cookies } from \"next/headers\";\nimport { withServerCache, CACHE_TTL, cacheTags } from \"@/lib/cache\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { orgsService_assertMember } from \"@/lib/services/orgs.service\";\nimport { apiKeysService_listForOrg } from \"@/lib/services/api-keys.service\";\n\nconst loadApiKeysOrgCached = withServerCache(\n  async (orgId: string) => await apiKeysService_listForOrg(orgId),\n  {\n    key: (orgId: string) => [\"api-keys\", \"org\", orgId],\n    tags: (orgId: string) => [cacheTags.apiKeysOrg(orgId)],\n    revalidate: CACHE_TTL.DASHBOARD,\n  }\n);\n\nexport const loadApiKeysForActiveOrg = cache(async () => {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) return { orgId: null, keys: [] as any[], viewer };\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  return { orgId, keys: await loadApiKeysOrgCached(orgId), viewer };\n});\n`
     );
 
     await writeFileEnsured(
       path.join(ctx.projectRoot, "lib", "actions", "api-keys.actions.ts"),
-      `"use server";\n\nimport { cookies } from \"next/headers\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { orgsService_assertMember } from \"@/lib/services/orgs.service\";\nimport { revalidate } from \"@/lib/cache\";\nimport { createApiKeyInput, revokeApiKeyInput } from \"@/lib/rules/api-keys.rules\";\nimport { apiKeysService_createForOrg, apiKeysService_revokeForOrg } from \"@/lib/services/api-keys.service\";\n\nexport async function createApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = createApiKeyInput.parse(input);\n  const created = await apiKeysService_createForOrg({ orgId, name: data.name });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const, created };\n}\n\nexport async function revokeApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertMember({ userId: viewer.userId, orgId });\n  const data = revokeApiKeyInput.parse(input);\n  await apiKeysService_revokeForOrg({ orgId, id: data.id });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const };\n}\n`
+      `"use server";\n\nimport { cookies } from \"next/headers\";\nimport { requireAuth } from \"@/lib/auth/server\";\nimport { getActiveOrgIdFromCookies } from \"@/lib/orgs/active-org\";\nimport { orgsService_assertRoleAtLeast } from \"@/lib/services/orgs.service\";\nimport { revalidate } from \"@/lib/cache\";\nimport { createApiKeyInput, revokeApiKeyInput } from \"@/lib/rules/api-keys.rules\";\nimport { apiKeysService_createForOrg, apiKeysService_revokeForOrg } from \"@/lib/services/api-keys.service\";\n\nexport async function createApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertRoleAtLeast({ userId: viewer.userId, orgId, atLeast: \"admin\" });\n  const data = createApiKeyInput.parse(input);\n  const created = await apiKeysService_createForOrg({ orgId, name: data.name, createdBy: viewer.userId });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const, created };\n}\n\nexport async function revokeApiKeyAction(input: unknown) {\n  const viewer = await requireAuth();\n  const orgId = getActiveOrgIdFromCookies(await cookies());\n  if (!orgId) throw new Error(\"no_active_org\");\n  await orgsService_assertRoleAtLeast({ userId: viewer.userId, orgId, atLeast: \"admin\" });\n  const data = revokeApiKeyInput.parse(input);\n  await apiKeysService_revokeForOrg({ orgId, id: data.id, revokedBy: viewer.userId });\n  revalidate.dashboard(viewer.userId);\n  revalidate.apiKeysForOrg(orgId);\n  return { ok: true as const };\n}\n`
     );
 
     await writeFileEnsured(

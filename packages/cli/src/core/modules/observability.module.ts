@@ -166,9 +166,46 @@ export const logger = {
 
     // Sentry SDK init files (only when enabled in config).
     if (ctx.modules.observability?.sentry) {
+      // P0 #12: Sentry middleware for automatic error capture in API routes
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "lib", "sentry", "middleware.ts"),
+        `import * as Sentry from "@sentry/nextjs";
+
+/**
+ * Wrap an API route handler with Sentry error capture and request context.
+ * Automatically sets request ID, tags, and captures unhandled errors.
+ */
+export function withSentry<T extends (...args: any[]) => Promise<any>>(handler: T): T {
+  return (async (...args: Parameters<T>) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      Sentry.captureException(error);
+      throw error;
+    }
+  }) as T;
+}
+
+/**
+ * Set Sentry request context (used in instrumentation and API routes).
+ */
+export function setSentryRequestContext(req: Request) {
+  const url = new URL(req.url);
+  Sentry.setContext("request", {
+    method: req.method,
+    url: url.pathname + url.search,
+    host: url.host,
+  });
+  Sentry.setTag("route", url.pathname);
+}
+`
+      );
+
       await writeFileEnsured(
         path.join(ctx.projectRoot, "instrumentation.ts"),
-        `export async function register() {
+        `import * as Sentry from "@sentry/nextjs";
+
+export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
   }
@@ -176,6 +213,9 @@ export const logger = {
     await import("./sentry.edge.config");
   }
 }
+
+// P0 #12: Global error handler for uncaught exceptions
+export const onRequestError = Sentry.captureRequestError;
 `
       );
       await writeFileEnsured(
@@ -186,6 +226,12 @@ export const logger = {
   tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
   profilesSampleRate: Number(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? 0),
   enabled: process.env.NODE_ENV === "production",
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
 });
 `
       );
@@ -207,6 +253,31 @@ export const logger = {
   dsn: process.env.SENTRY_DSN,
   tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
   enabled: process.env.NODE_ENV === "production",
+});
+`
+      );
+
+      // P0 #13: Wrap next.config.ts with withSentryConfig for source map uploads
+      await ensureDir(path.join(ctx.projectRoot));
+      await writeFileEnsured(
+        path.join(ctx.projectRoot, "next.config.ts"),
+        `import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
+
+const nextConfig: NextConfig = {
+  // Your Next.js config here
+};
+
+// P0 #13: Wrap with Sentry for source map upload and automatic error capture
+export default withSentryConfig(nextConfig, {
+  // Upload source maps to Sentry during build
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  // Automatically annotate errors with org + project
+  org: process.env.SENTRY_ORG ?? "0xstack",
+  project: process.env.SENTRY_PROJECT ?? "0xstack-app",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
 });
 `
       );

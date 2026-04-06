@@ -21,7 +21,9 @@ export function expectedDepsForConfig(cfg: MilordConfig) {
   if (cfg.modules.storage === "s3") deps.push("@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner");
   if (cfg.modules.storage === "supabase") deps.push("@supabase/supabase-js");
   if (cfg.modules.email === "resend") deps.push("resend", "@react-email/components", "@react-email/render");
-  if (cfg.modules.cache) deps.push("lru-cache");
+  // lru-cache is ALWAYS installed because the cache module unconditionally generates lib/cache/
+  // If cache module is disabled, OXSTACK_CACHE_DISABLED=1 bypasses the LRU at runtime.
+  deps.push("lru-cache");
   if (cfg.modules.pwa) {
     deps.push("web-push", "idb");
     devDeps.push("@types/web-push");

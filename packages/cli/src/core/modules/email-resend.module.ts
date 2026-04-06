@@ -8,42 +8,77 @@ async function patchAuthForEmail(projectRoot: string) {
   const authPath = path.join(projectRoot, "lib", "auth", "auth.ts");
   let src = await fs.readFile(authPath, "utf8");
   if (!src.includes("betterAuth({")) return;
-  if (src.includes("sendVerifyEmail") && src.includes("sendResetPasswordEmail")) return;
 
+  // Guard: if already patched with all 3 email imports, skip
+  if (src.includes("sendVerifyEmail") && src.includes("sendResetPasswordEmail") && src.includes("sendWelcomeEmail")) return;
+
+  // 1. Add email imports (only if not already present)
   if (!src.includes('from "@/lib/email/auth-emails"')) {
+    // Insert after the "@/lib/env/server" import line
     src = src.replace(
-      /import \{ env \} from ["']@\/lib\/env\/server["'];\s*/,
-      `import { env } from "@/lib/env/server";\nimport { sendResetPasswordEmail, sendVerifyEmail } from "@/lib/email/auth-emails";\n`
+      /(import\s*\{\s*env\s*\}\s*from\s*["']@\/lib\/env\/server["'];)/,
+      `$1\nimport { sendResetPasswordEmail, sendVerifyEmail, sendWelcomeEmail } from "@/lib/email/auth-emails";`
+    );
+  } else {
+    // Import line exists but may be missing sendWelcomeEmail
+    src = src.replace(
+      /(import\s*\{[^}]*)\bfrom\s*["']@\/lib\/email\/auth-emails["'])/,
+      (match, imports) => {
+        if (!imports.includes("sendWelcomeEmail")) {
+          // Add sendWelcomeEmail to the import list
+          return imports.replace(/\}$/, ", sendWelcomeEmail }") + ' from "@/lib/email/auth-emails"';
+        }
+        return match;
+      }
     );
   }
 
-  src = src.replace(
-    /emailAndPassword:\s*\{\s*\n\s*enabled:\s*true,\s*\n\s*\},/m,
-    `emailAndPassword: {
-    enabled: true,
+  // 2. Patch emailAndPassword block — add sendResetPassword callback
+  if (!src.includes("sendResetPassword({ user, url }")) {
+    src = src.replace(
+      /(emailAndPassword\s*:\s*\{[\s\S]*?enabled\s*:\s*true\s*,?)(\s*\})/,
+      `$1
     async sendResetPassword({ user, url }) {
       await sendResetPasswordEmail({
         to: user.email,
         userName: (user as any)?.name ?? user.email,
         resetLink: url,
       });
-    },
-  },`
-  );
+    },$2`
+    );
+  }
 
-  src = src.replace(
-    /emailVerification:\s*\{\s*\n\s*sendOnSignUp:\s*true,\s*\n\s*\},/m,
-    `emailVerification: {
-    sendOnSignUp: true,
+  // 3. Patch emailVerification block — add sendVerificationEmail callback
+  if (!src.includes("sendVerificationEmail({ user, url }")) {
+    src = src.replace(
+      /(emailVerification\s*:\s*\{[\s\S]*?sendOnSignUp\s*:\s*true\s*,?)(\s*\})/,
+      `$1
     async sendVerificationEmail({ user, url }) {
       await sendVerifyEmail({
         to: user.email,
         userName: (user as any)?.name ?? user.email,
         verificationUrl: url,
       });
-    },
-  },`
-  );
+    },$2`
+    );
+  }
+
+  // 4. Verify patching succeeded (P0 #15 — fail loudly if patches didn't apply)
+  const checks = [
+    { name: "sendResetPasswordEmail", test: src.includes("sendResetPassword(") },
+    { name: "sendVerifyEmail", test: src.includes("sendVerifyEmail(") },
+    { name: "sendWelcomeEmail import", test: src.includes("sendWelcomeEmail") },
+  ];
+  const failed = checks.filter(c => !c.test);
+  if (failed.length > 0) {
+    console.error(`[email-resend] Auth patching failed for: ${failed.map(c => c.name).join(", ")}`);
+    console.error("[email-resend] Auth content snippet:");
+    console.error(src.substring(0, 500));
+    throw new Error(
+      `[email-resend] Failed to patch auth.ts for: ${failed.map(c => c.name).join(", ")}. ` +
+      "Check that auth-core module ran first and auth.ts has expected formatting."
+    );
+  }
 
   await fs.writeFile(authPath, src, "utf8");
 }
@@ -130,16 +165,21 @@ export function getResend() {
 }
 
 export async function sendResendEmail(input: { to: string; subject: string; html: string; text?: string }) {
-  const resend = getResend();
-  if (!env.RESEND_FROM) throw new Error("Missing RESEND_FROM");
-  const res = await resend.emails.send({
-    from: env.RESEND_FROM,
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  });
-  return res;
+  try {
+    const resend = getResend();
+    if (!env.RESEND_FROM) throw new Error("Missing RESEND_FROM");
+    const res = await resend.emails.send({
+      from: env.RESEND_FROM,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+    return { success: true as const, data: res };
+  } catch (error) {
+    console.error("[resend] sendResendEmail error:", error);
+    return { success: false as const, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 `
     );
@@ -513,12 +553,15 @@ export async function sendVerifyEmail(input: { to: string; userName: string; ver
   const html = await render(
     VerifyEmailTemplate({ appName: appName(), userName: input.userName, verificationUrl: input.verificationUrl })
   );
-  await sendResendEmail({
+  const res = await sendResendEmail({
     to: input.to,
     subject: \`Verify your email for \${appName()}\`,
     html,
     text,
   });
+  if (!res.success) {
+    console.error("[auth-emails] sendVerifyEmail failed:", res.error);
+  }
 }
 
 export async function sendResetPasswordEmail(input: { to: string; userName: string; resetLink: string }) {
@@ -535,12 +578,15 @@ export async function sendResetPasswordEmail(input: { to: string; userName: stri
   const html = await render(
     ResetPasswordTemplate({ appName: appName(), userName: input.userName, resetLink: input.resetLink })
   );
-  await sendResendEmail({
+  const res = await sendResendEmail({
     to: input.to,
     subject: \`Reset your password for \${appName()}\`,
     html,
     text,
   });
+  if (!res.success) {
+    console.error("[auth-emails] sendResetPasswordEmail failed:", res.error);
+  }
 }
 
 export async function sendWelcomeEmail(input: { to: string; userName: string; dashboardUrl: string }) {
@@ -559,12 +605,15 @@ export async function sendWelcomeEmail(input: { to: string; userName: string; da
   const html = await render(
     WelcomeEmailTemplate({ appName: appName(), userName: input.userName, dashboardUrl: input.dashboardUrl })
   );
-  await sendResendEmail({
+  const res = await sendResendEmail({
     to: input.to,
     subject: \`Welcome to \${appName()}! Let's get started 🎉\`,
     html,
     text,
   });
+  if (!res.success) {
+    console.error("[auth-emails] sendWelcomeEmail failed:", res.error);
+  }
 }
 `
     );

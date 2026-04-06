@@ -81,7 +81,11 @@ export async function ensureApiKeysTable(projectRoot: string) {
   prefix: text("prefix").notNull(),
   hash: text("hash").notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdBy: text("created_by"),
+  revokedBy: text("revoked_by"),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });`
   );
 }

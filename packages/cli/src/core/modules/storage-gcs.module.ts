@@ -47,15 +47,19 @@ function getStorage() {
   return _gcsStorage;
 }
 
-export async function providerSignUpload(input: { objectKey: string; contentType: string }): Promise<ProviderSignUploadResult> {
+export async function providerSignUpload(input: { objectKey: string; contentType: string; maxBytes?: number }): Promise<ProviderSignUploadResult> {
   const storage = getStorage();
   const bucket = storage.bucket(env.GCS_BUCKET!);
   const file = bucket.file(input.objectKey);
+  const maxBytes = input.maxBytes ?? 50 * 1024 * 1024; // Default 50MB
   const [uploadUrl] = await file.getSignedUrl({
     version: "v4",
     action: "write",
     expires: Date.now() + 15 * 60 * 1000,
     contentType: input.contentType,
+    extensionHeaders: {
+      "x-goog-content-length-range": `0,${maxBytes}`,
+    },
   });
   return { uploadUrl, headers: { "Content-Type": input.contentType } };
 }
