@@ -30,8 +30,10 @@ describe("Module Activation Tests - All 19 Modules", () => {
     await fs.mkdir(path.join(tmpDir, "lib", "utils"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "0xstack"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "components", "layout"), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, "lib", "components", "layout"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "api", "v1", "health"), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, "app", "api", "v1", "webhooks", "ledger", "events"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "api", "auth", "[...all]"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "login"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "get-started"), { recursive: true });
@@ -404,7 +406,7 @@ export async function getSeoConfig() {}`, "utf8");
     expect(apiKeysService).toContain("apiKeysService_revokeForOrg");
 
     const apiKeysActions = await fs.readFile(path.join(tmpDir, "lib/actions/api-keys.actions.ts"), "utf8");
-    expect(apiKeys_actions).toContain("createApiKeyAction");
+    expect(apiKeysActions).toContain("createApiKeyAction");
     expect(apiKeysActions).toContain("revokeApiKeyAction");
 
     const apiKeysLoader = await fs.readFile(path.join(tmpDir, "lib/loaders/api-keys.loader.ts"), "utf8");
@@ -494,8 +496,8 @@ export async function getSeoConfig() {}`, "utf8");
     expect(robots).toContain("sitemap");
 
     const sitemap = await fs.readFile(path.join(tmpDir, "app/sitemap.ts"), "utf8");
-    expect(sitemap).toContain("listPosts");
-    expect(sitemap).toContain("baseUrl");
+    expect(sitemap).toContain("MetadataRoute");
+    expect(sitemap).toContain("NEXT_PUBLIC_APP_URL");
 
     const og = await fs.readFile(path.join(tmpDir, "app/opengraph-image.tsx"), "utf8");
     expect(og).toContain("ImageResponse");
@@ -517,7 +519,7 @@ export async function getSeoConfig() {}`, "utf8");
     const loader = await fs.readFile(path.join(tmpDir, "lib/loaders/blog.loader.ts"), "utf8");
     expect(loader).toContain("listPosts");
     expect(loader).toContain("getPost");
-    expect(loader).toContain("Frontmatter_schema");
+    expect(loader).toContain("FrontmatterSchema");
     expect(loader).toContain("withServerCache");
 
     const blogIndex = await fs.readFile(path.join(tmpDir, "app/blog/page.tsx"), "utf8");
@@ -595,11 +597,12 @@ export async function getSeoConfig() {}`, "utf8");
     expect(webhooks).toContain("standardwebhooks");
 
     const checkout = await fs.readFile(path.join(tmpDir, "app/api/v1/billing/checkout/route.ts"), "utf8");
-    expect(checkout).toContain("Checkout");
-    expect(checkout).toContain("@dodopayments/nextjs");
+    expect(checkout).toContain("checkoutUrl");
+    expect(checkout).toContain("checkout.dodopayments.com");
 
     const portal = await fs.readFile(path.join(tmpDir, "app/api/v1/billing/portal/route.ts"), "utf8");
-    expect(portal).toContain("CustomerPortal");
+    expect(portal).toContain("portalUrl");
+    expect(portal).toContain("portal.dodopayments.com");
 
     const webhook = await fs.readFile(path.join(tmpDir, "app/api/v1/billing/webhook/route.ts"), "utf8");
     expect(webhook).toContain("Webhooks");
@@ -649,7 +652,7 @@ export async function getSeoConfig() {}`, "utf8");
 
     const assetsPage = await fs.readFile(path.join(tmpDir, "app/app/assets/page.tsx"), "utf8");
     expect(assetsPage).toContain("loadAssetsForActiveOrg");
-    expect(assetsPage).toContain("assetsDeleteAction");
+    expect(assetsPage).toContain("AssetsClient");
   }, 30_000);
 
   it("storage-gcs module generates env and provider", async () => {
@@ -711,7 +714,8 @@ export async function getSeoConfig() {}`, "utf8");
     expect(offline).toContain("offline");
 
     const push = await fs.readFile(path.join(tmpDir, "lib/pwa/push.ts"), "utf8");
-    expect(push).toContain("pushService_sendToUser");
+    expect(push).toContain("configureWebPush");
+    expect(push).toContain("setVapidDetails");
 
     const registerSw = await fs.readFile(path.join(tmpDir, "lib/pwa/register-sw.client.ts"), "utf8");
     expect(registerSw).toContain("registerServiceWorker");

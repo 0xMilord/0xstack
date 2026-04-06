@@ -29,8 +29,10 @@ describe("Docs Sync Command - Full Flow Tests", () => {
     await fs.mkdir(path.join(tmpDir, "lib", "utils"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "lib", "0xstack"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "components", "layout"), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, "lib", "components", "layout"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "app"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "api", "v1", "health"), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, "app", "api", "v1", "webhooks", "ledger", "events"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "api", "auth", "[...all]"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "login"), { recursive: true });
     await fs.mkdir(path.join(tmpDir, "app", "get-started"), { recursive: true });

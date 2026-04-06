@@ -743,6 +743,23 @@ export async function runBaseline(input: BaselineInput) {
         const cfg = applyProfile(await loadConfig(root), input.profile);
         const { deps, devDeps } = expectedDepsForConfig(cfg);
 
+        const pkgPath = path.join(root, "package.json");
+        let haveDeps = new Set<string>();
+        let haveDevDeps = new Set<string>();
+        try {
+          const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as {
+            dependencies?: Record<string, string>;
+            devDependencies?: Record<string, string>;
+          };
+          haveDeps = new Set(Object.keys(pkg.dependencies ?? {}));
+          haveDevDeps = new Set(Object.keys(pkg.devDependencies ?? {}));
+        } catch {
+          // treat as empty — install everything declared
+        }
+
+        const missingProd = Array.from(new Set(deps)).filter((d) => !haveDeps.has(d));
+        const missingDev = Array.from(new Set(devDeps)).filter((d) => !haveDevDeps.has(d));
+
         const cmd = pmCmd(input.packageManager);
         const install = async (pkgs: string[], dev: boolean) => {
           if (pkgs.length === 0) return;
@@ -754,8 +771,8 @@ export async function runBaseline(input: BaselineInput) {
           await execCmd(cmd, args, { cwd: root });
         };
 
-        await install(Array.from(new Set(deps)), false);
-        await install(Array.from(new Set(devDeps)), true);
+        await install(missingProd, false);
+        await install(missingDev, true);
         return { kind: "ok" };
       },
     },
